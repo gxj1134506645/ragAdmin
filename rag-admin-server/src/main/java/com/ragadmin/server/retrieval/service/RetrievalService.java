@@ -11,6 +11,7 @@ import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
 import com.ragadmin.server.infra.vector.MilvusVectorStoreClient;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.model.service.ModelService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -23,25 +24,20 @@ import java.util.stream.Collectors;
 @Service
 public class RetrievalService {
 
-    private final ModelService modelService;
-    private final EmbeddingClientRegistry embeddingClientRegistry;
-    private final MilvusVectorStoreClient milvusVectorStoreClient;
-    private final ChunkVectorRefMapper chunkVectorRefMapper;
-    private final ChunkMapper chunkMapper;
+    @Autowired
+    private ModelService modelService;
 
-    public RetrievalService(
-            ModelService modelService,
-            EmbeddingClientRegistry embeddingClientRegistry,
-            MilvusVectorStoreClient milvusVectorStoreClient,
-            ChunkVectorRefMapper chunkVectorRefMapper,
-            ChunkMapper chunkMapper
-    ) {
-        this.modelService = modelService;
-        this.embeddingClientRegistry = embeddingClientRegistry;
-        this.milvusVectorStoreClient = milvusVectorStoreClient;
-        this.chunkVectorRefMapper = chunkVectorRefMapper;
-        this.chunkMapper = chunkMapper;
-    }
+    @Autowired
+    private EmbeddingClientRegistry embeddingClientRegistry;
+
+    @Autowired
+    private MilvusVectorStoreClient milvusVectorStoreClient;
+
+    @Autowired
+    private ChunkVectorRefMapper chunkVectorRefMapper;
+
+    @Autowired
+    private ChunkMapper chunkMapper;
 
     public RetrievalResult retrieve(KnowledgeBaseEntity knowledgeBase, String question) {
         ChunkVectorRefEntity sampleRef = chunkVectorRefMapper.selectOne(new LambdaQueryWrapper<ChunkVectorRefEntity>()

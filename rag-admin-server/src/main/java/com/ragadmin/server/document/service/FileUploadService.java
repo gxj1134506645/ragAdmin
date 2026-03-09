@@ -7,6 +7,7 @@ import com.ragadmin.server.infra.storage.MinioProperties;
 import com.ragadmin.server.infra.storage.support.MinioClientFactory;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.http.Method;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -17,13 +18,11 @@ import java.util.UUID;
 @Service
 public class FileUploadService {
 
-    private final MinioProperties minioProperties;
-    private final MinioClientFactory minioClientFactory;
+    @Autowired
+    private MinioProperties minioProperties;
 
-    public FileUploadService(MinioProperties minioProperties, MinioClientFactory minioClientFactory) {
-        this.minioProperties = minioProperties;
-        this.minioClientFactory = minioClientFactory;
-    }
+    @Autowired
+    private MinioClientFactory minioClientFactory;
 
     public UploadUrlResponse createUploadUrl(UploadUrlRequest request) {
         if (!minioProperties.isConfigured()) {

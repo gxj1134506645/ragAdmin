@@ -18,6 +18,7 @@ import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.mapper.DocumentVersionMapper;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,25 +26,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DocumentService {
 
-    private final DocumentMapper documentMapper;
-    private final DocumentVersionMapper documentVersionMapper;
-    private final DocumentParseTaskMapper documentParseTaskMapper;
-    private final ChunkMapper chunkMapper;
-    private final KnowledgeBaseService knowledgeBaseService;
+    @Autowired
+    private DocumentMapper documentMapper;
 
-    public DocumentService(
-            DocumentMapper documentMapper,
-            DocumentVersionMapper documentVersionMapper,
-            DocumentParseTaskMapper documentParseTaskMapper,
-            ChunkMapper chunkMapper,
-            KnowledgeBaseService knowledgeBaseService
-    ) {
-        this.documentMapper = documentMapper;
-        this.documentVersionMapper = documentVersionMapper;
-        this.documentParseTaskMapper = documentParseTaskMapper;
-        this.chunkMapper = chunkMapper;
-        this.knowledgeBaseService = knowledgeBaseService;
-    }
+    @Autowired
+    private DocumentVersionMapper documentVersionMapper;
+
+    @Autowired
+    private DocumentParseTaskMapper documentParseTaskMapper;
+
+    @Autowired
+    private ChunkMapper chunkMapper;
+
+    @Autowired
+    private KnowledgeBaseService knowledgeBaseService;
 
     @Transactional
     public DocumentResponse createDocument(Long kbId, CreateDocumentRequest request, Long operatorUserId) {

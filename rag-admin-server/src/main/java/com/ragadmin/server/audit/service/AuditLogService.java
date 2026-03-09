@@ -6,6 +6,7 @@ import com.ragadmin.server.audit.dto.AuditLogResponse;
 import com.ragadmin.server.audit.entity.AuditLogEntity;
 import com.ragadmin.server.audit.mapper.AuditLogMapper;
 import com.ragadmin.server.common.model.PageResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -14,11 +15,8 @@ import java.time.LocalDateTime;
 @Service
 public class AuditLogService {
 
-    private final AuditLogMapper auditLogMapper;
-
-    public AuditLogService(AuditLogMapper auditLogMapper) {
-        this.auditLogMapper = auditLogMapper;
-    }
+    @Autowired
+    private AuditLogMapper auditLogMapper;
 
     public void save(AuditLogEntity entity) {
         auditLogMapper.insert(entity);

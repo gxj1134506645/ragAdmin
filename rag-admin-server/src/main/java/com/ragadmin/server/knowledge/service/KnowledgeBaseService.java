@@ -10,6 +10,7 @@ import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.mapper.KnowledgeBaseMapper;
 import com.ragadmin.server.model.entity.AiModelEntity;
 import com.ragadmin.server.model.service.ModelService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -22,13 +23,11 @@ import java.util.stream.Collectors;
 @Service
 public class KnowledgeBaseService {
 
-    private final KnowledgeBaseMapper knowledgeBaseMapper;
-    private final ModelService modelService;
+    @Autowired
+    private KnowledgeBaseMapper knowledgeBaseMapper;
 
-    public KnowledgeBaseService(KnowledgeBaseMapper knowledgeBaseMapper, ModelService modelService) {
-        this.knowledgeBaseMapper = knowledgeBaseMapper;
-        this.modelService = modelService;
-    }
+    @Autowired
+    private ModelService modelService;
 
     public PageResponse<KnowledgeBaseResponse> list(String keyword, String status, long pageNo, long pageSize) {
         LambdaQueryWrapper<KnowledgeBaseEntity> wrapper = new LambdaQueryWrapper<KnowledgeBaseEntity>()

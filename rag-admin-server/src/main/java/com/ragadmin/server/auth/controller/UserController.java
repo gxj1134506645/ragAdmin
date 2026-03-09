@@ -8,6 +8,7 @@ import com.ragadmin.server.auth.service.UserAdminService;
 import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.common.model.PageResponse;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,11 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/admin/users")
 public class UserController {
 
-    private final UserAdminService userAdminService;
-
-    public UserController(UserAdminService userAdminService) {
-        this.userAdminService = userAdminService;
-    }
+    @Autowired
+    private UserAdminService userAdminService;
 
     @GetMapping
     public ApiResponse<PageResponse<UserListItemResponse>> list(

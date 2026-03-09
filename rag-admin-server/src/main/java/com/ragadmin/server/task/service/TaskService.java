@@ -14,6 +14,7 @@ import com.ragadmin.server.task.dto.TaskListItemResponse;
 import com.ragadmin.server.task.dto.TaskStepResponse;
 import com.ragadmin.server.task.entity.TaskStepRecordEntity;
 import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -30,22 +31,17 @@ public class TaskService {
     private static final String TASK_TYPE_DOCUMENT_PARSE = "DOCUMENT_PARSE";
     private static final String BIZ_TYPE_DOCUMENT = "DOCUMENT";
 
-    private final DocumentParseTaskMapper documentParseTaskMapper;
-    private final DocumentMapper documentMapper;
-    private final DocumentService documentService;
-    private final TaskStepRecordMapper taskStepRecordMapper;
+    @Autowired
+    private DocumentParseTaskMapper documentParseTaskMapper;
 
-    public TaskService(
-            DocumentParseTaskMapper documentParseTaskMapper,
-            DocumentMapper documentMapper,
-            DocumentService documentService,
-            TaskStepRecordMapper taskStepRecordMapper
-    ) {
-        this.documentParseTaskMapper = documentParseTaskMapper;
-        this.documentMapper = documentMapper;
-        this.documentService = documentService;
-        this.taskStepRecordMapper = taskStepRecordMapper;
-    }
+    @Autowired
+    private DocumentMapper documentMapper;
+
+    @Autowired
+    private DocumentService documentService;
+
+    @Autowired
+    private TaskStepRecordMapper taskStepRecordMapper;
 
     public PageResponse<TaskListItemResponse> list(String taskType, String taskStatus, Long bizId, long pageNo, long pageSize) {
         validateTaskType(taskType);

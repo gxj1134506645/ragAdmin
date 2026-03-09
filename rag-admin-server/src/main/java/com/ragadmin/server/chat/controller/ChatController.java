@@ -13,6 +13,7 @@ import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.common.model.PageResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,11 +28,8 @@ import java.util.List;
 @RequestMapping("/api/admin/chat")
 public class ChatController {
 
-    private final ChatService chatService;
-
-    public ChatController(ChatService chatService) {
-        this.chatService = chatService;
-    }
+    @Autowired
+    private ChatService chatService;
 
     @PostMapping("/sessions")
     public ApiResponse<ChatSessionResponse> createSession(

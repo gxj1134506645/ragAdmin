@@ -5,6 +5,7 @@ import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.task.dto.TaskDetailResponse;
 import com.ragadmin.server.task.dto.TaskListItemResponse;
 import com.ragadmin.server.task.service.TaskService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,11 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/admin/tasks")
 public class TaskController {
 
-    private final TaskService taskService;
-
-    public TaskController(TaskService taskService) {
-        this.taskService = taskService;
-    }
+    @Autowired
+    private TaskService taskService;
 
     @GetMapping
     public ApiResponse<PageResponse<TaskListItemResponse>> list(

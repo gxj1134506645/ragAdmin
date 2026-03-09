@@ -12,6 +12,7 @@ import com.ragadmin.server.document.dto.UpdateDocumentStatusRequest;
 import com.ragadmin.server.document.service.DocumentService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,11 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/admin")
 public class DocumentController {
 
-    private final DocumentService documentService;
-
-    public DocumentController(DocumentService documentService) {
-        this.documentService = documentService;
-    }
+    @Autowired
+    private DocumentService documentService;
 
     @PostMapping("/knowledge-bases/{kbId}/documents")
     public ApiResponse<DocumentResponse> createDocument(

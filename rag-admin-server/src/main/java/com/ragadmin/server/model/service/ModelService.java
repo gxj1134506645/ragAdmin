@@ -18,6 +18,7 @@ import com.ragadmin.server.model.entity.AiProviderEntity;
 import com.ragadmin.server.model.mapper.AiModelCapabilityMapper;
 import com.ragadmin.server.model.mapper.AiModelMapper;
 import com.ragadmin.server.model.mapper.AiProviderMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,28 +33,23 @@ import java.util.stream.Collectors;
 @Service
 public class ModelService {
 
-    private final AiModelMapper aiModelMapper;
-    private final AiProviderMapper aiProviderMapper;
-    private final AiModelCapabilityMapper aiModelCapabilityMapper;
-    private final ModelProviderService modelProviderService;
-    private final ChatClientRegistry chatClientRegistry;
-    private final EmbeddingClientRegistry embeddingClientRegistry;
+    @Autowired
+    private AiModelMapper aiModelMapper;
 
-    public ModelService(
-            AiModelMapper aiModelMapper,
-            AiProviderMapper aiProviderMapper,
-            AiModelCapabilityMapper aiModelCapabilityMapper,
-            ModelProviderService modelProviderService,
-            ChatClientRegistry chatClientRegistry,
-            EmbeddingClientRegistry embeddingClientRegistry
-    ) {
-        this.aiModelMapper = aiModelMapper;
-        this.aiProviderMapper = aiProviderMapper;
-        this.aiModelCapabilityMapper = aiModelCapabilityMapper;
-        this.modelProviderService = modelProviderService;
-        this.chatClientRegistry = chatClientRegistry;
-        this.embeddingClientRegistry = embeddingClientRegistry;
-    }
+    @Autowired
+    private AiProviderMapper aiProviderMapper;
+
+    @Autowired
+    private AiModelCapabilityMapper aiModelCapabilityMapper;
+
+    @Autowired
+    private ModelProviderService modelProviderService;
+
+    @Autowired
+    private ChatClientRegistry chatClientRegistry;
+
+    @Autowired
+    private EmbeddingClientRegistry embeddingClientRegistry;
 
     public PageResponse<ModelResponse> list(String providerCode, String capabilityType, String status, long pageNo, long pageSize) {
         LambdaQueryWrapper<AiModelEntity> wrapper = new LambdaQueryWrapper<AiModelEntity>()

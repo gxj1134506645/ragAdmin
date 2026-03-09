@@ -6,6 +6,7 @@ import com.ragadmin.server.model.dto.CreateModelProviderRequest;
 import com.ragadmin.server.model.dto.ModelProviderResponse;
 import com.ragadmin.server.model.entity.AiProviderEntity;
 import com.ragadmin.server.model.mapper.AiProviderMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -14,11 +15,8 @@ import java.util.List;
 @Service
 public class ModelProviderService {
 
-    private final AiProviderMapper aiProviderMapper;
-
-    public ModelProviderService(AiProviderMapper aiProviderMapper) {
-        this.aiProviderMapper = aiProviderMapper;
-    }
+    @Autowired
+    private AiProviderMapper aiProviderMapper;
 
     public List<ModelProviderResponse> list() {
         return aiProviderMapper.selectList(new LambdaQueryWrapper<AiProviderEntity>()

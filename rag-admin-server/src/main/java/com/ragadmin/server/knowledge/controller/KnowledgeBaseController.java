@@ -10,6 +10,7 @@ import com.ragadmin.server.knowledge.dto.UpdateKnowledgeBaseStatusRequest;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,11 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/admin/knowledge-bases")
 public class KnowledgeBaseController {
 
-    private final KnowledgeBaseService knowledgeBaseService;
-
-    public KnowledgeBaseController(KnowledgeBaseService knowledgeBaseService) {
-        this.knowledgeBaseService = knowledgeBaseService;
-    }
+    @Autowired
+    private KnowledgeBaseService knowledgeBaseService;
 
     @GetMapping
     public ApiResponse<PageResponse<KnowledgeBaseResponse>> list(

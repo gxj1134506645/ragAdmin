@@ -13,6 +13,7 @@ import com.ragadmin.server.auth.mapper.SysUserMapper;
 import com.ragadmin.server.auth.mapper.SysUserRoleMapper;
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.common.model.PageResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,22 +29,17 @@ import java.util.stream.Collectors;
 @Service
 public class UserAdminService {
 
-    private final SysUserMapper sysUserMapper;
-    private final SysRoleMapper sysRoleMapper;
-    private final SysUserRoleMapper sysUserRoleMapper;
-    private final PasswordEncoder passwordEncoder;
+    @Autowired
+    private SysUserMapper sysUserMapper;
 
-    public UserAdminService(
-            SysUserMapper sysUserMapper,
-            SysRoleMapper sysRoleMapper,
-            SysUserRoleMapper sysUserRoleMapper,
-            PasswordEncoder passwordEncoder
-    ) {
-        this.sysUserMapper = sysUserMapper;
-        this.sysRoleMapper = sysRoleMapper;
-        this.sysUserRoleMapper = sysUserRoleMapper;
-        this.passwordEncoder = passwordEncoder;
-    }
+    @Autowired
+    private SysRoleMapper sysRoleMapper;
+
+    @Autowired
+    private SysUserRoleMapper sysUserRoleMapper;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     public PageResponse<UserListItemResponse> list(String keyword, String status, long pageNo, long pageSize) {
         Page<SysUserEntity> page = sysUserMapper.selectPage(

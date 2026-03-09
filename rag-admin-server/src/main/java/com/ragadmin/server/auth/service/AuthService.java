@@ -13,6 +13,7 @@ import com.ragadmin.server.auth.model.AuthClaims;
 import com.ragadmin.server.auth.model.AuthTokenType;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.common.exception.BusinessException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,28 +30,23 @@ public class AuthService {
 
     public static final String REQUEST_ATTRIBUTE = "AUTHENTICATED_USER";
 
-    private final SysUserMapper sysUserMapper;
-    private final SysRoleMapper sysRoleMapper;
-    private final PasswordEncoder passwordEncoder;
-    private final TokenService tokenService;
-    private final StringRedisTemplate stringRedisTemplate;
-    private final AuthProperties authProperties;
+    @Autowired
+    private SysUserMapper sysUserMapper;
 
-    public AuthService(
-            SysUserMapper sysUserMapper,
-            SysRoleMapper sysRoleMapper,
-            PasswordEncoder passwordEncoder,
-            TokenService tokenService,
-            StringRedisTemplate stringRedisTemplate,
-            AuthProperties authProperties
-    ) {
-        this.sysUserMapper = sysUserMapper;
-        this.sysRoleMapper = sysRoleMapper;
-        this.passwordEncoder = passwordEncoder;
-        this.tokenService = tokenService;
-        this.stringRedisTemplate = stringRedisTemplate;
-        this.authProperties = authProperties;
-    }
+    @Autowired
+    private SysRoleMapper sysRoleMapper;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private TokenService tokenService;
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Autowired
+    private AuthProperties authProperties;
 
     public LoginResponse login(LoginRequest request) {
         SysUserEntity user = findByLoginId(request.getLoginId());

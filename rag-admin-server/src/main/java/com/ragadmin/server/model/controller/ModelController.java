@@ -7,6 +7,7 @@ import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
 import com.ragadmin.server.model.dto.ModelResponse;
 import com.ragadmin.server.model.service.ModelService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,11 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/admin/models")
 public class ModelController {
 
-    private final ModelService modelService;
-
-    public ModelController(ModelService modelService) {
-        this.modelService = modelService;
-    }
+    @Autowired
+    private ModelService modelService;
 
     @GetMapping
     public ApiResponse<PageResponse<ModelResponse>> list(

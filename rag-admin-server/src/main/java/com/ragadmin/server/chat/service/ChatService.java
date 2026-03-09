@@ -30,6 +30,7 @@ import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.service.ModelService;
 import com.ragadmin.server.retrieval.service.RetrievalService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,40 +45,35 @@ import java.util.stream.Collectors;
 @Service
 public class ChatService {
 
-    private final ChatSessionMapper chatSessionMapper;
-    private final ChatMessageMapper chatMessageMapper;
-    private final ChatAnswerReferenceMapper chatAnswerReferenceMapper;
-    private final ChatFeedbackMapper chatFeedbackMapper;
-    private final KnowledgeBaseService knowledgeBaseService;
-    private final RetrievalService retrievalService;
-    private final ModelService modelService;
-    private final ChatClientRegistry chatClientRegistry;
-    private final DocumentMapper documentMapper;
-    private final ChunkMapper chunkMapper;
+    @Autowired
+    private ChatSessionMapper chatSessionMapper;
 
-    public ChatService(
-            ChatSessionMapper chatSessionMapper,
-            ChatMessageMapper chatMessageMapper,
-            ChatAnswerReferenceMapper chatAnswerReferenceMapper,
-            ChatFeedbackMapper chatFeedbackMapper,
-            KnowledgeBaseService knowledgeBaseService,
-            RetrievalService retrievalService,
-            ModelService modelService,
-            ChatClientRegistry chatClientRegistry,
-            DocumentMapper documentMapper,
-            ChunkMapper chunkMapper
-    ) {
-        this.chatSessionMapper = chatSessionMapper;
-        this.chatMessageMapper = chatMessageMapper;
-        this.chatAnswerReferenceMapper = chatAnswerReferenceMapper;
-        this.chatFeedbackMapper = chatFeedbackMapper;
-        this.knowledgeBaseService = knowledgeBaseService;
-        this.retrievalService = retrievalService;
-        this.modelService = modelService;
-        this.chatClientRegistry = chatClientRegistry;
-        this.documentMapper = documentMapper;
-        this.chunkMapper = chunkMapper;
-    }
+    @Autowired
+    private ChatMessageMapper chatMessageMapper;
+
+    @Autowired
+    private ChatAnswerReferenceMapper chatAnswerReferenceMapper;
+
+    @Autowired
+    private ChatFeedbackMapper chatFeedbackMapper;
+
+    @Autowired
+    private KnowledgeBaseService knowledgeBaseService;
+
+    @Autowired
+    private RetrievalService retrievalService;
+
+    @Autowired
+    private ModelService modelService;
+
+    @Autowired
+    private ChatClientRegistry chatClientRegistry;
+
+    @Autowired
+    private DocumentMapper documentMapper;
+
+    @Autowired
+    private ChunkMapper chunkMapper;
 
     public ChatSessionResponse createSession(CreateChatSessionRequest request, AuthenticatedUser user) {
         knowledgeBaseService.requireById(request.getKbId());

@@ -7,6 +7,7 @@ import com.ragadmin.server.system.dto.DependencyHealthResponse;
 import com.ragadmin.server.system.dto.HealthCheckResponse;
 import io.minio.BucketExistsArgs;
 import io.minio.MinioClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -23,25 +24,20 @@ import java.util.Map;
 @Service
 public class SystemHealthService {
 
-    private final JdbcTemplate jdbcTemplate;
-    private final StringRedisTemplate stringRedisTemplate;
-    private final MinioProperties minioProperties;
-    private final OllamaProperties ollamaProperties;
-    private final MilvusProperties milvusProperties;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
-    public SystemHealthService(
-            JdbcTemplate jdbcTemplate,
-            StringRedisTemplate stringRedisTemplate,
-            MinioProperties minioProperties,
-            OllamaProperties ollamaProperties,
-            MilvusProperties milvusProperties
-    ) {
-        this.jdbcTemplate = jdbcTemplate;
-        this.stringRedisTemplate = stringRedisTemplate;
-        this.minioProperties = minioProperties;
-        this.ollamaProperties = ollamaProperties;
-        this.milvusProperties = milvusProperties;
-    }
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Autowired
+    private MinioProperties minioProperties;
+
+    @Autowired
+    private OllamaProperties ollamaProperties;
+
+    @Autowired
+    private MilvusProperties milvusProperties;
 
     public HealthCheckResponse check() {
         DependencyHealthResponse postgres = checkPostgres();

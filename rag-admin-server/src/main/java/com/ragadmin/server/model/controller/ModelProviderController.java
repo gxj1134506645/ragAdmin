@@ -5,6 +5,7 @@ import com.ragadmin.server.model.dto.CreateModelProviderRequest;
 import com.ragadmin.server.model.dto.ModelProviderResponse;
 import com.ragadmin.server.model.service.ModelProviderService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,11 +18,8 @@ import java.util.List;
 @RequestMapping("/api/admin/model-providers")
 public class ModelProviderController {
 
-    private final ModelProviderService modelProviderService;
-
-    public ModelProviderController(ModelProviderService modelProviderService) {
-        this.modelProviderService = modelProviderService;
-    }
+    @Autowired
+    private ModelProviderService modelProviderService;
 
     @GetMapping
     public ApiResponse<List<ModelProviderResponse>> list() {

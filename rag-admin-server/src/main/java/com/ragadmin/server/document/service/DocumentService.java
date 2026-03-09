@@ -6,6 +6,7 @@ import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.document.dto.ChunkResponse;
 import com.ragadmin.server.document.dto.CreateDocumentRequest;
+import com.ragadmin.server.document.dto.CreateDocumentVersionRequest;
 import com.ragadmin.server.document.dto.DocumentResponse;
 import com.ragadmin.server.document.dto.DocumentVersionResponse;
 import com.ragadmin.server.document.dto.InternalTaskCompleteRequest;
@@ -79,6 +80,32 @@ public class DocumentService {
 
     public DocumentResponse getDocument(Long documentId) {
         return toResponse(requireDocument(documentId));
+    }
+
+    @Transactional
+    public DocumentResponse createDocumentVersion(Long documentId, CreateDocumentVersionRequest request, Long operatorUserId) {
+        DocumentEntity document = requireDocument(documentId);
+        int newVersionNo = document.getCurrentVersion() + 1;
+
+        // 新版本创建后立即切换 currentVersion，并把文档解析状态重置为 PENDING，后续由显式解析接口触发真正处理。
+        DocumentVersionEntity version = new DocumentVersionEntity();
+        version.setDocumentId(document.getId());
+        version.setVersionNo(newVersionNo);
+        version.setStorageBucket(request.getStorageBucket());
+        version.setStorageObjectKey(request.getStorageObjectKey());
+        version.setContentHash(request.getContentHash());
+        version.setParseStatus("PENDING");
+        version.setCreatedBy(operatorUserId);
+        documentVersionMapper.insert(version);
+
+        document.setStorageBucket(request.getStorageBucket());
+        document.setStorageObjectKey(request.getStorageObjectKey());
+        document.setCurrentVersion(newVersionNo);
+        document.setParseStatus("PENDING");
+        document.setFileSize(request.getFileSize());
+        document.setContentHash(request.getContentHash());
+        documentMapper.updateById(document);
+        return toResponse(document);
     }
 
     public void updateDocumentStatus(Long documentId, Boolean enabled) {

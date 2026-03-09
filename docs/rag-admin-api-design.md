@@ -354,6 +354,20 @@
 
 - `GET /api/admin/documents/{documentId}`
 
+### 6.3.1 新增文档版本
+
+- `POST /api/admin/documents/{documentId}/versions`
+
+请求体：
+
+```json
+{
+  "storageBucket": "rag-kb",
+  "storageObjectKey": "kb/20260309/uuid/employee-manual-v2.pdf",
+  "contentHash": "sha256-value"
+}
+```
+
 ### 6.4 更新文档启停状态
 
 - `PUT /api/admin/documents/{documentId}/status`

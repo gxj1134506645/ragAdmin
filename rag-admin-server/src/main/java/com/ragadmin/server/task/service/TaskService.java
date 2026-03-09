@@ -11,8 +11,11 @@ import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.service.DocumentService;
 import com.ragadmin.server.task.dto.TaskDetailResponse;
 import com.ragadmin.server.task.dto.TaskListItemResponse;
+import com.ragadmin.server.task.dto.TaskRetryRecordResponse;
 import com.ragadmin.server.task.dto.TaskStepResponse;
+import com.ragadmin.server.task.entity.TaskRetryRecordEntity;
 import com.ragadmin.server.task.entity.TaskStepRecordEntity;
+import com.ragadmin.server.task.mapper.TaskRetryRecordMapper;
 import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -42,6 +45,9 @@ public class TaskService {
 
     @Autowired
     private TaskStepRecordMapper taskStepRecordMapper;
+
+    @Autowired
+    private TaskRetryRecordMapper taskRetryRecordMapper;
 
     public PageResponse<TaskListItemResponse> list(String taskType, String taskStatus, Long bizId, long pageNo, long pageSize) {
         validateTaskType(taskType);
@@ -76,7 +82,7 @@ public class TaskService {
     public TaskDetailResponse detail(Long taskId) {
         DocumentParseTaskEntity task = requireTask(taskId);
         DocumentEntity document = documentMapper.selectById(task.getDocumentId());
-        return toDetail(task, document, listSteps(taskId));
+        return toDetail(task, document, listSteps(taskId), listRetryRecords(taskId));
     }
 
     public TaskDetailResponse retry(Long taskId) {
@@ -85,8 +91,9 @@ public class TaskService {
             throw new BusinessException("TASK_RETRY_NOT_ALLOWED", "任务进行中，不能重复重试", HttpStatus.BAD_REQUEST);
         }
         DocumentParseTaskEntity retriedTask = documentService.submitParseTask(task.getDocumentId(), task.getRetryCount() + 1);
+        recordRetry(retriedTask, "手动重试", "SUBMITTED");
         DocumentEntity document = documentMapper.selectById(retriedTask.getDocumentId());
-        return toDetail(retriedTask, document, listSteps(retriedTask.getId()));
+        return toDetail(retriedTask, document, listSteps(retriedTask.getId()), listRetryRecords(retriedTask.getId()));
     }
 
     private void validateTaskType(String taskType) {
@@ -122,7 +129,12 @@ public class TaskService {
         );
     }
 
-    private TaskDetailResponse toDetail(DocumentParseTaskEntity task, DocumentEntity document, List<TaskStepResponse> steps) {
+    private TaskDetailResponse toDetail(
+            DocumentParseTaskEntity task,
+            DocumentEntity document,
+            List<TaskStepResponse> steps,
+            List<TaskRetryRecordResponse> retryRecords
+    ) {
         return new TaskDetailResponse(
                 task.getId(),
                 TASK_TYPE_DOCUMENT_PARSE,
@@ -140,7 +152,8 @@ public class TaskService {
                 task.getFinishedAt(),
                 task.getCreatedAt(),
                 task.getUpdatedAt(),
-                steps
+                steps,
+                retryRecords
         );
     }
 
@@ -158,5 +171,29 @@ public class TaskService {
                         step.getFinishedAt()
                 ))
                 .toList();
+    }
+
+    private List<TaskRetryRecordResponse> listRetryRecords(Long taskId) {
+        return taskRetryRecordMapper.selectList(new LambdaQueryWrapper<TaskRetryRecordEntity>()
+                        .eq(TaskRetryRecordEntity::getTaskId, taskId)
+                        .orderByAsc(TaskRetryRecordEntity::getRetryNo)
+                        .orderByAsc(TaskRetryRecordEntity::getId))
+                .stream()
+                .map(record -> new TaskRetryRecordResponse(
+                        record.getRetryNo(),
+                        record.getRetryReason(),
+                        record.getRetryResult(),
+                        record.getCreatedAt()
+                ))
+                .toList();
+    }
+
+    private void recordRetry(DocumentParseTaskEntity task, String retryReason, String retryResult) {
+        TaskRetryRecordEntity record = new TaskRetryRecordEntity();
+        record.setTaskId(task.getId());
+        record.setRetryNo(task.getRetryCount());
+        record.setRetryReason(retryReason);
+        record.setRetryResult(retryResult);
+        taskRetryRecordMapper.insert(record);
     }
 }

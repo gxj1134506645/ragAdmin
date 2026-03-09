@@ -19,6 +19,7 @@ public record TaskDetailResponse(
         LocalDateTime finishedAt,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
-        java.util.List<TaskStepResponse> steps
+        java.util.List<TaskStepResponse> steps,
+        java.util.List<TaskRetryRecordResponse> retryRecords
 ) {
 }

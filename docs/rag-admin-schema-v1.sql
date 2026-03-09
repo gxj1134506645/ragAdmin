@@ -352,7 +352,7 @@ CREATE TABLE IF NOT EXISTS job_task_step_record (
     started_at          TIMESTAMP,
     finished_at         TIMESTAMP,
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_job_task_step_record_task FOREIGN KEY (task_id) REFERENCES job_task_record (id)
+    CONSTRAINT fk_job_task_step_record_task FOREIGN KEY (task_id) REFERENCES kb_document_parse_task (id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_job_task_step_record_task_id ON job_task_step_record (task_id);
@@ -364,7 +364,7 @@ CREATE TABLE IF NOT EXISTS job_retry_record (
     retry_reason        VARCHAR(255),
     retry_result        VARCHAR(16),
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_job_retry_record_task FOREIGN KEY (task_id) REFERENCES job_task_record (id)
+    CONSTRAINT fk_job_retry_record_task FOREIGN KEY (task_id) REFERENCES kb_document_parse_task (id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_job_retry_record_task_id ON job_retry_record (task_id);

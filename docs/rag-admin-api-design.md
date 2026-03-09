@@ -367,6 +367,15 @@
 - 仅投递任务，不同步执行
 - 若文档已有进行中的解析任务，应返回幂等提示
 
+### 6.5.1 文档版本列表
+
+- `GET /api/admin/documents/{documentId}/versions`
+
+查询参数：
+
+- `pageNo`
+- `pageSize`
+
 ### 6.6 文档切片列表
 
 - `GET /api/admin/documents/{documentId}/chunks`
@@ -404,6 +413,16 @@
 
 - Worker 完成处理后回写任务状态
 - 回写文档解析状态和统计信息
+
+请求体：
+
+```json
+{
+  "taskStatus": "SUCCESS",
+  "errorMessage": null,
+  "parseStatus": "SUCCESS"
+}
+```
 
 ## 7. RAG 问答接口
 

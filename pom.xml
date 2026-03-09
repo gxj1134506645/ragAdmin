@@ -27,5 +27,6 @@
         <jjwt.version>0.12.6</jjwt.version>
         <mybatis-plus.version>3.5.7</mybatis-plus.version>
         <minio.version>8.5.17</minio.version>
+        <tika.version>2.9.2</tika.version>
     </properties>
 </project>

@@ -9,20 +9,14 @@ import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.mapper.DocumentVersionMapper;
-import com.ragadmin.server.infra.storage.support.MinioClientFactory;
-import io.minio.GetObjectArgs;
-import io.minio.MinioClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 @Component
 public class DocumentParseProcessor {
@@ -33,20 +27,20 @@ public class DocumentParseProcessor {
     private final DocumentMapper documentMapper;
     private final DocumentVersionMapper documentVersionMapper;
     private final ChunkMapper chunkMapper;
-    private final MinioClientFactory minioClientFactory;
+    private final DocumentContentExtractor documentContentExtractor;
 
     public DocumentParseProcessor(
             DocumentParseTaskMapper documentParseTaskMapper,
             DocumentMapper documentMapper,
             DocumentVersionMapper documentVersionMapper,
             ChunkMapper chunkMapper,
-            MinioClientFactory minioClientFactory
+            DocumentContentExtractor documentContentExtractor
     ) {
         this.documentParseTaskMapper = documentParseTaskMapper;
         this.documentMapper = documentMapper;
         this.documentVersionMapper = documentVersionMapper;
         this.chunkMapper = chunkMapper;
-        this.minioClientFactory = minioClientFactory;
+        this.documentContentExtractor = documentContentExtractor;
     }
 
     public void processWaitingTasks() {
@@ -167,19 +161,8 @@ public class DocumentParseProcessor {
     }
 
     private ParsedContent parseContent(DocumentEntity document, DocumentVersionEntity version) throws Exception {
-        String docType = document.getDocType() == null ? "" : document.getDocType().toUpperCase(Locale.ROOT);
-        if (!List.of("TXT", "MD", "MARKDOWN").contains(docType)) {
-            throw new IllegalArgumentException("当前仅支持 TXT/MD 文档解析");
-        }
-
-        MinioClient minioClient = minioClientFactory.createClient();
-        try (InputStream inputStream = minioClient.getObject(GetObjectArgs.builder()
-                .bucket(version.getStorageBucket())
-                .object(version.getStorageObjectKey())
-                .build())) {
-            String content = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-            return new ParsedContent(splitIntoChunks(content));
-        }
+        String content = documentContentExtractor.extract(document, version);
+        return new ParsedContent(splitIntoChunks(content));
     }
 
     private List<String> splitIntoChunks(String content) {
@@ -189,18 +172,39 @@ public class DocumentParseProcessor {
         }
 
         List<String> chunks = new ArrayList<>();
-        int maxLength = 500;
-        int overlap = 100;
-        int start = 0;
-        while (start < normalized.length()) {
-            int end = Math.min(start + maxLength, normalized.length());
-            chunks.add(normalized.substring(start, end));
-            if (end == normalized.length()) {
-                break;
+        List<String> paragraphs = List.of(normalized.split("\\n\\s*\\n"));
+        StringBuilder current = new StringBuilder();
+        int chunkNo = 0;
+        for (String paragraph : paragraphs) {
+            String trimmed = paragraph.trim();
+            if (trimmed.isEmpty()) {
+                continue;
             }
-            start = Math.max(end - overlap, start + 1);
+            if (current.length() > 0 && current.length() + trimmed.length() + 2 > 800) {
+                chunks.add(current.toString());
+                chunkNo++;
+                current = new StringBuilder(overlapTail(chunks.get(chunkNo - 1), 120));
+            }
+            if (current.length() > 0) {
+                current.append("\n\n");
+            }
+            current.append(trimmed);
+        }
+        if (current.length() > 0) {
+            chunks.add(current.toString());
+        }
+
+        if (chunks.isEmpty()) {
+            chunks.add(normalized.substring(0, Math.min(normalized.length(), 800)));
         }
         return chunks;
+    }
+
+    private String overlapTail(String source, int tailLength) {
+        if (source.length() <= tailLength) {
+            return source;
+        }
+        return source.substring(source.length() - tailLength);
     }
 
     private int estimateTokenCount(String text) {

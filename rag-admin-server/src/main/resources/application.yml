@@ -41,6 +41,8 @@ rag:
       admin-display-name: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:系统管理员}
       admin-mobile: ${BOOTSTRAP_ADMIN_MOBILE:13800000000}
       admin-password: ${BOOTSTRAP_ADMIN_PASSWORD:Admin@123456}
+  internal:
+    callback-token: ${RAG_INTERNAL_CALLBACK_TOKEN:rag-admin-internal-callback-token}
   ai:
     ollama:
       base-url: ${OLLAMA_BASE_URL:http://127.0.0.1:11434}

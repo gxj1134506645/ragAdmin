@@ -11,11 +11,15 @@ import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.service.DocumentService;
 import com.ragadmin.server.task.dto.TaskDetailResponse;
 import com.ragadmin.server.task.dto.TaskListItemResponse;
+import com.ragadmin.server.task.dto.TaskStepResponse;
+import com.ragadmin.server.task.entity.TaskStepRecordEntity;
+import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -29,15 +33,18 @@ public class TaskService {
     private final DocumentParseTaskMapper documentParseTaskMapper;
     private final DocumentMapper documentMapper;
     private final DocumentService documentService;
+    private final TaskStepRecordMapper taskStepRecordMapper;
 
     public TaskService(
             DocumentParseTaskMapper documentParseTaskMapper,
             DocumentMapper documentMapper,
-            DocumentService documentService
+            DocumentService documentService,
+            TaskStepRecordMapper taskStepRecordMapper
     ) {
         this.documentParseTaskMapper = documentParseTaskMapper;
         this.documentMapper = documentMapper;
         this.documentService = documentService;
+        this.taskStepRecordMapper = taskStepRecordMapper;
     }
 
     public PageResponse<TaskListItemResponse> list(String taskType, String taskStatus, Long bizId, long pageNo, long pageSize) {
@@ -73,7 +80,7 @@ public class TaskService {
     public TaskDetailResponse detail(Long taskId) {
         DocumentParseTaskEntity task = requireTask(taskId);
         DocumentEntity document = documentMapper.selectById(task.getDocumentId());
-        return toDetail(task, document);
+        return toDetail(task, document, listSteps(taskId));
     }
 
     public TaskDetailResponse retry(Long taskId) {
@@ -83,7 +90,7 @@ public class TaskService {
         }
         DocumentParseTaskEntity retriedTask = documentService.submitParseTask(task.getDocumentId(), task.getRetryCount() + 1);
         DocumentEntity document = documentMapper.selectById(retriedTask.getDocumentId());
-        return toDetail(retriedTask, document);
+        return toDetail(retriedTask, document, listSteps(retriedTask.getId()));
     }
 
     private void validateTaskType(String taskType) {
@@ -119,7 +126,7 @@ public class TaskService {
         );
     }
 
-    private TaskDetailResponse toDetail(DocumentParseTaskEntity task, DocumentEntity document) {
+    private TaskDetailResponse toDetail(DocumentParseTaskEntity task, DocumentEntity document, List<TaskStepResponse> steps) {
         return new TaskDetailResponse(
                 task.getId(),
                 TASK_TYPE_DOCUMENT_PARSE,
@@ -136,7 +143,24 @@ public class TaskService {
                 task.getStartedAt(),
                 task.getFinishedAt(),
                 task.getCreatedAt(),
-                task.getUpdatedAt()
+                task.getUpdatedAt(),
+                steps
         );
+    }
+
+    private List<TaskStepResponse> listSteps(Long taskId) {
+        return taskStepRecordMapper.selectList(new LambdaQueryWrapper<TaskStepRecordEntity>()
+                        .eq(TaskStepRecordEntity::getTaskId, taskId)
+                        .orderByAsc(TaskStepRecordEntity::getId))
+                .stream()
+                .map(step -> new TaskStepResponse(
+                        step.getStepCode(),
+                        step.getStepName(),
+                        step.getStepStatus(),
+                        step.getErrorMessage(),
+                        step.getStartedAt(),
+                        step.getFinishedAt()
+                ))
+                .toList();
     }
 }

@@ -18,6 +18,7 @@ public record TaskDetailResponse(
         LocalDateTime startedAt,
         LocalDateTime finishedAt,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        java.util.List<TaskStepResponse> steps
 ) {
 }

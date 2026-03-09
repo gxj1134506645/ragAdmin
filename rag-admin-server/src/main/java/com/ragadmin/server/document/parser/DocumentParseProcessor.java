@@ -9,6 +9,8 @@ import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.mapper.DocumentVersionMapper;
+import com.ragadmin.server.task.entity.TaskStepRecordEntity;
+import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -28,19 +30,22 @@ public class DocumentParseProcessor {
     private final DocumentVersionMapper documentVersionMapper;
     private final ChunkMapper chunkMapper;
     private final DocumentContentExtractor documentContentExtractor;
+    private final TaskStepRecordMapper taskStepRecordMapper;
 
     public DocumentParseProcessor(
             DocumentParseTaskMapper documentParseTaskMapper,
             DocumentMapper documentMapper,
             DocumentVersionMapper documentVersionMapper,
             ChunkMapper chunkMapper,
-            DocumentContentExtractor documentContentExtractor
+            DocumentContentExtractor documentContentExtractor,
+            TaskStepRecordMapper taskStepRecordMapper
     ) {
         this.documentParseTaskMapper = documentParseTaskMapper;
         this.documentMapper = documentMapper;
         this.documentVersionMapper = documentVersionMapper;
         this.chunkMapper = chunkMapper;
         this.documentContentExtractor = documentContentExtractor;
+        this.taskStepRecordMapper = taskStepRecordMapper;
     }
 
     public void processWaitingTasks() {
@@ -56,8 +61,13 @@ public class DocumentParseProcessor {
     public void processSingleTask(Long taskId) {
         try {
             ProcessingContext context = markRunning(taskId);
+            TaskStepRecordEntity extractStep = startStep(context.task().getId(), "EXTRACT_TEXT", "文本抽取");
             ParsedContent parsedContent = parseContent(context.document(), context.version());
+            completeStep(extractStep);
+
+            TaskStepRecordEntity chunkStep = startStep(context.task().getId(), "PERSIST_CHUNKS", "切片入库");
             persistChunks(context, parsedContent.chunks());
+            completeStep(chunkStep);
             markSuccess(context);
             log.info("文档解析任务执行成功，taskId={}, documentId={}, chunkCount={}",
                     context.task().getId(), context.document().getId(), parsedContent.chunks().size());
@@ -92,6 +102,26 @@ public class DocumentParseProcessor {
         documentVersionMapper.updateById(version);
 
         return new ProcessingContext(task, document, version);
+    }
+
+    @Transactional
+    protected TaskStepRecordEntity startStep(Long taskId, String stepCode, String stepName) {
+        TaskStepRecordEntity step = new TaskStepRecordEntity();
+        step.setTaskId(taskId);
+        step.setStepCode(stepCode);
+        step.setStepName(stepName);
+        step.setStepStatus("RUNNING");
+        step.setStartedAt(LocalDateTime.now());
+        taskStepRecordMapper.insert(step);
+        return step;
+    }
+
+    @Transactional
+    protected void completeStep(TaskStepRecordEntity step) {
+        step.setStepStatus("SUCCESS");
+        step.setFinishedAt(LocalDateTime.now());
+        step.setErrorMessage(null);
+        taskStepRecordMapper.updateById(step);
     }
 
     @Transactional
@@ -157,6 +187,18 @@ public class DocumentParseProcessor {
             version.setParseStatus("FAILED");
             version.setParseFinishedAt(now);
             documentVersionMapper.updateById(version);
+        }
+
+        TaskStepRecordEntity runningStep = taskStepRecordMapper.selectOne(new LambdaQueryWrapper<TaskStepRecordEntity>()
+                .eq(TaskStepRecordEntity::getTaskId, taskId)
+                .eq(TaskStepRecordEntity::getStepStatus, "RUNNING")
+                .orderByDesc(TaskStepRecordEntity::getId)
+                .last("LIMIT 1"));
+        if (runningStep != null) {
+            runningStep.setStepStatus("FAILED");
+            runningStep.setFinishedAt(now);
+            runningStep.setErrorMessage(buildErrorMessage(ex));
+            taskStepRecordMapper.updateById(runningStep);
         }
     }
 

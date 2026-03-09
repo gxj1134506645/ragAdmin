@@ -96,6 +96,14 @@ public class KnowledgeBaseService {
         );
     }
 
+    public KnowledgeBaseEntity requireById(Long kbId) {
+        KnowledgeBaseEntity entity = knowledgeBaseMapper.selectById(kbId);
+        if (entity == null) {
+            throw new BusinessException("KB_NOT_FOUND", "知识库不存在", HttpStatus.NOT_FOUND);
+        }
+        return entity;
+    }
+
     private KnowledgeBaseResponse toResponse(KnowledgeBaseEntity entity, Map<Long, AiModelEntity> modelMap) {
         AiModelEntity embeddingModel = modelMap.get(entity.getEmbeddingModelId());
         AiModelEntity chatModel = modelMap.get(entity.getChatModelId());

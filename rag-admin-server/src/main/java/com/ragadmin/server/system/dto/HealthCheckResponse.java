@@ -4,6 +4,8 @@ public record HealthCheckResponse(
         String status,
         DependencyHealthResponse postgres,
         DependencyHealthResponse redis,
-        DependencyHealthResponse minio
+        DependencyHealthResponse minio,
+        DependencyHealthResponse ollama,
+        DependencyHealthResponse milvus
 ) {
 }

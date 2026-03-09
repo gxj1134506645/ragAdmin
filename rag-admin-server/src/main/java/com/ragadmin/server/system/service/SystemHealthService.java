@@ -1,6 +1,8 @@
 package com.ragadmin.server.system.service;
 
+import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
 import com.ragadmin.server.infra.storage.MinioProperties;
+import com.ragadmin.server.infra.vector.MilvusProperties;
 import com.ragadmin.server.system.dto.DependencyHealthResponse;
 import com.ragadmin.server.system.dto.HealthCheckResponse;
 import io.minio.BucketExistsArgs;
@@ -9,8 +11,14 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClient;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class SystemHealthService {
@@ -18,23 +26,31 @@ public class SystemHealthService {
     private final JdbcTemplate jdbcTemplate;
     private final StringRedisTemplate stringRedisTemplate;
     private final MinioProperties minioProperties;
+    private final OllamaProperties ollamaProperties;
+    private final MilvusProperties milvusProperties;
 
     public SystemHealthService(
             JdbcTemplate jdbcTemplate,
             StringRedisTemplate stringRedisTemplate,
-            MinioProperties minioProperties
+            MinioProperties minioProperties,
+            OllamaProperties ollamaProperties,
+            MilvusProperties milvusProperties
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.stringRedisTemplate = stringRedisTemplate;
         this.minioProperties = minioProperties;
+        this.ollamaProperties = ollamaProperties;
+        this.milvusProperties = milvusProperties;
     }
 
     public HealthCheckResponse check() {
         DependencyHealthResponse postgres = checkPostgres();
         DependencyHealthResponse redis = checkRedis();
         DependencyHealthResponse minio = checkMinio();
-        String status = isUp(postgres) && isUp(redis) && isUp(minio) ? "UP" : "DEGRADED";
-        return new HealthCheckResponse(status, postgres, redis, minio);
+        DependencyHealthResponse ollama = checkOllama();
+        DependencyHealthResponse milvus = checkMilvus();
+        String status = isHealthy(postgres, redis, minio, ollama, milvus) ? "UP" : "DEGRADED";
+        return new HealthCheckResponse(status, postgres, redis, minio, ollama, milvus);
     }
 
     private DependencyHealthResponse checkPostgres() {
@@ -89,11 +105,77 @@ public class SystemHealthService {
         return "UP".equals(response.status());
     }
 
+    private boolean isHealthy(DependencyHealthResponse... responses) {
+        for (DependencyHealthResponse response : responses) {
+            if (!isUp(response) && !"UNKNOWN".equals(response.status())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private DependencyHealthResponse checkOllama() {
+        if (!StringUtils.hasText(ollamaProperties.getBaseUrl())) {
+            return new DependencyHealthResponse("UNKNOWN", "Ollama 未配置地址");
+        }
+        try {
+            SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+            requestFactory.setConnectTimeout(Duration.ofSeconds(Math.max(5, ollamaProperties.getTimeoutSeconds())));
+            requestFactory.setReadTimeout(Duration.ofSeconds(Math.max(5, ollamaProperties.getTimeoutSeconds())));
+            RestClient client = RestClient.builder()
+                    .baseUrl(ollamaProperties.getBaseUrl())
+                    .requestFactory(requestFactory)
+                    .build();
+            OllamaTagsResponse response = client.get()
+                    .uri("/api/tags")
+                    .retrieve()
+                    .body(OllamaTagsResponse.class);
+            int modelCount = response == null || response.models() == null ? 0 : response.models().size();
+            return new DependencyHealthResponse("UP", "Ollama 连通正常，模型数=" + modelCount);
+        } catch (Exception ex) {
+            return new DependencyHealthResponse("DOWN", buildMessage("Ollama 检查失败", ex));
+        }
+    }
+
+    private DependencyHealthResponse checkMilvus() {
+        if (!milvusProperties.isEnabled()) {
+            return new DependencyHealthResponse("UNKNOWN", "Milvus 已禁用");
+        }
+        if (!StringUtils.hasText(milvusProperties.getBaseUrl())) {
+            return new DependencyHealthResponse("UNKNOWN", "Milvus 未配置地址");
+        }
+        try {
+            SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+            requestFactory.setConnectTimeout(Duration.ofSeconds(10));
+            requestFactory.setReadTimeout(Duration.ofSeconds(15));
+            RestClient client = RestClient.builder()
+                    .baseUrl(milvusProperties.getBaseUrl())
+                    .defaultHeader("Authorization", "Bearer " + milvusProperties.getToken())
+                    .requestFactory(requestFactory)
+                    .build();
+            MilvusCollectionsResponse response = client.post()
+                    .uri("/v2/vectordb/collections/list")
+                    .body(Map.of("dbName", "_default"))
+                    .retrieve()
+                    .body(MilvusCollectionsResponse.class);
+            int collectionCount = response == null || response.data() == null ? 0 : response.data().size();
+            return new DependencyHealthResponse("UP", "Milvus 连通正常，集合数=" + collectionCount);
+        } catch (Exception ex) {
+            return new DependencyHealthResponse("DOWN", buildMessage("Milvus 检查失败", ex));
+        }
+    }
+
     private String buildMessage(String prefix, Exception ex) {
         String message = ex.getMessage();
         if (!StringUtils.hasText(message)) {
             return prefix;
         }
         return prefix + ": " + message;
+    }
+
+    private record OllamaTagsResponse(List<Map<String, Object>> models) {
+    }
+
+    private record MilvusCollectionsResponse(List<Object> data) {
     }
 }

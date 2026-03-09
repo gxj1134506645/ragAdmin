@@ -127,6 +127,28 @@ public class ModelService {
         return toResponse(entity, provider, request.getCapabilityTypes().stream().distinct().toList());
     }
 
+    public AiModelEntity requireModelWithCapability(Long modelId, String capabilityType) {
+        AiModelEntity model = aiModelMapper.selectById(modelId);
+        if (model == null) {
+            throw new BusinessException("MODEL_NOT_FOUND", "模型不存在", HttpStatus.NOT_FOUND);
+        }
+        List<String> capabilityTypes = aiModelCapabilityMapper.selectEnabledByModelIds(List.of(modelId))
+                .stream()
+                .map(AiModelCapabilityEntity::getCapabilityType)
+                .toList();
+        if (!capabilityTypes.contains(capabilityType)) {
+            throw new BusinessException("MODEL_CAPABILITY_INVALID", "模型能力类型不匹配", HttpStatus.BAD_REQUEST);
+        }
+        return model;
+    }
+
+    public List<AiModelEntity> findByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return aiModelMapper.selectBatchIds(ids);
+    }
+
     private ModelResponse toResponse(AiModelEntity entity, AiProviderEntity provider, List<String> capabilityTypes) {
         return new ModelResponse(
                 entity.getId(),

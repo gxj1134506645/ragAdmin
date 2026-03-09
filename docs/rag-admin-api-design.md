@@ -78,7 +78,7 @@
 
 ### 2.4 鉴权约定
 
-- 登录成功后返回 `accessToken`
+- 登录成功后返回 `accessToken` 与 `refreshToken`
 - 管理台请求头使用 `Authorization: Bearer <token>`
 - 首期建议使用 JWT + Redis 会话控制
 
@@ -98,7 +98,7 @@
 
 ```json
 {
-  "username": "admin",
+  "loginId": "admin 或 13800000000",
   "password": "******"
 }
 ```
@@ -111,7 +111,9 @@
   "message": "success",
   "data": {
     "accessToken": "token-value",
+    "refreshToken": "refresh-token-value",
     "expiresIn": 7200,
+    "refreshExpiresIn": 604800,
     "user": {
       "id": 1,
       "username": "admin",
@@ -126,7 +128,19 @@
 
 - `GET /api/admin/auth/me`
 
-### 3.3 用户退出
+### 3.3 刷新 Token
+
+- `POST /api/admin/auth/refresh`
+
+请求体：
+
+```json
+{
+  "refreshToken": "refresh-token-value"
+}
+```
+
+### 3.4 用户退出
 
 - `POST /api/admin/auth/logout`
 

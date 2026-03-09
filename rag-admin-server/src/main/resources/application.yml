@@ -32,6 +32,15 @@ logging:
   config: classpath:logback-spring.xml
 
 rag:
+  auth:
+    jwt-secret: ${RAG_JWT_SECRET:rag-admin-dev-secret-key-change-me-2026}
+    access-token-ttl-seconds: 7200
+    refresh-token-ttl-seconds: 604800
+    bootstrap:
+      admin-username: ${BOOTSTRAP_ADMIN_USERNAME:admin}
+      admin-display-name: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:系统管理员}
+      admin-mobile: ${BOOTSTRAP_ADMIN_MOBILE:13800000000}
+      admin-password: ${BOOTSTRAP_ADMIN_PASSWORD:Admin@123456}
   storage:
     minio:
       endpoint:

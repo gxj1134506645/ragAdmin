@@ -70,6 +70,13 @@ public class DocumentService {
 
     @Transactional
     public ParseDocumentResponse submitParseTask(Long documentId) {
+        DocumentParseTaskEntity task = submitParseTask(documentId, 0);
+        DocumentEntity document = documentMapper.selectById(documentId);
+        return new ParseDocumentResponse(task.getId(), documentId, task.getDocumentVersionId(), task.getTaskStatus(), document.getParseStatus());
+    }
+
+    @Transactional
+    public DocumentParseTaskEntity submitParseTask(Long documentId, int retryCount) {
         DocumentEntity document = documentMapper.selectById(documentId);
         if (document == null) {
             throw new BusinessException("DOCUMENT_NOT_FOUND", "文档不存在", HttpStatus.NOT_FOUND);
@@ -89,13 +96,7 @@ public class DocumentService {
                 .in(DocumentParseTaskEntity::getTaskStatus, "WAITING", "RUNNING")
                 .last("LIMIT 1"));
         if (existingTask != null) {
-            return new ParseDocumentResponse(
-                    existingTask.getId(),
-                    documentId,
-                    version.getId(),
-                    existingTask.getTaskStatus(),
-                    document.getParseStatus()
-            );
+            return existingTask;
         }
 
         DocumentParseTaskEntity task = new DocumentParseTaskEntity();
@@ -103,7 +104,7 @@ public class DocumentService {
         task.setDocumentId(documentId);
         task.setDocumentVersionId(version.getId());
         task.setTaskStatus("WAITING");
-        task.setRetryCount(0);
+        task.setRetryCount(retryCount);
         documentParseTaskMapper.insert(task);
 
         document.setParseStatus("PENDING");
@@ -111,7 +112,7 @@ public class DocumentService {
         version.setParseStatus("PENDING");
         documentVersionMapper.updateById(version);
 
-        return new ParseDocumentResponse(task.getId(), documentId, version.getId(), task.getTaskStatus(), document.getParseStatus());
+        return task;
     }
 
     private DocumentResponse toResponse(DocumentEntity document) {

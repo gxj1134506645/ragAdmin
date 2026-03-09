@@ -152,7 +152,7 @@
 - 对于 Entity、VO、DTO、Query、Request、Response 这类主要数据对象，默认优先使用 Lombok 注解生成 `getter` / `setter` / `constructor` / `builder` / `chain set`，避免手写重复样板代码
 - 如果引入 Lombok，必须同时保证对应依赖和注解处理器配置完整，并注意与 MapStruct 的处理顺序，避免生成代码冲突
 - 使用 MapStruct 时，Mapper 接口必须显式配置为可注入 Spring Bean，例如 `componentModel = "spring"`，禁止只保留普通接口而不纳入 Spring 容器
-- Bean 注入默认优先使用 `@Autowired` 或 `@Resource`，并在实现时显式检查依赖方向，必须小心避免循环依赖；一旦发现潜在循环依赖，优先调整设计而不是硬性规避
+- Bean 注入默认统一使用 `@Autowired`，除非有非常明确的特殊理由，否则不要与 `@Resource` 混用；并在实现时显式检查依赖方向，必须小心避免循环依赖；一旦发现潜在循环依赖，优先调整设计而不是硬性规避
 
 AI 生成代码时必须检查：
 - 是否存在注入、反序列化、敏感信息泄露等安全问题

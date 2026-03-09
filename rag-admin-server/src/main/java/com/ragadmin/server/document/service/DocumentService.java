@@ -7,6 +7,8 @@ import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.document.dto.ChunkResponse;
 import com.ragadmin.server.document.dto.CreateDocumentRequest;
 import com.ragadmin.server.document.dto.DocumentResponse;
+import com.ragadmin.server.document.dto.DocumentVersionResponse;
+import com.ragadmin.server.document.dto.InternalTaskCompleteRequest;
 import com.ragadmin.server.document.dto.ParseDocumentResponse;
 import com.ragadmin.server.document.entity.ChunkEntity;
 import com.ragadmin.server.document.entity.DocumentEntity;
@@ -23,6 +25,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
+import java.time.LocalDateTime;
 
 @Service
 public class DocumentService {
@@ -129,6 +133,22 @@ public class DocumentService {
         );
     }
 
+    public PageResponse<DocumentVersionResponse> listVersions(Long documentId, long pageNo, long pageSize) {
+        requireDocument(documentId);
+        Page<DocumentVersionEntity> page = documentVersionMapper.selectPage(
+                Page.of(pageNo, pageSize),
+                new LambdaQueryWrapper<DocumentVersionEntity>()
+                        .eq(DocumentVersionEntity::getDocumentId, documentId)
+                        .orderByDesc(DocumentVersionEntity::getVersionNo)
+        );
+        return new PageResponse<>(
+                page.getRecords().stream().map(this::toVersionResponse).toList(),
+                pageNo,
+                pageSize,
+                page.getTotal()
+        );
+    }
+
     @Transactional
     public ParseDocumentResponse submitParseTask(Long documentId) {
         DocumentParseTaskEntity task = submitParseTask(documentId, 0);
@@ -173,6 +193,38 @@ public class DocumentService {
         return task;
     }
 
+    @Transactional
+    public void completeInternalTask(Long taskId, InternalTaskCompleteRequest request) {
+        DocumentParseTaskEntity task = documentParseTaskMapper.selectById(taskId);
+        if (task == null) {
+            throw new BusinessException("TASK_NOT_FOUND", "任务不存在", HttpStatus.NOT_FOUND);
+        }
+        if (!"SUCCESS".equals(request.getTaskStatus()) && !"FAILED".equals(request.getTaskStatus())) {
+            throw new BusinessException("TASK_STATUS_INVALID", "内部回调状态仅允许 SUCCESS 或 FAILED", HttpStatus.BAD_REQUEST);
+        }
+        if (!"SUCCESS".equals(request.getParseStatus()) && !"FAILED".equals(request.getParseStatus())) {
+            throw new BusinessException("PARSE_STATUS_INVALID", "解析状态仅允许 SUCCESS 或 FAILED", HttpStatus.BAD_REQUEST);
+        }
+
+        DocumentEntity document = requireDocument(task.getDocumentId());
+        DocumentVersionEntity version = documentVersionMapper.selectById(task.getDocumentVersionId());
+        if (version == null) {
+            throw new BusinessException("DOCUMENT_VERSION_NOT_FOUND", "文档版本不存在", HttpStatus.NOT_FOUND);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        task.setTaskStatus(request.getTaskStatus());
+        task.setFinishedAt(now);
+        task.setErrorMessage(request.getErrorMessage());
+        documentParseTaskMapper.updateById(task);
+
+        document.setParseStatus(request.getParseStatus());
+        documentMapper.updateById(document);
+        version.setParseStatus(request.getParseStatus());
+        version.setParseFinishedAt(now);
+        documentVersionMapper.updateById(version);
+    }
+
     private DocumentResponse toResponse(DocumentEntity document) {
         return new DocumentResponse(
                 document.getId(),
@@ -197,6 +249,20 @@ public class DocumentService {
                 chunk.getTokenCount(),
                 chunk.getCharCount(),
                 chunk.getEnabled()
+        );
+    }
+
+    private DocumentVersionResponse toVersionResponse(DocumentVersionEntity version) {
+        return new DocumentVersionResponse(
+                version.getId(),
+                version.getVersionNo(),
+                version.getStorageBucket(),
+                version.getStorageObjectKey(),
+                version.getContentHash(),
+                version.getParseStatus(),
+                version.getParseStartedAt(),
+                version.getParseFinishedAt(),
+                version.getCreatedAt()
         );
     }
 

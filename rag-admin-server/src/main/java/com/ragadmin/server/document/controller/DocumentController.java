@@ -7,6 +7,7 @@ import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.document.dto.ChunkResponse;
 import com.ragadmin.server.document.dto.CreateDocumentRequest;
 import com.ragadmin.server.document.dto.DocumentResponse;
+import com.ragadmin.server.document.dto.DocumentVersionResponse;
 import com.ragadmin.server.document.dto.ParseDocumentResponse;
 import com.ragadmin.server.document.dto.UpdateDocumentStatusRequest;
 import com.ragadmin.server.document.service.DocumentService;
@@ -65,5 +66,14 @@ public class DocumentController {
             @RequestParam(defaultValue = "20") long pageSize
     ) {
         return ApiResponse.success(documentService.listChunks(documentId, pageNo, pageSize));
+    }
+
+    @GetMapping("/documents/{documentId}/versions")
+    public ApiResponse<PageResponse<DocumentVersionResponse>> listVersions(
+            @PathVariable Long documentId,
+            @RequestParam(defaultValue = "1") long pageNo,
+            @RequestParam(defaultValue = "20") long pageSize
+    ) {
+        return ApiResponse.success(documentService.listVersions(documentId, pageNo, pageSize));
     }
 }

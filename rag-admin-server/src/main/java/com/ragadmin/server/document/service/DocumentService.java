@@ -1,13 +1,18 @@
 package com.ragadmin.server.document.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ragadmin.server.common.exception.BusinessException;
+import com.ragadmin.server.common.model.PageResponse;
+import com.ragadmin.server.document.dto.ChunkResponse;
 import com.ragadmin.server.document.dto.CreateDocumentRequest;
 import com.ragadmin.server.document.dto.DocumentResponse;
 import com.ragadmin.server.document.dto.ParseDocumentResponse;
+import com.ragadmin.server.document.entity.ChunkEntity;
 import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.entity.DocumentParseTaskEntity;
 import com.ragadmin.server.document.entity.DocumentVersionEntity;
+import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.mapper.DocumentVersionMapper;
@@ -23,17 +28,20 @@ public class DocumentService {
     private final DocumentMapper documentMapper;
     private final DocumentVersionMapper documentVersionMapper;
     private final DocumentParseTaskMapper documentParseTaskMapper;
+    private final ChunkMapper chunkMapper;
     private final KnowledgeBaseService knowledgeBaseService;
 
     public DocumentService(
             DocumentMapper documentMapper,
             DocumentVersionMapper documentVersionMapper,
             DocumentParseTaskMapper documentParseTaskMapper,
+            ChunkMapper chunkMapper,
             KnowledgeBaseService knowledgeBaseService
     ) {
         this.documentMapper = documentMapper;
         this.documentVersionMapper = documentVersionMapper;
         this.documentParseTaskMapper = documentParseTaskMapper;
+        this.chunkMapper = chunkMapper;
         this.knowledgeBaseService = knowledgeBaseService;
     }
 
@@ -68,6 +76,26 @@ public class DocumentService {
         return toResponse(document);
     }
 
+    public DocumentResponse getDocument(Long documentId) {
+        return toResponse(requireDocument(documentId));
+    }
+
+    public PageResponse<ChunkResponse> listChunks(Long documentId, long pageNo, long pageSize) {
+        requireDocument(documentId);
+        Page<ChunkEntity> page = chunkMapper.selectPage(
+                Page.of(pageNo, pageSize),
+                new LambdaQueryWrapper<ChunkEntity>()
+                        .eq(ChunkEntity::getDocumentId, documentId)
+                        .orderByAsc(ChunkEntity::getChunkNo)
+        );
+        return new PageResponse<>(
+                page.getRecords().stream().map(this::toChunkResponse).toList(),
+                pageNo,
+                pageSize,
+                page.getTotal()
+        );
+    }
+
     @Transactional
     public ParseDocumentResponse submitParseTask(Long documentId) {
         DocumentParseTaskEntity task = submitParseTask(documentId, 0);
@@ -77,10 +105,7 @@ public class DocumentService {
 
     @Transactional
     public DocumentParseTaskEntity submitParseTask(Long documentId, int retryCount) {
-        DocumentEntity document = documentMapper.selectById(documentId);
-        if (document == null) {
-            throw new BusinessException("DOCUMENT_NOT_FOUND", "文档不存在", HttpStatus.NOT_FOUND);
-        }
+        DocumentEntity document = requireDocument(documentId);
 
         DocumentVersionEntity version = documentVersionMapper.selectOne(new LambdaQueryWrapper<DocumentVersionEntity>()
                 .eq(DocumentVersionEntity::getDocumentId, documentId)
@@ -129,5 +154,24 @@ public class DocumentService {
                 document.getFileSize(),
                 document.getContentHash()
         );
+    }
+
+    private ChunkResponse toChunkResponse(ChunkEntity chunk) {
+        return new ChunkResponse(
+                chunk.getId(),
+                chunk.getChunkNo(),
+                chunk.getChunkText(),
+                chunk.getTokenCount(),
+                chunk.getCharCount(),
+                chunk.getEnabled()
+        );
+    }
+
+    private DocumentEntity requireDocument(Long documentId) {
+        DocumentEntity document = documentMapper.selectById(documentId);
+        if (document == null) {
+            throw new BusinessException("DOCUMENT_NOT_FOUND", "文档不存在", HttpStatus.NOT_FOUND);
+        }
+        return document;
     }
 }

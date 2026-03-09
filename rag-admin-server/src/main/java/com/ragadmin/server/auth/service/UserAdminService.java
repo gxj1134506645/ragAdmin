@@ -3,6 +3,7 @@ package com.ragadmin.server.auth.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ragadmin.server.auth.dto.CreateUserRequest;
+import com.ragadmin.server.auth.dto.UpdateUserRequest;
 import com.ragadmin.server.auth.dto.UserListItemResponse;
 import com.ragadmin.server.auth.entity.SysRoleEntity;
 import com.ragadmin.server.auth.entity.SysUserEntity;
@@ -99,11 +100,25 @@ public class UserAdminService {
     }
 
     @Transactional
-    public void assignRoles(Long userId, List<String> roleCodes) {
-        SysUserEntity user = sysUserMapper.selectById(userId);
-        if (user == null || Boolean.TRUE.equals(user.getDeleted())) {
-            throw new BusinessException("USER_NOT_FOUND", "用户不存在", HttpStatus.NOT_FOUND);
+    public UserListItemResponse update(Long userId, UpdateUserRequest request) {
+        SysUserEntity user = requireUser(userId);
+        validateUniqueMobileForUpdate(userId, request.getMobile());
+
+        user.setDisplayName(request.getDisplayName());
+        user.setEmail(request.getEmail());
+        user.setMobile(request.getMobile());
+        user.setStatus(request.getStatus());
+        // 密码更新走显式字段，避免每次普通资料更新都触发密码重算。
+        if (StringUtils.hasText(request.getPassword())) {
+            user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         }
+        sysUserMapper.updateById(user);
+        return toResponse(user, sysRoleMapper.selectRoleCodesByUserId(user.getId()));
+    }
+
+    @Transactional
+    public void assignRoles(Long userId, List<String> roleCodes) {
+        requireUser(userId);
 
         // 角色重配采用“先删后插”，逻辑直白且适合当前单表关联场景。
         sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRoleEntity>()
@@ -143,6 +158,27 @@ public class UserAdminService {
                 throw new BusinessException("MOBILE_EXISTS", "手机号已存在", HttpStatus.BAD_REQUEST);
             }
         }
+    }
+
+    private void validateUniqueMobileForUpdate(Long userId, String mobile) {
+        if (!StringUtils.hasText(mobile)) {
+            return;
+        }
+        SysUserEntity mobileExists = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
+                .eq(SysUserEntity::getMobile, mobile)
+                .ne(SysUserEntity::getId, userId)
+                .last("LIMIT 1"));
+        if (mobileExists != null) {
+            throw new BusinessException("MOBILE_EXISTS", "手机号已存在", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private SysUserEntity requireUser(Long userId) {
+        SysUserEntity user = sysUserMapper.selectById(userId);
+        if (user == null || Boolean.TRUE.equals(user.getDeleted())) {
+            throw new BusinessException("USER_NOT_FOUND", "用户不存在", HttpStatus.NOT_FOUND);
+        }
+        return user;
     }
 
     private UserListItemResponse toResponse(SysUserEntity user, List<String> roles) {

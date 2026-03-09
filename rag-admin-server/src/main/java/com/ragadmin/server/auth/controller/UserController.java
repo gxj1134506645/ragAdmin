@@ -2,6 +2,7 @@ package com.ragadmin.server.auth.controller;
 
 import com.ragadmin.server.auth.dto.AssignUserRolesRequest;
 import com.ragadmin.server.auth.dto.CreateUserRequest;
+import com.ragadmin.server.auth.dto.UpdateUserRequest;
 import com.ragadmin.server.auth.dto.UserListItemResponse;
 import com.ragadmin.server.auth.service.UserAdminService;
 import com.ragadmin.server.common.model.ApiResponse;
@@ -39,6 +40,14 @@ public class UserController {
     @PostMapping
     public ApiResponse<UserListItemResponse> create(@Valid @RequestBody CreateUserRequest request) {
         return ApiResponse.success(userAdminService.create(request));
+    }
+
+    @PutMapping("/{userId}")
+    public ApiResponse<UserListItemResponse> update(
+            @PathVariable Long userId,
+            @Valid @RequestBody UpdateUserRequest request
+    ) {
+        return ApiResponse.success(userAdminService.update(userId, request));
     }
 
     @PutMapping("/{userId}/roles")

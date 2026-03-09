@@ -80,6 +80,13 @@ public class DocumentService {
         return toResponse(requireDocument(documentId));
     }
 
+    public void updateDocumentStatus(Long documentId, Boolean enabled) {
+        DocumentEntity document = requireDocument(documentId);
+        // 文档启停只影响是否参与后续使用，不直接清理解析结果，便于后续重新启用。
+        document.setEnabled(enabled);
+        documentMapper.updateById(document);
+    }
+
     public PageResponse<ChunkResponse> listChunks(Long documentId, long pageNo, long pageSize) {
         requireDocument(documentId);
         Page<ChunkEntity> page = chunkMapper.selectPage(

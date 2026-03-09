@@ -6,11 +6,14 @@ import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.knowledge.dto.CreateKnowledgeBaseRequest;
 import com.ragadmin.server.knowledge.dto.KnowledgeBaseResponse;
+import com.ragadmin.server.knowledge.dto.UpdateKnowledgeBaseStatusRequest;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -43,5 +46,19 @@ public class KnowledgeBaseController {
     ) {
         AuthenticatedUser authenticatedUser = (AuthenticatedUser) httpServletRequest.getAttribute(AuthService.REQUEST_ATTRIBUTE);
         return ApiResponse.success(knowledgeBaseService.create(request, authenticatedUser.userId()));
+    }
+
+    @GetMapping("/{kbId}")
+    public ApiResponse<KnowledgeBaseResponse> detail(@PathVariable Long kbId) {
+        return ApiResponse.success(knowledgeBaseService.getDetail(kbId));
+    }
+
+    @PutMapping("/{kbId}/status")
+    public ApiResponse<Void> updateStatus(
+            @PathVariable Long kbId,
+            @Valid @RequestBody UpdateKnowledgeBaseStatusRequest request
+    ) {
+        knowledgeBaseService.updateStatus(kbId, request.getStatus());
+        return ApiResponse.success(null);
     }
 }

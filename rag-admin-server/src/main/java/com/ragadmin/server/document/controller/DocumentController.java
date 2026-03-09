@@ -8,12 +8,14 @@ import com.ragadmin.server.document.dto.ChunkResponse;
 import com.ragadmin.server.document.dto.CreateDocumentRequest;
 import com.ragadmin.server.document.dto.DocumentResponse;
 import com.ragadmin.server.document.dto.ParseDocumentResponse;
+import com.ragadmin.server.document.dto.UpdateDocumentStatusRequest;
 import com.ragadmin.server.document.service.DocumentService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -47,6 +49,15 @@ public class DocumentController {
     @GetMapping("/documents/{documentId}")
     public ApiResponse<DocumentResponse> getDocument(@PathVariable Long documentId) {
         return ApiResponse.success(documentService.getDocument(documentId));
+    }
+
+    @PutMapping("/documents/{documentId}/status")
+    public ApiResponse<Void> updateDocumentStatus(
+            @PathVariable Long documentId,
+            @Valid @RequestBody UpdateDocumentStatusRequest request
+    ) {
+        documentService.updateDocumentStatus(documentId, request.getEnabled());
+        return ApiResponse.success(null);
     }
 
     @GetMapping("/documents/{documentId}/chunks")

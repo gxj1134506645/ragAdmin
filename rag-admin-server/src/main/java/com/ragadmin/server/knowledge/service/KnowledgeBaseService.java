@@ -104,6 +104,25 @@ public class KnowledgeBaseService {
         return entity;
     }
 
+    public KnowledgeBaseResponse getDetail(Long kbId) {
+        KnowledgeBaseEntity entity = requireById(kbId);
+        Map<Long, AiModelEntity> modelMap = modelService.findByIds(
+                        java.util.stream.Stream.of(entity.getEmbeddingModelId(), entity.getChatModelId()).toList())
+                .stream()
+                .collect(Collectors.toMap(AiModelEntity::getId, Function.identity()));
+        return toResponse(entity, modelMap);
+    }
+
+    public void updateStatus(Long kbId, String status) {
+        KnowledgeBaseEntity entity = requireById(kbId);
+        // 状态切换当前只允许在 ENABLED / DISABLED 间流转，避免把任意字符串直接写进核心状态字段。
+        if (!"ENABLED".equals(status) && !"DISABLED".equals(status)) {
+            throw new BusinessException("KB_STATUS_INVALID", "知识库状态不合法", HttpStatus.BAD_REQUEST);
+        }
+        entity.setStatus(status);
+        knowledgeBaseMapper.updateById(entity);
+    }
+
     private KnowledgeBaseResponse toResponse(KnowledgeBaseEntity entity, Map<Long, AiModelEntity> modelMap) {
         AiModelEntity embeddingModel = modelMap.get(entity.getEmbeddingModelId());
         AiModelEntity chatModel = modelMap.get(entity.getChatModelId());

@@ -111,6 +111,20 @@ cp docker/compose/.env.example docker/compose/.env
 docker compose --env-file docker/compose/.env -f docker/compose/docker-compose.yml up -d
 ```
 
+当前 `compose` 已包含项目首期会用到的完整中间件：
+
+- PostgreSQL
+- Redis
+- MinIO
+- Etcd
+- Milvus
+- Ollama
+
+同时包含两个初始化动作：
+
+- 自动创建 MinIO bucket
+- 自动拉取默认 Ollama 聊天模型与 Embedding 模型
+
 更完整的依赖准备、接口验收顺序和常见排查方式，直接看联调文档。
 
 ## 5. 关键文档

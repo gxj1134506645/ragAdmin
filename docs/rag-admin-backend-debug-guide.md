@@ -111,16 +111,34 @@ docker compose --env-file docker/compose/.env -f docker/compose/docker-compose.y
 当前编排会启动：
 
 - `postgres`
+- `redis`
 - `etcd`
 - `minio`
 - `milvus`
 - `ollama`
 
+并会自动执行：
+
+- `minio-init`：创建默认 bucket
+- `ollama-init`：拉取默认聊天模型和 Embedding 模型
+
 说明：
 
-- 当前后端仍可继续复用内网 Redis
-- 当前后端如继续使用内网 MinIO，请保持 `application-local.yml` 或环境变量配置一致
-- 如要改为使用本地 MinIO，请同步覆盖 `MINIO_ENDPOINT`、`MINIO_PORT`、`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY`、`MINIO_BUCKET_NAME`
+- 当前 `application-local.yml` 已改为默认优先使用本地容器地址
+- 如果仍要复用内网 Redis、MinIO 或其他服务，请自行覆盖环境变量
+- 常用覆盖项包括：
+  - `REDIS_HOST`
+  - `REDIS_PORT`
+  - `REDIS_PASSWORD`
+  - `MINIO_ENDPOINT`
+  - `MINIO_PORT`
+  - `MINIO_ACCESS_KEY`
+  - `MINIO_SECRET_KEY`
+  - `MINIO_BUCKET_NAME`
+  - `MINIO_PUBLIC_URL`
+  - `OLLAMA_BASE_URL`
+  - `MILVUS_BASE_URL`
+  - `MILVUS_TOKEN`
 
 ### 4.1 编译
 

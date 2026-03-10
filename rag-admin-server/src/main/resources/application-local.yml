@@ -6,32 +6,32 @@ spring:
     driver-class-name: org.postgresql.Driver
   data:
     redis:
-      host: 192.168.0.11
-      port: 6379
-      password: zhonghe_2h3b4bv57d3b
-      database: 0
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:ragadmin123}
+      database: ${REDIS_DATABASE:0}
   threads:
     virtual:
       enabled: true
 
 rag:
   internal:
-    callback-token: rag-admin-internal-callback-token
+    callback-token: ${RAG_INTERNAL_CALLBACK_TOKEN:rag-admin-internal-callback-token}
   ai:
     ollama:
-      base-url: http://127.0.0.1:11434
-      timeout-seconds: 30
+      base-url: ${OLLAMA_BASE_URL:http://127.0.0.1:11434}
+      timeout-seconds: ${OLLAMA_TIMEOUT_SECONDS:30}
   storage:
     minio:
-      endpoint: 192.168.0.11
-      port: 9000
-      use-ssl: false
-      access-key: root
-      secret-key: zh123456
-      bucket-name: hrsys
-      public-url: http://192.168.0.11:9000
+      endpoint: ${MINIO_ENDPOINT:127.0.0.1}
+      port: ${MINIO_PORT:9000}
+      use-ssl: ${MINIO_USE_SSL:false}
+      access-key: ${MINIO_ACCESS_KEY:minioadmin}
+      secret-key: ${MINIO_SECRET_KEY:minioadmin123}
+      bucket-name: ${MINIO_BUCKET_NAME:hrsys}
+      public-url: ${MINIO_PUBLIC_URL:http://127.0.0.1:9000}
   vector:
     milvus:
-      base-url: http://127.0.0.1:19530
-      token: root:Milvus
-      enabled: true
+      base-url: ${MILVUS_BASE_URL:http://127.0.0.1:19530}
+      token: ${MILVUS_TOKEN:root:Milvus}
+      enabled: ${MILVUS_ENABLED:true}

@@ -119,6 +119,7 @@ docker compose --env-file docker/compose/.env -f docker/compose/docker-compose.y
 - 接口设计：[docs/rag-admin-api-design.md](docs/rag-admin-api-design.md)
 - 数据库草案：[docs/rag-admin-schema-v1.sql](docs/rag-admin-schema-v1.sql)
 - 实施计划：[docs/rag-admin-implementation-plan.md](docs/rag-admin-implementation-plan.md)
+- 后端完成度清单：[docs/rag-admin-backend-completion-checklist.md](docs/rag-admin-backend-completion-checklist.md)
 - 后端联调说明：[docs/rag-admin-backend-debug-guide.md](docs/rag-admin-backend-debug-guide.md)
 - API 验收脚本说明：[docs/rag-admin-api-acceptance.md](docs/rag-admin-api-acceptance.md)
 - 项目协作规则：[AGENTS.md](AGENTS.md)

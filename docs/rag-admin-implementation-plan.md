@@ -102,7 +102,7 @@
 
 - Redis：`192.168.0.11:6379`
 - MinIO API：`http://192.168.0.11:9000`
-- MinIO Bucket：`hrsys`
+- MinIO Bucket：`ragadmin`
 - Redis 和 MinIO 账号密钥只允许保存在本地环境变量或未纳管的本地配置中
 
 ### 3.2 固定端口

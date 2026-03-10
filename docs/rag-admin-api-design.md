@@ -328,7 +328,7 @@
   "code": "OK",
   "message": "success",
   "data": {
-    "bucket": "rag-kb",
+    "bucket": "ragadmin",
     "objectKey": "kb/20260309/uuid/employee-manual.pdf",
     "uploadUrl": "presigned-url"
   }
@@ -345,7 +345,7 @@
 {
   "docName": "员工手册.pdf",
   "docType": "PDF",
-  "storageBucket": "rag-kb",
+  "storageBucket": "ragadmin",
   "storageObjectKey": "kb/20260309/uuid/employee-manual.pdf"
 }
 ```
@@ -362,7 +362,7 @@
 
 ```json
 {
-  "storageBucket": "rag-kb",
+  "storageBucket": "ragadmin",
   "storageObjectKey": "kb/20260309/uuid/employee-manual-v2.pdf",
   "contentHash": "sha256-value"
 }

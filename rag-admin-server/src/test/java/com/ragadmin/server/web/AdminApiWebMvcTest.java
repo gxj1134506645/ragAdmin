@@ -291,7 +291,7 @@ class AdminApiWebMvcTest {
     void shouldCreateUploadUrlWhenBearerTokenIsValid() throws Exception {
         when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
         when(fileUploadService.createUploadUrl(any())).thenReturn(new UploadUrlResponse(
-                "hrsys",
+                "ragadmin",
                 "kb_document/20260310/demo/sample.md",
                 "http://minio/upload"
         ));
@@ -308,7 +308,7 @@ class AdminApiWebMvcTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
-                .andExpect(jsonPath("$.data.bucket").value("hrsys"))
+                .andExpect(jsonPath("$.data.bucket").value("ragadmin"))
                 .andExpect(jsonPath("$.data.objectKey").value("kb_document/20260310/demo/sample.md"));
     }
 
@@ -320,7 +320,7 @@ class AdminApiWebMvcTest {
                 21L,
                 "sample.md",
                 "MARKDOWN",
-                "hrsys",
+                "ragadmin",
                 "kb_document/20260310/demo/sample.md",
                 1,
                 "PENDING",
@@ -336,7 +336,7 @@ class AdminApiWebMvcTest {
                                 {
                                   "docName": "sample.md",
                                   "docType": "MARKDOWN",
-                                  "storageBucket": "hrsys",
+                                  "storageBucket": "ragadmin",
                                   "storageObjectKey": "kb_document/20260310/demo/sample.md",
                                   "fileSize": 128,
                                   "contentHash": "hash-1"
@@ -358,7 +358,7 @@ class AdminApiWebMvcTest {
                                 21L,
                                 "sample.md",
                                 "MARKDOWN",
-                                "hrsys",
+                                "ragadmin",
                                 "kb_document/20260310/demo/sample.md",
                                 1,
                                 "SUCCESS",

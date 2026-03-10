@@ -61,7 +61,7 @@
 
 1. PostgreSQL 已创建数据库 `rag_admin`
 2. Redis 可连通，密码正确
-3. MinIO 可连通，Bucket `hrsys` 已存在
+3. MinIO 可连通，Bucket `ragadmin` 已存在
 4. Ollama 已启动，并至少拉取：
    - `qwen2.5:7b`
    - `nomic-embed-text`

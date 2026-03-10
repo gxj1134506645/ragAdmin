@@ -28,7 +28,7 @@ rag:
       use-ssl: ${MINIO_USE_SSL:false}
       access-key: ${MINIO_ACCESS_KEY:minioadmin}
       secret-key: ${MINIO_SECRET_KEY:minioadmin123}
-      bucket-name: ${MINIO_BUCKET_NAME:hrsys}
+      bucket-name: ${MINIO_BUCKET_NAME:ragadmin}
       public-url: ${MINIO_PUBLIC_URL:http://127.0.0.1:9000}
   vector:
     milvus:

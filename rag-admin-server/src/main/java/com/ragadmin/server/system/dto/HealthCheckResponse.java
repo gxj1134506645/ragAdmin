@@ -5,6 +5,7 @@ public record HealthCheckResponse(
         DependencyHealthResponse postgres,
         DependencyHealthResponse redis,
         DependencyHealthResponse minio,
+        DependencyHealthResponse bailian,
         DependencyHealthResponse ollama,
         DependencyHealthResponse milvus
 ) {

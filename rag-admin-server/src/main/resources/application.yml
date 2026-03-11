@@ -41,8 +41,8 @@ rag:
     bailian:
       enabled: true
       api-key:
-      chat-model: qwen-max
-      embedding-model: text-embedding-v3
+      default-chat-model: qwen-max
+      default-embedding-model: text-embedding-v3
       timeout-seconds: 60
     ollama:
       enabled: false

@@ -387,6 +387,7 @@ class AdminApiWebMvcTest {
                 new DependencyHealthResponse("UP", "PostgreSQL 正常"),
                 new DependencyHealthResponse("UP", "Redis 正常"),
                 new DependencyHealthResponse("UP", "MinIO 正常"),
+                new DependencyHealthResponse("UP", "百炼正常"),
                 new DependencyHealthResponse("UP", "Ollama 正常"),
                 new DependencyHealthResponse("UP", "Milvus 正常")
         ));
@@ -397,6 +398,7 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.status").value("UP"))
                 .andExpect(jsonPath("$.data.postgres.status").value("UP"))
+                .andExpect(jsonPath("$.data.bailian.status").value("UP"))
                 .andExpect(jsonPath("$.data.milvus.status").value("UP"));
     }
 

@@ -140,7 +140,7 @@ public class ChatService {
 
         KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(session.getKbId());
         RetrievalService.RetrievalResult retrievalResult = retrievalService.retrieve(knowledgeBase, request.getQuestion());
-        var chatModel = modelService.requireChatModelDescriptor(knowledgeBase.getChatModelId());
+        var chatModel = modelService.resolveChatModelDescriptor(knowledgeBase.getChatModelId());
         ChatModelClient chatClient = chatClientRegistry.getClient(chatModel.providerCode());
 
         Instant start = Instant.now();

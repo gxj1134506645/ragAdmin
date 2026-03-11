@@ -48,7 +48,7 @@ public class RetrievalService {
             return new RetrievalResult(List.of(), "");
         }
 
-        var embeddingDescriptor = modelService.requireEmbeddingModelDescriptor(knowledgeBase.getEmbeddingModelId());
+        var embeddingDescriptor = modelService.resolveEmbeddingModelDescriptor(knowledgeBase.getEmbeddingModelId());
         EmbeddingModelClient client = embeddingClientRegistry.getClient(embeddingDescriptor.providerCode());
         List<Float> vector = client.embed(embeddingDescriptor.modelCode(), List.of(question)).getFirst();
         List<MilvusVectorStoreClient.SearchResult> searchResults = milvusVectorStoreClient.search(

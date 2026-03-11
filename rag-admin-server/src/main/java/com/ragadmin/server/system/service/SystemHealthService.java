@@ -1,5 +1,7 @@
 package com.ragadmin.server.system.service;
 
+import com.ragadmin.server.infra.ai.bailian.BailianApiSupport;
+import com.ragadmin.server.infra.ai.bailian.BailianProperties;
 import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
 import com.ragadmin.server.infra.storage.MinioProperties;
 import com.ragadmin.server.infra.vector.MilvusProperties;
@@ -34,6 +36,9 @@ public class SystemHealthService {
     private MinioProperties minioProperties;
 
     @Autowired
+    private BailianProperties bailianProperties;
+
+    @Autowired
     private OllamaProperties ollamaProperties;
 
     @Autowired
@@ -43,10 +48,11 @@ public class SystemHealthService {
         DependencyHealthResponse postgres = checkPostgres();
         DependencyHealthResponse redis = checkRedis();
         DependencyHealthResponse minio = checkMinio();
+        DependencyHealthResponse bailian = checkBailian();
         DependencyHealthResponse ollama = checkOllama();
         DependencyHealthResponse milvus = checkMilvus();
-        String status = isHealthy(postgres, redis, minio, ollama, milvus) ? "UP" : "DEGRADED";
-        return new HealthCheckResponse(status, postgres, redis, minio, ollama, milvus);
+        String status = isHealthy(postgres, redis, minio, bailian, ollama, milvus) ? "UP" : "DEGRADED";
+        return new HealthCheckResponse(status, postgres, redis, minio, bailian, ollama, milvus);
     }
 
     private DependencyHealthResponse checkPostgres() {
@@ -133,6 +139,26 @@ public class SystemHealthService {
         }
     }
 
+    private DependencyHealthResponse checkBailian() {
+        if (!bailianProperties.isEnabled()) {
+            return new DependencyHealthResponse("UNKNOWN", "百炼已禁用");
+        }
+        if (!StringUtils.hasText(bailianProperties.getApiKey())) {
+            return new DependencyHealthResponse("UNKNOWN", "百炼未配置 API Key");
+        }
+        try {
+            RestClient client = BailianApiSupport.buildRestClient(bailianProperties);
+            BailianModelsResponse response = client.get()
+                    .uri("/models")
+                    .retrieve()
+                    .body(BailianModelsResponse.class);
+            int modelCount = response == null || response.data() == null ? 0 : response.data().size();
+            return new DependencyHealthResponse("UP", "百炼连通正常，模型数=" + modelCount);
+        } catch (Exception ex) {
+            return new DependencyHealthResponse("DOWN", buildMessage("百炼检查失败", ex));
+        }
+    }
+
     private DependencyHealthResponse checkMilvus() {
         if (!milvusProperties.isEnabled()) {
             return new DependencyHealthResponse("UNKNOWN", "Milvus 已禁用");
@@ -170,6 +196,9 @@ public class SystemHealthService {
     }
 
     private record OllamaTagsResponse(List<Map<String, Object>> models) {
+    }
+
+    private record BailianModelsResponse(List<Map<String, Object>> data) {
     }
 
     private record MilvusCollectionsResponse(List<Object> data) {

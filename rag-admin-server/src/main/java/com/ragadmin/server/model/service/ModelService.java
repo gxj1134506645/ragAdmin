@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
+import com.ragadmin.server.infra.ai.AiProperties;
+import com.ragadmin.server.infra.ai.bailian.BailianProperties;
 import com.ragadmin.server.infra.ai.chat.ChatClientRegistry;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
@@ -50,6 +52,12 @@ public class ModelService {
 
     @Autowired
     private EmbeddingClientRegistry embeddingClientRegistry;
+
+    @Autowired
+    private AiProperties aiProperties;
+
+    @Autowired
+    private BailianProperties bailianProperties;
 
     public PageResponse<ModelResponse> list(String providerCode, String capabilityType, String status, long pageNo, long pageSize) {
         LambdaQueryWrapper<AiModelEntity> wrapper = new LambdaQueryWrapper<AiModelEntity>()
@@ -171,6 +179,10 @@ public class ModelService {
         );
     }
 
+    public EmbeddingModelDescriptor resolveEmbeddingModelDescriptor(Long modelId) {
+        return modelId != null ? requireEmbeddingModelDescriptor(modelId) : resolveDefaultEmbeddingModelDescriptor();
+    }
+
     public ChatModelDescriptor requireChatModelDescriptor(Long modelId) {
         AiModelEntity model = requireModelWithCapability(modelId, "TEXT_GENERATION");
         AiProviderEntity provider = aiProviderMapper.selectById(model.getProviderId());
@@ -183,6 +195,10 @@ public class ModelService {
                 provider.getProviderCode(),
                 provider.getProviderName()
         );
+    }
+
+    public ChatModelDescriptor resolveChatModelDescriptor(Long modelId) {
+        return modelId != null ? requireChatModelDescriptor(modelId) : resolveDefaultChatModelDescriptor();
     }
 
     public ModelHealthCheckResponse healthCheck(Long modelId) {
@@ -246,6 +262,66 @@ public class ModelService {
             throw new BusinessException("PROVIDER_NOT_FOUND", "模型提供方不存在", HttpStatus.NOT_FOUND);
         }
         return provider;
+    }
+
+    private EmbeddingModelDescriptor resolveDefaultEmbeddingModelDescriptor() {
+        String providerCode = resolveDefaultProviderCode();
+        if ("BAILIAN".equalsIgnoreCase(providerCode)) {
+            return requireEmbeddingDescriptorByProviderAndCode(providerCode, bailianProperties.getDefaultEmbeddingModel());
+        }
+        throw new BusinessException("DEFAULT_EMBEDDING_MODEL_UNSUPPORTED", "当前默认提供方未配置 Embedding 默认模型", HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    private ChatModelDescriptor resolveDefaultChatModelDescriptor() {
+        String providerCode = resolveDefaultProviderCode();
+        if ("BAILIAN".equalsIgnoreCase(providerCode)) {
+            return requireChatDescriptorByProviderAndCode(providerCode, bailianProperties.getDefaultChatModel());
+        }
+        throw new BusinessException("DEFAULT_CHAT_MODEL_UNSUPPORTED", "当前默认提供方未配置聊天默认模型", HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    private EmbeddingModelDescriptor requireEmbeddingDescriptorByProviderAndCode(String providerCode, String modelCode) {
+        AiProviderEntity provider = requireProviderByCode(providerCode);
+        AiModelEntity model = requireModelByProviderAndCapability(provider.getId(), modelCode, "EMBEDDING");
+        return new EmbeddingModelDescriptor(model.getId(), model.getModelCode(), provider.getProviderCode(), provider.getProviderName());
+    }
+
+    private ChatModelDescriptor requireChatDescriptorByProviderAndCode(String providerCode, String modelCode) {
+        AiProviderEntity provider = requireProviderByCode(providerCode);
+        AiModelEntity model = requireModelByProviderAndCapability(provider.getId(), modelCode, "TEXT_GENERATION");
+        return new ChatModelDescriptor(model.getId(), model.getModelCode(), provider.getProviderCode(), provider.getProviderName());
+    }
+
+    private String resolveDefaultProviderCode() {
+        if (!StringUtils.hasText(aiProperties.getDefaultProvider())) {
+            throw new BusinessException("DEFAULT_PROVIDER_NOT_CONFIGURED", "未配置默认模型提供方", HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        return aiProperties.getDefaultProvider();
+    }
+
+    private AiProviderEntity requireProviderByCode(String providerCode) {
+        AiProviderEntity provider = aiProviderMapper.selectOne(new LambdaQueryWrapper<AiProviderEntity>()
+                .eq(AiProviderEntity::getProviderCode, providerCode)
+                .last("LIMIT 1"));
+        if (provider == null) {
+            throw new BusinessException("PROVIDER_NOT_FOUND", "默认模型提供方不存在", HttpStatus.NOT_FOUND);
+        }
+        return provider;
+    }
+
+    private AiModelEntity requireModelByProviderAndCapability(Long providerId, String modelCode, String capabilityType) {
+        if (!StringUtils.hasText(modelCode)) {
+            throw new BusinessException("DEFAULT_MODEL_NOT_CONFIGURED", "未配置默认模型编码", HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        AiModelEntity model = aiModelMapper.selectOne(new LambdaQueryWrapper<AiModelEntity>()
+                .eq(AiModelEntity::getProviderId, providerId)
+                .eq(AiModelEntity::getModelCode, modelCode)
+                .last("LIMIT 1"));
+        if (model == null) {
+            throw new BusinessException("MODEL_NOT_FOUND", "默认模型不存在，请先在后台模型管理中维护", HttpStatus.NOT_FOUND);
+        }
+        requireModelWithCapability(model.getId(), capabilityType);
+        return model;
     }
 
     private ModelResponse toResponse(AiModelEntity entity, AiProviderEntity provider, List<String> capabilityTypes) {

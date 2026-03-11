@@ -169,7 +169,7 @@ class ChatServiceTest {
         when(chatSessionMapper.selectById(31L)).thenReturn(session);
         when(knowledgeBaseService.requireById(401L)).thenReturn(knowledgeBase);
         when(retrievalService.retrieve(knowledgeBase, "请总结制度要点")).thenReturn(retrievalResult);
-        when(modelService.requireChatModelDescriptor(501L)).thenReturn(modelDescriptor);
+        when(modelService.resolveChatModelDescriptor(501L)).thenReturn(modelDescriptor);
         when(chatClientRegistry.getClient("OLLAMA")).thenReturn(chatClient);
         when(documentMapper.selectBatchIds(List.of(701L))).thenReturn(List.of(document));
         when(retrievalService.toReferenceResponses(eq(List.of(retrievedChunk)), any()))
@@ -248,7 +248,7 @@ class ChatServiceTest {
         when(chatSessionMapper.selectById(32L)).thenReturn(session);
         when(knowledgeBaseService.requireById(402L)).thenReturn(knowledgeBase);
         when(retrievalService.retrieve(knowledgeBase, "没有命中时应该怎么回答")).thenReturn(retrievalResult);
-        when(modelService.requireChatModelDescriptor(502L)).thenReturn(modelDescriptor);
+        when(modelService.resolveChatModelDescriptor(502L)).thenReturn(modelDescriptor);
         when(chatClientRegistry.getClient("OLLAMA")).thenReturn(chatClient);
         when(retrievalService.toReferenceResponses(eq(List.of()), any())).thenReturn(List.of());
 

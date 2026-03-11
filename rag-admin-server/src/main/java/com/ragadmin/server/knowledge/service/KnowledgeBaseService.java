@@ -65,8 +65,12 @@ public class KnowledgeBaseService {
             throw new BusinessException("KB_CODE_EXISTS", "知识库编码已存在", HttpStatus.BAD_REQUEST);
         }
 
-        AiModelEntity embeddingModel = modelService.requireModelWithCapability(request.getEmbeddingModelId(), "EMBEDDING");
-        AiModelEntity chatModel = modelService.requireModelWithCapability(request.getChatModelId(), "TEXT_GENERATION");
+        if (request.getEmbeddingModelId() != null) {
+            modelService.requireModelWithCapability(request.getEmbeddingModelId(), "EMBEDDING");
+        }
+        if (request.getChatModelId() != null) {
+            modelService.requireModelWithCapability(request.getChatModelId(), "TEXT_GENERATION");
+        }
 
         KnowledgeBaseEntity entity = new KnowledgeBaseEntity();
         entity.setKbCode(request.getKbCode());
@@ -79,20 +83,7 @@ public class KnowledgeBaseService {
         entity.setStatus(request.getStatus());
         entity.setCreatedBy(operatorUserId);
         knowledgeBaseMapper.insert(entity);
-
-        return new KnowledgeBaseResponse(
-                entity.getId(),
-                entity.getKbCode(),
-                entity.getKbName(),
-                entity.getDescription(),
-                embeddingModel.getId(),
-                embeddingModel.getModelName(),
-                chatModel.getId(),
-                chatModel.getModelName(),
-                entity.getRetrieveTopK(),
-                entity.getRerankEnabled(),
-                entity.getStatus()
-        );
+        return getDetail(entity.getId());
     }
 
     public KnowledgeBaseEntity requireById(Long kbId) {

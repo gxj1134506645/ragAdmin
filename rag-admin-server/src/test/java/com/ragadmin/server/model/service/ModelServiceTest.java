@@ -2,6 +2,8 @@ package com.ragadmin.server.model.service;
 
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
+import com.ragadmin.server.infra.ai.AiProperties;
+import com.ragadmin.server.infra.ai.bailian.BailianProperties;
 import com.ragadmin.server.infra.ai.chat.ChatClientRegistry;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
@@ -49,6 +51,9 @@ class ModelServiceTest {
     @Mock
     private EmbeddingClientRegistry embeddingClientRegistry;
 
+    private final AiProperties aiProperties = new AiProperties();
+    private final BailianProperties bailianProperties = new BailianProperties();
+
     private ModelService modelService;
 
     @BeforeEach
@@ -60,6 +65,8 @@ class ModelServiceTest {
         ReflectionTestUtils.setField(modelService, "modelProviderService", modelProviderService);
         ReflectionTestUtils.setField(modelService, "chatClientRegistry", chatClientRegistry);
         ReflectionTestUtils.setField(modelService, "embeddingClientRegistry", embeddingClientRegistry);
+        ReflectionTestUtils.setField(modelService, "aiProperties", aiProperties);
+        ReflectionTestUtils.setField(modelService, "bailianProperties", bailianProperties);
     }
 
     @Test
@@ -103,6 +110,35 @@ class ModelServiceTest {
         assertEquals("nomic-embed-text", descriptor.modelCode());
         assertEquals("OLLAMA", descriptor.providerCode());
         assertEquals("Ollama", descriptor.providerName());
+    }
+
+    @Test
+    void shouldResolveDefaultChatModelDescriptorWhenKnowledgeBaseModelIsEmpty() {
+        AiProviderEntity provider = new AiProviderEntity();
+        provider.setId(50L);
+        provider.setProviderCode("BAILIAN");
+        provider.setProviderName("百炼");
+
+        AiModelEntity model = new AiModelEntity();
+        model.setId(5L);
+        model.setProviderId(50L);
+        model.setModelCode("qwen-max");
+
+        aiProperties.setDefaultProvider("BAILIAN");
+        bailianProperties.setDefaultChatModel("qwen-max");
+
+        when(aiProviderMapper.selectOne(any())).thenReturn(provider);
+        when(aiModelMapper.selectOne(any())).thenReturn(model);
+        when(aiModelMapper.selectById(5L)).thenReturn(model);
+        when(aiModelCapabilityMapper.selectEnabledByModelIds(List.of(5L)))
+                .thenReturn(List.of(capability(5L, "TEXT_GENERATION")));
+
+        ModelService.ChatModelDescriptor descriptor = modelService.resolveChatModelDescriptor(null);
+
+        assertEquals(5L, descriptor.modelId());
+        assertEquals("qwen-max", descriptor.modelCode());
+        assertEquals("BAILIAN", descriptor.providerCode());
+        assertEquals("百炼", descriptor.providerName());
     }
 
     @Test

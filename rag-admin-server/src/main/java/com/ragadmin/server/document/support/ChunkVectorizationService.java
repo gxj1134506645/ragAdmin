@@ -42,7 +42,7 @@ public class ChunkVectorizationService {
         if (chunks == null || chunks.isEmpty()) {
             return;
         }
-        EmbeddingModelDescriptor descriptor = modelService.requireEmbeddingModelDescriptor(knowledgeBase.getEmbeddingModelId());
+        EmbeddingModelDescriptor descriptor = modelService.resolveEmbeddingModelDescriptor(knowledgeBase.getEmbeddingModelId());
         EmbeddingModelClient client = embeddingClientRegistry.getClient(descriptor.providerCode());
         List<List<Float>> embeddings = client.embed(descriptor.modelCode(), chunks.stream().map(ChunkEntity::getChunkText).toList());
         if (embeddings.size() != chunks.size()) {

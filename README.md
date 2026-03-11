@@ -104,7 +104,7 @@ mvn -q -pl rag-admin-server spring-boot:run
 
 - `9212`
 
-默认 profile 为 `local`，对应本机 localhost + Docker 容器环境。
+默认 profile 为 `local`，对应本机 `127.0.0.1` + Docker 容器环境。
 
 如果你需要继续使用内网共享开发环境，可显式切换：
 

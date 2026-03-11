@@ -96,7 +96,7 @@
 - 后端应用在本机运行
 - PostgreSQL、Milvus、Ollama 优先通过容器运行
 - Redis、MinIO 当前阶段走内网服务器
-- 所有连接通过环境变量配置，不强制写死 `localhost`
+- 所有连接通过环境变量配置，不强制写死 `127.0.0.1`
 
 ### 3.1.1 当前已确认的内网依赖
 
@@ -132,11 +132,11 @@
 
 ### 3.4 本地连接约定
 
-- `jdbc:postgresql://localhost:5432/rag_admin`
+- `jdbc:postgresql://127.0.0.1:5432/rag_admin`
 - `redis://$REDIS_HOST:$REDIS_PORT`
 - `http://$MINIO_ENDPOINT:$MINIO_PORT`
-- `localhost:19530`
-- `http://localhost:11434`
+- `127.0.0.1:19530`
+- `http://127.0.0.1:11434`
 
 ## 4. 代码结构与模块划分
 

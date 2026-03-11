@@ -38,7 +38,7 @@ public class ModelBootstrapInitializer implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         AiProviderEntity bailian = ensureProvider("BAILIAN", "阿里百炼", "https://dashscope.aliyuncs.com");
-        AiProviderEntity ollama = ensureProvider("OLLAMA", "Ollama", "http://localhost:11434");
+        AiProviderEntity ollama = ensureProvider("OLLAMA", "Ollama", "http://127.0.0.1:11434");
 
         ensureModel(bailian, "qwen-max", "通义千问 Max", "CHAT", List.of("TEXT_GENERATION"), 8000, new BigDecimal("0.7"));
         ensureModel(bailian, "text-embedding-v3", "通义文本向量", "EMBEDDING", List.of("EMBEDDING"), null, null);

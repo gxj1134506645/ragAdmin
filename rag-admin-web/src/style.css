@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Serif+SC:wght@500;600;700&display=swap');
+
+:root {
+  font-family: "Manrope", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  line-height: 1.5;
+  font-weight: 500;
+  color: #2f241d;
+  background:
+    radial-gradient(circle at top left, rgba(218, 122, 34, 0.14), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(106, 74, 42, 0.1), transparent 24%),
+    linear-gradient(180deg, #f7f1e7 0%, #f4ecdf 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --rag-bg: #f4ecdf;
+  --rag-surface: rgba(255, 251, 245, 0.8);
+  --rag-surface-strong: #fffaf2;
+  --rag-border: rgba(113, 82, 45, 0.18);
+  --rag-text-primary: #2f241d;
+  --rag-text-secondary: #6b5746;
+  --rag-accent: #c66b22;
+  --rag-accent-deep: #8d4510;
+  --rag-success: #2f8f5b;
+  --rag-danger: #b54d3d;
+  --rag-shadow: 0 24px 60px rgba(91, 65, 37, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+body {
+  color: var(--rag-text-primary);
+  background:
+    linear-gradient(rgba(82, 62, 45, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(82, 62, 45, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, #f8f2e8 0%, #f3eadb 100%);
+  background-size: 32px 32px, 32px 32px, 100% 100%;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(198, 107, 34, 0.1), transparent 22%),
+    radial-gradient(circle at 80% 85%, rgba(141, 69, 16, 0.08), transparent 18%);
+  mix-blend-mode: multiply;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.page-title {
+  margin: 0;
+  font-family: "Noto Serif SC", serif;
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.page-subtitle {
+  margin: 8px 0 0;
+  color: var(--rag-text-secondary);
+  font-size: 14px;
+}
+
+.soft-panel {
+  border: 1px solid var(--rag-border);
+  border-radius: 24px;
+  background: var(--rag-surface);
+  box-shadow: var(--rag-shadow);
+  backdrop-filter: blur(12px);
+}

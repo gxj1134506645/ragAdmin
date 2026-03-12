@@ -69,6 +69,10 @@ async function handleEdit(id: number): Promise<void> {
   await router.push(`/knowledge-bases/${id}/edit`)
 }
 
+async function handleDetail(id: number): Promise<void> {
+  await router.push(`/knowledge-bases/${id}`)
+}
+
 async function consumeCreatedFlag(): Promise<void> {
   if (route.query.created !== '1') {
     return
@@ -168,8 +172,9 @@ onMounted(async () => {
             {{ row.description || '暂无描述' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
+            <el-button link @click="handleDetail(row.id)">详情</el-button>
             <el-button link type="primary" @click="handleEdit(row.id)">编辑</el-button>
           </template>
         </el-table-column>

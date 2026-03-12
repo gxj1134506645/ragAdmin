@@ -1,6 +1,7 @@
 import type { ApiResponse, PageResponse } from '@/types/api'
 import type {
   KnowledgeBase,
+  KnowledgeBaseDocument,
   KnowledgeBaseUpsertRequest,
   ModelDefinition,
 } from '@/types/knowledge-base'
@@ -18,6 +19,14 @@ export interface ModelListQuery {
   pageSize: number
   capabilityType?: string
   status?: string
+}
+
+export interface KnowledgeBaseDocumentListQuery {
+  pageNo: number
+  pageSize: number
+  keyword?: string
+  parseStatus?: string
+  enabled?: boolean
 }
 
 export async function listKnowledgeBases(
@@ -45,6 +54,19 @@ export async function updateKnowledgeBase(
 ): Promise<void> {
   const response = await http.put<ApiResponse<null>>(`/admin/knowledge-bases/${id}`, payload)
   unwrapResponse(response.data)
+}
+
+export async function listKnowledgeBaseDocuments(
+  id: number,
+  query: KnowledgeBaseDocumentListQuery,
+): Promise<PageResponse<KnowledgeBaseDocument>> {
+  const response = await http.get<ApiResponse<PageResponse<KnowledgeBaseDocument>>>(
+    `/admin/knowledge-bases/${id}/documents`,
+    {
+      params: query,
+    },
+  )
+  return unwrapResponse(response.data)
 }
 
 export async function listModels(query: ModelListQuery): Promise<PageResponse<ModelDefinition>> {

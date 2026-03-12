@@ -32,3 +32,12 @@ export interface ModelDefinition {
   capabilityType?: string
   status: string
 }
+
+export interface KnowledgeBaseDocument {
+  documentId: number
+  docName: string
+  docType: string
+  parseStatus: string
+  enabled: boolean
+  createdAt: string
+}

@@ -65,6 +65,10 @@ async function handleCreate(): Promise<void> {
   await router.push('/knowledge-bases/create')
 }
 
+async function handleEdit(id: number): Promise<void> {
+  await router.push(`/knowledge-bases/${id}/edit`)
+}
+
 async function consumeCreatedFlag(): Promise<void> {
   if (route.query.created !== '1') {
     return
@@ -78,8 +82,22 @@ async function consumeCreatedFlag(): Promise<void> {
   })
 }
 
+async function consumeUpdatedFlag(): Promise<void> {
+  if (route.query.updated !== '1') {
+    return
+  }
+  ElMessage.success('知识库更新成功')
+  const query = { ...route.query }
+  delete query.updated
+  await router.replace({
+    path: route.path,
+    query,
+  })
+}
+
 onMounted(async () => {
   await consumeCreatedFlag()
+  await consumeUpdatedFlag()
   await loadList()
 })
 </script>
@@ -148,6 +166,11 @@ onMounted(async () => {
         <el-table-column label="说明" min-width="220">
           <template #default="{ row }">
             {{ row.description || '暂无描述' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="handleEdit(row.id)">编辑</el-button>
           </template>
         </el-table-column>
       </el-table>

@@ -34,6 +34,19 @@ export async function createKnowledgeBase(payload: KnowledgeBaseUpsertRequest): 
   return unwrapResponse(response.data)
 }
 
+export async function getKnowledgeBaseDetail(id: number): Promise<KnowledgeBase> {
+  const response = await http.get<ApiResponse<KnowledgeBase>>(`/admin/knowledge-bases/${id}`)
+  return unwrapResponse(response.data)
+}
+
+export async function updateKnowledgeBase(
+  id: number,
+  payload: KnowledgeBaseUpsertRequest,
+): Promise<void> {
+  const response = await http.put<ApiResponse<null>>(`/admin/knowledge-bases/${id}`, payload)
+  unwrapResponse(response.data)
+}
+
 export async function listModels(query: ModelListQuery): Promise<PageResponse<ModelDefinition>> {
   const response = await http.get<ApiResponse<PageResponse<ModelDefinition>>>('/admin/models', {
     params: query,

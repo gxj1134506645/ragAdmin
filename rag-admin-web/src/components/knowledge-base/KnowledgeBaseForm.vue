@@ -11,6 +11,10 @@ const props = defineProps<{
   modelFallback: boolean
   modelLoading: boolean
   submitting: boolean
+  title: string
+  description: string
+  submitText: string
+  eyebrow?: string
 }>()
 
 const emit = defineEmits<{
@@ -63,11 +67,9 @@ async function handleSubmit(): Promise<void> {
   <section class="form-panel soft-panel">
     <div class="form-head">
       <div>
-        <p class="form-eyebrow">Knowledge Base / Create</p>
-        <h2>新建知识库</h2>
-        <p class="form-description">
-          这一版先打通知识库创建与列表回跳闭环，模型项支持真实接口和默认模型兜底双模式。
-        </p>
+        <p class="form-eyebrow">{{ eyebrow || 'Knowledge Base / Workspace' }}</p>
+        <h2>{{ title }}</h2>
+        <p class="form-description">{{ description }}</p>
       </div>
     </div>
 
@@ -189,7 +191,7 @@ async function handleSubmit(): Promise<void> {
       <div class="form-actions">
         <el-button @click="emit('cancel')">取消返回</el-button>
         <el-button type="primary" :loading="submitting" @click="handleSubmit">
-          创建知识库
+          {{ submitText }}
         </el-button>
       </div>
     </el-form>

@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElButton, ElEmpty } from 'element-plus'
-import { listTasks } from '@/api/task'
+import { ElButton, ElEmpty, ElMessage, ElMessageBox } from 'element-plus'
+import { listTasks, retryTask } from '@/api/task'
 import { resolveErrorMessage } from '@/api/http'
 import type { TaskRecord } from '@/types/task'
 
 const loading = ref(false)
 const loadError = ref('')
 const tasks = ref<TaskRecord[]>([])
+const retryingTaskIds = ref<number[]>([])
 const pagination = reactive({
   pageNo: 1,
   pageSize: 10,
@@ -47,6 +48,14 @@ function taskStatusType(status: string): 'warning' | 'success' | 'danger' | 'inf
     return 'danger'
   }
   return 'info'
+}
+
+function canRetry(status: string): boolean {
+  return status === 'FAILED' || status === 'CANCELED'
+}
+
+function isRetrying(taskId: number): boolean {
+  return retryingTaskIds.value.includes(taskId)
 }
 
 function formatTime(value: string): string {
@@ -120,6 +129,38 @@ async function handleSizeChange(pageSize: number): Promise<void> {
   pagination.pageSize = pageSize
   pagination.pageNo = 1
   await loadTasks()
+}
+
+async function handleRetry(task: TaskRecord): Promise<void> {
+  if (!canRetry(task.taskStatus) || isRetrying(task.taskId)) {
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要重新投递任务 #${task.taskId} 吗？`,
+      '确认重试',
+      {
+        confirmButtonText: '确认重试',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    return
+  }
+
+  retryingTaskIds.value = [...retryingTaskIds.value, task.taskId]
+
+  try {
+    await retryTask(task.taskId)
+    ElMessage.success(`任务 #${task.taskId} 已重新投递`)
+  } catch (error) {
+    ElMessage.error(resolveErrorMessage(error))
+  } finally {
+    retryingTaskIds.value = retryingTaskIds.value.filter((id) => id !== task.taskId)
+    await loadTasks()
+  }
 }
 
 onMounted(async () => {
@@ -201,6 +242,19 @@ onMounted(async () => {
           <el-table-column label="更新时间" min-width="180">
             <template #default="{ row }">
               {{ formatTime(row.updatedAt) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="140" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                v-if="canRetry(row.taskStatus)"
+                link
+                type="primary"
+                :loading="isRetrying(row.taskId)"
+                @click="handleRetry(row)"
+              >
+                重试
+              </el-button>
             </template>
           </el-table-column>
         </el-table>

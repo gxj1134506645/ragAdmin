@@ -16,3 +16,8 @@ export async function listTasks(query: TaskListQuery): Promise<PageResponse<Task
   })
   return unwrapResponse(response.data)
 }
+
+export async function retryTask(taskId: number): Promise<void> {
+  const response = await http.post<ApiResponse<null>>(`/admin/tasks/${taskId}/retry`)
+  unwrapResponse(response.data)
+}

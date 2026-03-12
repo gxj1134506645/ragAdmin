@@ -7,6 +7,7 @@ import {
   getKnowledgeBaseDetail,
   getKnowledgeBaseDocumentUploadUrl,
   listKnowledgeBaseDocuments,
+  triggerDocumentParse,
 } from '@/api/knowledge-base'
 import { resolveErrorMessage } from '@/api/http'
 import type {
@@ -36,6 +37,7 @@ const selectedFile = ref<File | null>(null)
 const uploadSubmitting = ref(false)
 const uploadStage = ref<'idle' | 'getting-url' | 'uploading' | 'registering'>('idle')
 const uploadError = ref('')
+const parsingDocumentIds = ref<number[]>([])
 
 const knowledgeBaseId = computed(() => Number(route.params.id))
 const hasDocuments = computed(() => documents.value.length > 0)
@@ -87,6 +89,14 @@ function parseStatusType(status: string): 'success' | 'warning' | 'danger' | 'in
 
 function enabledLabel(enabled: boolean): string {
   return enabled ? '启用' : '停用'
+}
+
+function canTriggerParse(status: string): boolean {
+  return status === 'PENDING' || status === 'FAILED'
+}
+
+function isParsing(documentId: number): boolean {
+  return parsingDocumentIds.value.includes(documentId)
 }
 
 function formatTime(value: string): string {
@@ -182,6 +192,24 @@ async function handleUpload(): Promise<void> {
     if (uploadDialogVisible.value) {
       uploadStage.value = 'idle'
     }
+  }
+}
+
+async function handleTriggerParse(document: KnowledgeBaseDocument): Promise<void> {
+  if (!canTriggerParse(document.parseStatus) || isParsing(document.documentId)) {
+    return
+  }
+
+  parsingDocumentIds.value = [...parsingDocumentIds.value, document.documentId]
+
+  try {
+    await triggerDocumentParse(document.documentId)
+    ElMessage.success(`已提交《${document.docName}》的解析任务`)
+  } catch (error) {
+    ElMessage.error(resolveErrorMessage(error))
+  } finally {
+    parsingDocumentIds.value = parsingDocumentIds.value.filter((id) => id !== document.documentId)
+    await loadDocuments()
   }
 }
 
@@ -385,6 +413,19 @@ onMounted(async () => {
             <el-table-column label="创建时间" min-width="180">
               <template #default="{ row }">
                 {{ formatTime(row.createdAt) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="140" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  link
+                  type="primary"
+                  :disabled="!canTriggerParse(row.parseStatus)"
+                  :loading="isParsing(row.documentId)"
+                  @click="handleTriggerParse(row)"
+                >
+                  开始解析
+                </el-button>
               </template>
             </el-table-column>
           </el-table>

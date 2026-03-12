@@ -87,6 +87,11 @@ export async function createKnowledgeBaseDocument(
   return unwrapResponse(response.data)
 }
 
+export async function triggerDocumentParse(documentId: number): Promise<void> {
+  const response = await http.post<ApiResponse<null>>(`/admin/documents/${documentId}/parse`)
+  unwrapResponse(response.data)
+}
+
 export async function listModels(query: ModelListQuery): Promise<PageResponse<ModelDefinition>> {
   const response = await http.get<ApiResponse<PageResponse<ModelDefinition>>>('/admin/models', {
     params: query,

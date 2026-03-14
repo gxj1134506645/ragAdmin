@@ -2,10 +2,12 @@ package com.ragadmin.server.infra.ai.chat;
 
 import com.ragadmin.server.infra.ai.SpringAiModelSupport;
 import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.ai.ollama.OllamaChatModel;
+import org.springframework.ai.ollama.api.OllamaApi;
+import org.springframework.ai.ollama.api.OllamaChatOptions;
+import org.springframework.ai.ollama.management.ModelManagementOptions;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -28,17 +30,18 @@ public class OllamaChatClient implements ChatModelClient {
 
     @Override
     public ChatCompletionResult chat(String modelCode, List<ChatMessage> messages) {
-        OpenAiApi openAiApi = OpenAiApi.builder()
-                .baseUrl(SpringAiModelSupport.normalizeOllamaOpenAiBaseUrl(ollamaProperties.getBaseUrl()))
-                .apiKey("ollama")
+        OllamaApi ollamaApi = OllamaApi.builder()
+                .baseUrl(ollamaProperties.getBaseUrl())
                 .restClientBuilder(SpringAiModelSupport.createRestClientBuilder(ollamaProperties.getTimeoutSeconds()))
                 .build();
-        OpenAiChatOptions options = OpenAiChatOptions.builder()
+        OllamaChatOptions options = OllamaChatOptions.builder()
                 .model(modelCode)
                 .build();
-        OpenAiChatModel chatModel = OpenAiChatModel.builder()
-                .openAiApi(openAiApi)
+        OllamaChatModel chatModel = OllamaChatModel.builder()
+                .ollamaApi(ollamaApi)
                 .defaultOptions(options)
+                .observationRegistry(ObservationRegistry.NOOP)
+                .modelManagementOptions(ModelManagementOptions.defaults())
                 .build();
         Prompt prompt = new Prompt(SpringAiModelSupport.toSpringMessages(messages), options);
         return SpringAiModelSupport.toChatCompletionResult(chatModel.call(prompt));

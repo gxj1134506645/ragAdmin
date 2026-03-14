@@ -2,13 +2,15 @@ package com.ragadmin.server.infra.ai.embedding;
 
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.infra.ai.SpringAiModelSupport;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.document.MetadataMode;
 import org.springframework.ai.embedding.Embedding;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
-import org.springframework.ai.openai.OpenAiEmbeddingModel;
-import org.springframework.ai.openai.OpenAiEmbeddingOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.ai.ollama.OllamaEmbeddingModel;
+import org.springframework.ai.ollama.api.OllamaApi;
+import org.springframework.ai.ollama.api.OllamaEmbeddingOptions;
+import org.springframework.ai.ollama.management.ModelManagementOptions;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -33,15 +35,19 @@ public class OllamaEmbeddingClient implements EmbeddingModelClient {
 
     @Override
     public List<List<Float>> embed(String modelCode, List<String> inputs) {
-        OpenAiApi openAiApi = OpenAiApi.builder()
-                .baseUrl(SpringAiModelSupport.normalizeOllamaOpenAiBaseUrl(ollamaProperties.getBaseUrl()))
-                .apiKey("ollama")
+        OllamaApi ollamaApi = OllamaApi.builder()
+                .baseUrl(ollamaProperties.getBaseUrl())
                 .restClientBuilder(SpringAiModelSupport.createRestClientBuilder(ollamaProperties.getTimeoutSeconds()))
                 .build();
-        OpenAiEmbeddingOptions options = OpenAiEmbeddingOptions.builder()
+        OllamaEmbeddingOptions options = OllamaEmbeddingOptions.builder()
                 .model(modelCode)
                 .build();
-        OpenAiEmbeddingModel embeddingModel = new OpenAiEmbeddingModel(openAiApi, MetadataMode.NONE, options);
+        OllamaEmbeddingModel embeddingModel = OllamaEmbeddingModel.builder()
+                .ollamaApi(ollamaApi)
+                .defaultOptions(options)
+                .observationRegistry(ObservationRegistry.NOOP)
+                .modelManagementOptions(ModelManagementOptions.defaults())
+                .build();
         EmbeddingResponse response = embeddingModel.call(new EmbeddingRequest(inputs, options));
         if (response == null || response.getResults() == null || response.getResults().isEmpty()) {
             throw new BusinessException("EMBEDDING_FAILED", "Ollama Embedding 返回为空", HttpStatus.BAD_GATEWAY);

@@ -1,6 +1,7 @@
 package com.ragadmin.server.infra.ai.bailian;
 
 import com.ragadmin.server.common.exception.BusinessException;
+import com.ragadmin.server.infra.ai.SpringAiModelFactory;
 import com.ragadmin.server.infra.ai.chat.BailianChatClient;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
 import com.ragadmin.server.infra.ai.embedding.BailianEmbeddingClient;
@@ -16,8 +17,9 @@ class BailianApiClientInitializationTest {
     @Test
     void shouldNotRequireApiKeyAtBeanInitializationTimeForChatClient() {
         BailianProperties properties = new BailianProperties();
+        SpringAiModelFactory springAiModelFactory = new SpringAiModelFactory(List.of(new BailianModelFactory(properties)));
 
-        BailianChatClient client = new BailianChatClient(properties);
+        BailianChatClient client = new BailianChatClient(springAiModelFactory);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -30,8 +32,9 @@ class BailianApiClientInitializationTest {
     @Test
     void shouldNotRequireApiKeyAtBeanInitializationTimeForEmbeddingClient() {
         BailianProperties properties = new BailianProperties();
+        SpringAiModelFactory springAiModelFactory = new SpringAiModelFactory(List.of(new BailianModelFactory(properties)));
 
-        BailianEmbeddingClient client = new BailianEmbeddingClient(properties);
+        BailianEmbeddingClient client = new BailianEmbeddingClient(springAiModelFactory);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,

@@ -1,10 +1,7 @@
 package com.ragadmin.server.infra.ai.chat;
 
-import com.alibaba.cloud.ai.dashscope.api.DashScopeApi;
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatModel;
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
+import com.ragadmin.server.infra.ai.SpringAiModelFactory;
 import com.ragadmin.server.infra.ai.SpringAiModelSupport;
-import com.ragadmin.server.infra.ai.bailian.BailianProperties;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -15,10 +12,10 @@ import java.util.List;
 @ConditionalOnProperty(prefix = "rag.ai.bailian", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class BailianChatClient implements ChatModelClient {
 
-    private final BailianProperties bailianProperties;
+    private final SpringAiModelFactory springAiModelFactory;
 
-    public BailianChatClient(BailianProperties bailianProperties) {
-        this.bailianProperties = bailianProperties;
+    public BailianChatClient(SpringAiModelFactory springAiModelFactory) {
+        this.springAiModelFactory = springAiModelFactory;
     }
 
     @Override
@@ -28,19 +25,8 @@ public class BailianChatClient implements ChatModelClient {
 
     @Override
     public ChatCompletionResult chat(String modelCode, List<ChatMessage> messages) {
-        DashScopeApi dashScopeApi = DashScopeApi.builder()
-                .baseUrl(SpringAiModelSupport.normalizeDashScopeBaseUrl(bailianProperties.getBaseUrl()))
-                .apiKey(SpringAiModelSupport.requireApiKey(bailianProperties.getApiKey()))
-                .restClientBuilder(SpringAiModelSupport.createRestClientBuilder(bailianProperties.getTimeoutSeconds()))
-                .build();
-        DashScopeChatOptions options = DashScopeChatOptions.builder()
-                .model(modelCode)
-                .build();
-        DashScopeChatModel chatModel = DashScopeChatModel.builder()
-                .dashScopeApi(dashScopeApi)
-                .defaultOptions(options)
-                .build();
-        Prompt prompt = new Prompt(SpringAiModelSupport.toSpringMessages(messages), options);
+        Prompt prompt = new Prompt(SpringAiModelSupport.toSpringMessages(messages));
+        var chatModel = springAiModelFactory.createChatModel("BAILIAN", modelCode);
         return SpringAiModelSupport.toChatCompletionResult(chatModel.call(prompt));
     }
 }

@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public record DocumentResponse(
         Long id,
         Long kbId,
+        String kbName,
         String docName,
         String docType,
         String storageBucket,

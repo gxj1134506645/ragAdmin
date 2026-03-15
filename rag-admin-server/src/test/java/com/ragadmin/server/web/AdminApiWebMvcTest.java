@@ -318,6 +318,7 @@ class AdminApiWebMvcTest {
         when(documentService.createDocument(eq(21L), any(), eq(1L))).thenReturn(new DocumentResponse(
                 31L,
                 21L,
+                "演示知识库",
                 "sample.md",
                 "MARKDOWN",
                 "ragadmin",
@@ -358,6 +359,7 @@ class AdminApiWebMvcTest {
                         List.of(new DocumentResponse(
                                 31L,
                                 21L,
+                                "演示知识库",
                                 "sample.md",
                                 "MARKDOWN",
                                 "ragadmin",

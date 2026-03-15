@@ -293,9 +293,11 @@ public class DocumentService {
     }
 
     private DocumentResponse toResponse(DocumentEntity document) {
+        KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(document.getKbId());
         return new DocumentResponse(
                 document.getId(),
                 document.getKbId(),
+                knowledgeBase.getKbName(),
                 document.getDocName(),
                 document.getDocType(),
                 document.getStorageBucket(),

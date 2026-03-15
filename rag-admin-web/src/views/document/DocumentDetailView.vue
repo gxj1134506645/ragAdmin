@@ -371,7 +371,7 @@ onMounted(async () => {
           <p class="detail-eyebrow">Document / Detail</p>
           <h1 class="page-title">{{ detail.docName }}</h1>
           <p class="page-subtitle">
-            当前页面聚焦文档主体信息与版本列表，切片浏览与版本操作后续补充。
+            当前页面已支持文档主体信息、版本激活、新增版本和切片浏览，适合直接检查解析结果。
           </p>
         </div>
         <div class="head-actions">
@@ -404,7 +404,7 @@ onMounted(async () => {
         <div class="section-head">
           <div>
             <h2>文档信息</h2>
-            <p>首版文档详情页先完整展示基础字段与存储信息。</p>
+            <p>这里展示文档基础信息、存储位置和当前解析状态。</p>
           </div>
         </div>
 
@@ -443,7 +443,7 @@ onMounted(async () => {
         <div class="section-head">
           <div>
             <h2>版本列表</h2>
-            <p>当前仅提供只读浏览，不包含激活版本与新增版本操作。</p>
+            <p>支持浏览版本、切换生效版本以及上传新的文档版本。</p>
           </div>
           <div class="version-actions">
             <el-button :loading="versionLoading" @click="handleRetryVersions">刷新版本列表</el-button>
@@ -513,7 +513,7 @@ onMounted(async () => {
         <div class="section-head">
           <div>
             <h2>切片浏览</h2>
-            <p>切片区支持分页、刷新和行内展开，便于快速检查解析结果质量。</p>
+            <p>切片区支持分页、刷新和行内展开，可直接观察解析与切片质量。</p>
           </div>
           <el-button :loading="chunkLoading" @click="handleRetryChunks">刷新切片</el-button>
         </div>

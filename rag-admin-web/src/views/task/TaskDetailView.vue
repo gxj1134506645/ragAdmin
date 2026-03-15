@@ -39,28 +39,30 @@ const timelineSteps = computed(() => {
       label: '运行中',
       reached: ['RUNNING', 'SUCCESS', 'FAILED', 'CANCELED'].includes(status),
       current: status === 'RUNNING',
-      time: ['RUNNING', 'SUCCESS', 'FAILED', 'CANCELED'].includes(status) ? '时间未知' : '待发生',
+      time: ['RUNNING', 'SUCCESS', 'FAILED', 'CANCELED'].includes(status)
+        ? formatTime(detail.value.startedAt || '')
+        : '待发生',
     },
     {
       code: 'SUCCESS',
       label: '成功',
       reached: status === 'SUCCESS',
       current: status === 'SUCCESS',
-      time: status === 'SUCCESS' ? formatTime(detail.value.updatedAt) : '待发生',
+      time: status === 'SUCCESS' ? formatTime(detail.value.finishedAt || detail.value.updatedAt) : '待发生',
     },
     {
       code: 'FAILED',
       label: '失败',
       reached: status === 'FAILED',
       current: status === 'FAILED',
-      time: status === 'FAILED' ? formatTime(detail.value.updatedAt) : '待发生',
+      time: status === 'FAILED' ? formatTime(detail.value.finishedAt || detail.value.updatedAt) : '待发生',
     },
     {
       code: 'CANCELED',
       label: '已取消',
       reached: status === 'CANCELED',
       current: status === 'CANCELED',
-      time: status === 'CANCELED' ? formatTime(detail.value.updatedAt) : '待发生',
+      time: status === 'CANCELED' ? formatTime(detail.value.finishedAt || detail.value.updatedAt) : '待发生',
     },
   ]
 
@@ -144,7 +146,7 @@ onMounted(async () => {
           <p class="detail-eyebrow">Task / Detail</p>
           <h1 class="page-title">任务 #{{ detail.taskId }}</h1>
           <p class="page-subtitle">
-            当前页面聚焦任务基础信息、错误信息和时间信息，不提前扩展状态流转时间线。
+            当前页面已补齐任务状态流转、步骤记录、重试记录和关联文档入口，适合直接用于联调排查。
           </p>
         </div>
         <div class="head-actions">
@@ -177,7 +179,7 @@ onMounted(async () => {
         <div class="section-head">
           <div>
             <h2>任务详情</h2>
-            <p>首版任务详情页聚焦基础字段与错误信息完整呈现。</p>
+            <p>当前展示任务基础字段、关联对象、重试信息与文档解析状态。</p>
           </div>
         </div>
 
@@ -213,7 +215,7 @@ onMounted(async () => {
         <div class="section-head">
           <div>
             <h2>业务关联</h2>
-            <p>当前只在前端能明确判断时展示业务关联信息，不强行推断跳转目标。</p>
+            <p>文档解析任务已直接关联到具体文档，可从这里进入文档详情继续排查。</p>
           </div>
         </div>
 
@@ -251,7 +253,7 @@ onMounted(async () => {
         <div class="section-head">
           <div>
             <h2>状态流转</h2>
-            <p>时间线基于当前任务状态保守推导，中间节点无精确时间时显示占位信息。</p>
+            <p>时间线优先使用任务真实开始时间和结束时间，缺失时再退化为占位信息。</p>
           </div>
         </div>
 

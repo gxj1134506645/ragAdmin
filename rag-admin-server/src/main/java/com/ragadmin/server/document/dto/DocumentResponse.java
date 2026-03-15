@@ -1,5 +1,7 @@
 package com.ragadmin.server.document.dto;
 
+import java.time.LocalDateTime;
+
 public record DocumentResponse(
         Long id,
         Long kbId,
@@ -11,6 +13,8 @@ public record DocumentResponse(
         String parseStatus,
         Boolean enabled,
         Long fileSize,
-        String contentHash
+        String contentHash,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
 ) {
 }

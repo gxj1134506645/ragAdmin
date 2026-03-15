@@ -9,6 +9,7 @@ public record DocumentVersionResponse(
         String storageObjectKey,
         String contentHash,
         String parseStatus,
+        Boolean active,
         LocalDateTime parseStartedAt,
         LocalDateTime parseFinishedAt,
         LocalDateTime createdAt

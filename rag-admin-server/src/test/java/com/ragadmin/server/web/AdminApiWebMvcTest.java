@@ -326,7 +326,9 @@ class AdminApiWebMvcTest {
                 "PENDING",
                 true,
                 128L,
-                "hash-1"
+                "hash-1",
+                LocalDateTime.of(2026, 3, 10, 10, 0),
+                LocalDateTime.of(2026, 3, 10, 10, 1)
         ));
 
         protectedMockMvc.perform(post("/api/admin/knowledge-bases/21/documents")
@@ -364,7 +366,9 @@ class AdminApiWebMvcTest {
                                 "SUCCESS",
                                 true,
                                 128L,
-                                "hash-1"
+                                "hash-1",
+                                LocalDateTime.of(2026, 3, 10, 10, 0),
+                                LocalDateTime.of(2026, 3, 10, 10, 1)
                         )),
                         1,
                         20,

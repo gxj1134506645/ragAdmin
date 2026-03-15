@@ -194,7 +194,9 @@ public class DocumentService {
                         .orderByDesc(DocumentVersionEntity::getVersionNo)
         );
         return new PageResponse<>(
-                page.getRecords().stream().map(this::toVersionResponse).toList(),
+                page.getRecords().stream()
+                        .map(item -> toVersionResponse(item, documentId))
+                        .toList(),
                 pageNo,
                 pageSize,
                 page.getTotal()
@@ -302,7 +304,9 @@ public class DocumentService {
                 document.getParseStatus(),
                 document.getEnabled(),
                 document.getFileSize(),
-                document.getContentHash()
+                document.getContentHash(),
+                document.getCreatedAt(),
+                document.getUpdatedAt()
         );
     }
 
@@ -317,7 +321,8 @@ public class DocumentService {
         );
     }
 
-    private DocumentVersionResponse toVersionResponse(DocumentVersionEntity version) {
+    private DocumentVersionResponse toVersionResponse(DocumentVersionEntity version, Long documentId) {
+        DocumentEntity document = requireDocument(documentId);
         return new DocumentVersionResponse(
                 version.getId(),
                 version.getVersionNo(),
@@ -325,6 +330,7 @@ public class DocumentService {
                 version.getStorageObjectKey(),
                 version.getContentHash(),
                 version.getParseStatus(),
+                version.getVersionNo().equals(document.getCurrentVersion()),
                 version.getParseStartedAt(),
                 version.getParseFinishedAt(),
                 version.getCreatedAt()

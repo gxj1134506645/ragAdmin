@@ -255,7 +255,17 @@ onMounted(async () => {
               <el-tag :type="taskStatusType(row.taskStatus)">{{ row.taskStatus }}</el-tag>
             </template>
           </el-table-column>
+          <el-table-column label="文档名称" min-width="220">
+            <template #default="{ row }">
+              {{ row.documentName || '暂无' }}
+            </template>
+          </el-table-column>
           <el-table-column prop="bizId" label="业务 ID" width="120" />
+          <el-table-column label="重试次数" width="100">
+            <template #default="{ row }">
+              {{ row.retryCount ?? 0 }}
+            </template>
+          </el-table-column>
           <el-table-column label="错误摘要" min-width="260">
             <template #default="{ row }">
               {{ row.errorMessage || '无' }}

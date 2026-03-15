@@ -198,6 +198,14 @@ onMounted(async () => {
             <span>更新时间</span>
             <strong>{{ formatTime(detail.updatedAt) }}</strong>
           </article>
+          <article class="detail-item">
+            <span>重试次数</span>
+            <strong>{{ detail.retryCount ?? 0 }}</strong>
+          </article>
+          <article class="detail-item">
+            <span>文档解析状态</span>
+            <strong>{{ detail.documentParseStatus || '暂无' }}</strong>
+          </article>
         </div>
       </section>
 
@@ -264,6 +272,52 @@ onMounted(async () => {
             </div>
           </article>
         </div>
+      </section>
+
+      <section class="detail-panel soft-panel" v-if="detail.steps?.length">
+        <div class="section-head">
+          <div>
+            <h2>执行步骤</h2>
+            <p>展示后端记录的任务步骤状态，便于快速判断卡在哪一段。</p>
+          </div>
+        </div>
+
+        <el-table :data="detail.steps" stripe>
+          <el-table-column prop="stepCode" label="步骤编码" min-width="150" />
+          <el-table-column prop="stepName" label="步骤名称" min-width="140" />
+          <el-table-column prop="stepStatus" label="状态" width="120" />
+          <el-table-column label="开始时间" min-width="180">
+            <template #default="{ row }">
+              {{ formatTime(row.startedAt || '') }}
+            </template>
+          </el-table-column>
+          <el-table-column label="结束时间" min-width="180">
+            <template #default="{ row }">
+              {{ formatTime(row.finishedAt || '') }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="errorMessage" label="错误信息" min-width="220" />
+        </el-table>
+      </section>
+
+      <section class="detail-panel soft-panel" v-if="detail.retryRecords?.length">
+        <div class="section-head">
+          <div>
+            <h2>重试记录</h2>
+            <p>保留任务重试轨迹，便于和当前状态一起判断是否需要再次重投。</p>
+          </div>
+        </div>
+
+        <el-table :data="detail.retryRecords" stripe>
+          <el-table-column prop="retryNo" label="重试次数" width="100" />
+          <el-table-column prop="retryReason" label="重试原因" min-width="180" />
+          <el-table-column prop="retryResult" label="结果" width="120" />
+          <el-table-column label="时间" min-width="180">
+            <template #default="{ row }">
+              {{ formatTime(row.createdAt) }}
+            </template>
+          </el-table-column>
+        </el-table>
       </section>
 
       <section class="error-panel soft-panel">

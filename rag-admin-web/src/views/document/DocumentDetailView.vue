@@ -290,6 +290,7 @@ async function handleCreateVersion(): Promise<void> {
       storageBucket: upload.bucket,
       storageObjectKey: upload.objectKey,
       contentHash: null,
+      fileSize: file.size,
     }
     await createDocumentVersion(documentId.value, payload)
 

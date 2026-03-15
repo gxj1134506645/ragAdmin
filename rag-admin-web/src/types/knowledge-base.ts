@@ -87,6 +87,7 @@ export interface CreateDocumentVersionRequest {
   storageBucket: string
   storageObjectKey: string
   contentHash?: string | null
+  fileSize?: number | null
 }
 
 export interface DocumentChunk {

@@ -61,3 +61,9 @@ rag:
     max-context-chunks: 5
     max-context-chars: 4000
     reference-snippet-chars: 200
+  document:
+    ocr:
+      enabled: false
+      tesseract-command: tesseract
+      language: chi_sim+eng
+      max-pdf-pages: 5

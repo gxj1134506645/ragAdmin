@@ -56,3 +56,8 @@ rag:
   vector:
     milvus:
       enabled: true
+  retrieval:
+    default-top-k: 5
+    max-context-chunks: 5
+    max-context-chars: 4000
+    reference-snippet-chars: 200

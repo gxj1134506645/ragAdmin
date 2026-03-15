@@ -36,7 +36,6 @@ const taskStatusOptions = [
 const taskTypeOptions = [
   { label: '全部类型', value: '' },
   { label: '文档解析', value: 'DOCUMENT_PARSE' },
-  { label: '索引构建', value: 'INDEX_BUILD' },
 ]
 
 function taskStatusType(status: string): 'warning' | 'success' | 'danger' | 'info' {

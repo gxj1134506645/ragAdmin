@@ -86,6 +86,35 @@ public class KnowledgeBaseService {
         return getDetail(entity.getId());
     }
 
+    public KnowledgeBaseResponse update(Long kbId, CreateKnowledgeBaseRequest request) {
+        KnowledgeBaseEntity entity = requireById(kbId);
+        KnowledgeBaseEntity existing = knowledgeBaseMapper.selectOne(new LambdaQueryWrapper<KnowledgeBaseEntity>()
+                .eq(KnowledgeBaseEntity::getKbCode, request.getKbCode())
+                .ne(KnowledgeBaseEntity::getId, kbId)
+                .last("LIMIT 1"));
+        if (existing != null) {
+            throw new BusinessException("KB_CODE_EXISTS", "知识库编码已存在", HttpStatus.BAD_REQUEST);
+        }
+
+        if (request.getEmbeddingModelId() != null) {
+            modelService.requireModelWithCapability(request.getEmbeddingModelId(), "EMBEDDING");
+        }
+        if (request.getChatModelId() != null) {
+            modelService.requireModelWithCapability(request.getChatModelId(), "TEXT_GENERATION");
+        }
+
+        entity.setKbCode(request.getKbCode());
+        entity.setKbName(request.getKbName());
+        entity.setDescription(request.getDescription());
+        entity.setEmbeddingModelId(request.getEmbeddingModelId());
+        entity.setChatModelId(request.getChatModelId());
+        entity.setRetrieveTopK(request.getRetrieveTopK());
+        entity.setRerankEnabled(request.getRerankEnabled());
+        entity.setStatus(request.getStatus());
+        knowledgeBaseMapper.updateById(entity);
+        return getDetail(kbId);
+    }
+
     public KnowledgeBaseEntity requireById(Long kbId) {
         KnowledgeBaseEntity entity = knowledgeBaseMapper.selectById(kbId);
         if (entity == null) {

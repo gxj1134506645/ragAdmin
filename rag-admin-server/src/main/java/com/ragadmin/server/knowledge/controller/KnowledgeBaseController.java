@@ -51,6 +51,14 @@ public class KnowledgeBaseController {
         return ApiResponse.success(knowledgeBaseService.create(request, authenticatedUser.getUserId()));
     }
 
+    @PutMapping("/{kbId}")
+    public ApiResponse<KnowledgeBaseResponse> update(
+            @PathVariable Long kbId,
+            @Valid @RequestBody CreateKnowledgeBaseRequest request
+    ) {
+        return ApiResponse.success(knowledgeBaseService.update(kbId, request));
+    }
+
     @GetMapping("/{kbId}")
     public ApiResponse<KnowledgeBaseResponse> detail(@PathVariable Long kbId) {
         return ApiResponse.success(knowledgeBaseService.getDetail(kbId));

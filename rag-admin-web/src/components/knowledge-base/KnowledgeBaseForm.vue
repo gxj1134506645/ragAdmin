@@ -32,8 +32,8 @@ const rules: FormRules<KnowledgeBaseUpsertRequest> = {
   kbCode: [
     { required: true, message: '请输入知识库编码', trigger: 'blur' },
     {
-      pattern: /^[a-z0-9-]+$/,
-      message: '知识库编码仅支持小写字母、数字和中划线',
+      pattern: /^[a-z0-9_-]+$/,
+      message: '知识库编码仅支持小写字母、数字、中划线和下划线',
       trigger: 'blur',
     },
   ],
@@ -93,7 +93,7 @@ async function handleSubmit(): Promise<void> {
           <el-input
             v-model="formModel.kbCode"
             maxlength="64"
-            placeholder="例如 company-policy"
+            placeholder="例如 company_policy"
           />
         </el-form-item>
         <el-form-item label="知识库名称" prop="kbName">

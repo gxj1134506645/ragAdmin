@@ -121,24 +121,6 @@ onMounted(async () => {
       </div>
     </header>
 
-    <div class="summary-strip">
-      <article class="summary-card soft-panel">
-        <span>列表总量</span>
-        <strong>{{ pagination.total }}</strong>
-        <p>与后端分页接口保持同一来源。</p>
-      </article>
-      <article class="summary-card soft-panel">
-        <span>当前页</span>
-        <strong>{{ pagination.pageNo }}</strong>
-        <p>分页浏览当前知识库数据。</p>
-      </article>
-      <article class="summary-card soft-panel">
-        <span>默认模型回退</span>
-        <strong>已兼容</strong>
-        <p>当知识库未绑定模型时，前端展示为平台默认模型。</p>
-      </article>
-    </div>
-
     <section class="table-panel soft-panel">
       <el-table :data="list" v-loading="loading" empty-text="暂无知识库数据" stripe>
         <el-table-column prop="id" label="ID" width="80" />
@@ -215,35 +197,6 @@ onMounted(async () => {
   gap: 12px;
 }
 
-.summary-strip {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.summary-card {
-  padding: 20px 22px;
-}
-
-.summary-card span {
-  color: #9d7a58;
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.summary-card strong {
-  display: block;
-  margin-top: 12px;
-  font-family: "Noto Serif SC", serif;
-  font-size: 30px;
-}
-
-.summary-card p {
-  margin: 12px 0 0;
-  color: #6d5948;
-}
-
 .table-panel {
   padding: 18px;
 }
@@ -263,9 +216,6 @@ onMounted(async () => {
     width: 100%;
   }
 
-  .summary-strip {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 640px) {

@@ -419,19 +419,6 @@ onMounted(async () => {
       </div>
     </header>
 
-    <div class="summary-strip">
-      <article class="summary-card soft-panel">
-        <span>提供方数量</span>
-        <strong>{{ providers.length }}</strong>
-        <p>仅作为模型路由目标维护，主页面不再单独展开展示。</p>
-      </article>
-      <article class="summary-card soft-panel">
-        <span>模型总量</span>
-        <strong>{{ pagination.total }}</strong>
-        <p>模型分页接口返回的真实总量。</p>
-      </article>
-    </div>
-
     <section class="model-panel soft-panel">
       <div class="section-head">
         <div>
@@ -746,9 +733,9 @@ onMounted(async () => {
           </el-form-item>
         </div>
         <div class="form-grid">
-        <el-form-item label="最大令牌数">
-          <el-input-number v-model="modelForm.maxTokens" :min="1" :step="256" controls-position="right" />
-        </el-form-item>
+          <el-form-item label="最大令牌数">
+            <el-input-number v-model="modelForm.maxTokens" :min="1" :step="256" controls-position="right" />
+          </el-form-item>
           <el-form-item label="默认温度">
             <el-input-number
               v-model="modelForm.temperatureDefault"
@@ -799,13 +786,6 @@ onMounted(async () => {
   justify-content: flex-end;
 }
 
-.summary-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 18px;
-}
-
-.summary-card,
 .model-panel {
   padding: 20px 22px;
 }
@@ -824,21 +804,6 @@ onMounted(async () => {
   line-height: 1.7;
 }
 
-.summary-card span {
-  color: #9d7a58;
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.summary-card strong {
-  display: block;
-  margin-top: 12px;
-  font-family: "Noto Serif SC", serif;
-  font-size: 30px;
-}
-
-.summary-card p,
 .section-subtitle,
 .health-message,
 .provider-tip,
@@ -951,7 +916,6 @@ onMounted(async () => {
     flex-direction: column;
   }
 
-  .summary-strip,
   .filter-grid,
   .form-grid {
     grid-template-columns: 1fr;

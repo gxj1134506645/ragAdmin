@@ -2,9 +2,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElButton, ElEmpty, ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
-import { getTaskSummary, listTasks, retryTask } from '@/api/task'
+import { listTasks, retryTask } from '@/api/task'
 import { resolveErrorMessage } from '@/api/http'
-import type { TaskRecord, TaskSummary } from '@/types/task'
+import type { TaskRecord } from '@/types/task'
 import { TASK_STATUS_OPTIONS, TASK_TYPE_OPTIONS, formatTaskStatus, formatTaskType } from '@/utils/task'
 
 const router = useRouter()
@@ -12,7 +12,6 @@ const loading = ref(false)
 const loadError = ref('')
 const tasks = ref<TaskRecord[]>([])
 const retryingTaskIds = ref<number[]>([])
-const summary = ref<TaskSummary | null>(null)
 const pagination = reactive({
   pageNo: 1,
   pageSize: 10,
@@ -84,11 +83,9 @@ async function loadTasks(): Promise<void> {
       pageSize: pagination.pageSize,
       ...normalizedQuery,
     })
-    summary.value = await getTaskSummary(normalizedQuery)
     tasks.value = response.list
     pagination.total = response.total
   } catch (error) {
-    summary.value = null
     tasks.value = []
     pagination.total = 0
     loadError.value = resolveErrorMessage(error)
@@ -177,24 +174,6 @@ onMounted(async () => {
       </div>
       <el-button @click="handleRefresh">刷新任务</el-button>
     </header>
-
-    <section v-if="summary" class="summary-strip">
-      <article class="summary-card soft-panel">
-        <span>总任务数</span>
-        <strong>{{ summary.total }}</strong>
-        <p>当前筛选条件下的任务总量。</p>
-      </article>
-      <article class="summary-card soft-panel">
-        <span>进行中</span>
-        <strong>{{ summary.waiting + summary.running }}</strong>
-        <p>等待中与运行中的任务汇总。</p>
-      </article>
-      <article class="summary-card soft-panel">
-        <span>失败数</span>
-        <strong>{{ summary.failed }}</strong>
-        <p>可用于快速定位需要重试的任务。</p>
-      </article>
-    </section>
 
     <section class="filter-panel soft-panel">
       <div class="filter-grid">
@@ -326,35 +305,6 @@ onMounted(async () => {
   padding: 20px;
 }
 
-.summary-strip {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.summary-card {
-  padding: 20px 22px;
-}
-
-.summary-card span {
-  color: #9d7a58;
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.summary-card strong {
-  display: block;
-  margin-top: 12px;
-  font-family: "Noto Serif SC", serif;
-  font-size: 30px;
-}
-
-.summary-card p {
-  margin: 12px 0 0;
-  color: #6d5948;
-}
-
 .filter-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -389,10 +339,6 @@ onMounted(async () => {
   }
 
   .filter-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .summary-strip {
     grid-template-columns: 1fr;
   }
 }

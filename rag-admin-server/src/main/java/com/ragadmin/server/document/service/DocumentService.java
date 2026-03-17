@@ -311,6 +311,12 @@ public class DocumentService {
         if (existingTask != null) {
             return existingTask;
         }
+        if ("PROCESSING".equals(version.getParseStatus())) {
+            throw new BusinessException("DOCUMENT_PARSE_PROCESSING", "文档正在解析中，请稍后刷新结果", HttpStatus.BAD_REQUEST);
+        }
+        if ("SUCCESS".equals(version.getParseStatus())) {
+            throw new BusinessException("DOCUMENT_ALREADY_PARSED", "文档已解析成功，无需重复提交", HttpStatus.BAD_REQUEST);
+        }
 
         DocumentParseTaskEntity task = new DocumentParseTaskEntity();
         task.setKbId(document.getKbId());

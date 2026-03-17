@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElButton, ElEmpty, ElMessage, ElMessageBox, ElSkeleton } from 'element-plus'
 import type { UploadFile, UploadFiles, UploadUserFile } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
@@ -77,6 +77,7 @@ const uploadProgress = reactive({
   currentFileName: '',
 })
 const documentTableRef = ref<{ clearSelection?: () => void } | null>(null)
+let documentAutoRefreshTimer: ReturnType<typeof window.setTimeout> | null = null
 
 const knowledgeBaseId = computed(() => Number(route.params.id))
 const hasDocuments = computed(() => documents.value.length > 0)
@@ -88,6 +89,9 @@ const selectedRetryableDocuments = computed(() =>
 const selectedRetryableDocumentCount = computed(() => selectedRetryableDocuments.value.length)
 const selectedNonRetryableDocumentCount = computed(
   () => selectedDocumentCount.value - selectedRetryableDocumentCount.value,
+)
+const hasActiveParseDocuments = computed(() =>
+  documents.value.some((item) => isActiveParseStatus(item.parseStatus)),
 )
 const selectedFiles = computed<File[]>(() =>
   uploadFileList.value.flatMap((item) => (item.raw instanceof File ? [item.raw] : [])),
@@ -153,9 +157,48 @@ function canTriggerParse(status: string): boolean {
   return status === 'PENDING' || status === 'FAILED'
 }
 
+function isActiveParseStatus(status: string): boolean {
+  return status === 'PENDING' || status === 'PROCESSING'
+}
+
 function clearDocumentSelection(): void {
   selectedDocuments.value = []
   documentTableRef.value?.clearSelection?.()
+}
+
+function clearDocumentAutoRefreshTimer(): void {
+  if (documentAutoRefreshTimer !== null) {
+    window.clearTimeout(documentAutoRefreshTimer)
+    documentAutoRefreshTimer = null
+  }
+}
+
+function canAutoRefreshDocuments(): boolean {
+  return (
+    hasActiveParseDocuments.value &&
+    !hasSelectedDocuments.value &&
+    !uploadDialogVisible.value &&
+    !uploadSubmitting.value &&
+    !batchRetrySubmitting.value &&
+    !batchDeleteSubmitting.value
+  )
+}
+
+function scheduleDocumentAutoRefresh(): void {
+  clearDocumentAutoRefreshTimer()
+  if (!canAutoRefreshDocuments()) {
+    return
+  }
+
+  // 有文档仍在排队或处理中时，自动刷新列表，避免页面停留在旧状态。
+  documentAutoRefreshTimer = window.setTimeout(async () => {
+    documentAutoRefreshTimer = null
+    if (!canAutoRefreshDocuments()) {
+      scheduleDocumentAutoRefresh()
+      return
+    }
+    await loadDocuments()
+  }, 5000)
 }
 
 function isParsing(documentId: number): boolean {
@@ -398,6 +441,7 @@ async function handleTriggerParse(document: KnowledgeBaseDocument): Promise<void
 
 function handleSelectionChange(rows: KnowledgeBaseDocument[]): void {
   selectedDocuments.value = rows
+  scheduleDocumentAutoRefresh()
 }
 
 async function handleBatchRetryParse(): Promise<void> {
@@ -413,7 +457,7 @@ async function handleBatchRetryParse(): Promise<void> {
   try {
     await ElMessageBox.confirm(
       skippedCount > 0
-        ? `将批量解析 ${selectedRetryableDocumentCount.value} 个文档，另外 ${skippedCount} 个文档因状态不允许会被跳过，是否继续？`
+        ? `将批量解析 ${selectedRetryableDocumentCount.value} 个失败或待处理文档，另外 ${skippedCount} 个成功或处理中文档会自动跳过，是否继续？`
         : `确定批量解析 ${selectedRetryableDocumentCount.value} 个文档吗？`,
       '确认批量解析',
       {
@@ -570,6 +614,7 @@ async function loadDetail(): Promise<void> {
 async function loadDocuments(): Promise<void> {
   documentLoading.value = true
   documentError.value = ''
+  clearDocumentAutoRefreshTimer()
   try {
     const response = await listKnowledgeBaseDocuments(knowledgeBaseId.value, {
       keyword: documentFilters.keyword.trim() || undefined,
@@ -590,6 +635,7 @@ async function loadDocuments(): Promise<void> {
   } finally {
     documentLoading.value = false
     clearDocumentSelection()
+    scheduleDocumentAutoRefresh()
   }
 }
 
@@ -624,11 +670,13 @@ async function handleResetDocuments(): Promise<void> {
 function handleOpenUploadDialog(): void {
   resetUploadState()
   uploadDialogVisible.value = true
+  scheduleDocumentAutoRefresh()
 }
 
 function handleCloseUploadDialog(): void {
   uploadDialogVisible.value = false
   resetUploadState()
+  scheduleDocumentAutoRefresh()
 }
 
 async function handleBack(): Promise<void> {
@@ -680,6 +728,10 @@ async function handleSizeChange(pageSize: number): Promise<void> {
 onMounted(async () => {
   await initialize()
   await consumeEntryFlags()
+})
+
+onUnmounted(() => {
+  clearDocumentAutoRefreshTimer()
 })
 </script>
 
@@ -820,8 +872,25 @@ onMounted(async () => {
               <el-option label="停用" value="false" />
             </el-select>
           </div>
+          <el-alert
+            v-if="hasActiveParseDocuments"
+            type="info"
+            :closable="false"
+            show-icon
+            class="parse-progress-alert"
+            title="存在待处理或处理中任务，列表会每 5 秒自动刷新一次。"
+          >
+            <template #default>
+              <p class="capability-text">待处理表示已入队等待执行，处理中表示后台正在解析与向量化。</p>
+            </template>
+          </el-alert>
           <div class="filter-actions">
-            <span v-if="hasSelectedDocuments" class="selection-summary">已选 {{ selectedDocumentCount }} 个文档</span>
+            <span v-if="hasSelectedDocuments" class="selection-summary">
+              已选 {{ selectedDocumentCount }} 个文档
+              <template v-if="selectedNonRetryableDocumentCount > 0">
+                ，本次可解析 {{ selectedRetryableDocumentCount }} 个，自动跳过 {{ selectedNonRetryableDocumentCount }} 个成功或处理中
+              </template>
+            </span>
             <el-button
               type="primary"
               plain

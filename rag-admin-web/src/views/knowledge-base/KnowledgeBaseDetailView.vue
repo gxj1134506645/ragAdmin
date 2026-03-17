@@ -47,6 +47,7 @@ const knowledgeBase = ref<KnowledgeBase | null>(null)
 const documentLoading = ref(false)
 const documentError = ref('')
 const documents = ref<KnowledgeBaseDocument[]>([])
+const selectedDocuments = ref<KnowledgeBaseDocument[]>([])
 const documentFilters = reactive({
   keyword: '',
   parseStatus: '',
@@ -68,14 +69,26 @@ const uploadCapabilityError = ref('')
 const autoParseAfterUpload = ref(true)
 const parsingDocumentIds = ref<number[]>([])
 const deletingDocumentIds = ref<number[]>([])
+const batchRetrySubmitting = ref(false)
+const batchDeleteSubmitting = ref(false)
 const uploadProgress = reactive({
   total: 0,
   completed: 0,
   currentFileName: '',
 })
+const documentTableRef = ref<{ clearSelection?: () => void } | null>(null)
 
 const knowledgeBaseId = computed(() => Number(route.params.id))
 const hasDocuments = computed(() => documents.value.length > 0)
+const selectedDocumentCount = computed(() => selectedDocuments.value.length)
+const hasSelectedDocuments = computed(() => selectedDocumentCount.value > 0)
+const selectedRetryableDocuments = computed(() =>
+  selectedDocuments.value.filter((item) => canTriggerParse(item.parseStatus)),
+)
+const selectedRetryableDocumentCount = computed(() => selectedRetryableDocuments.value.length)
+const selectedNonRetryableDocumentCount = computed(
+  () => selectedDocumentCount.value - selectedRetryableDocumentCount.value,
+)
 const selectedFiles = computed<File[]>(() =>
   uploadFileList.value.flatMap((item) => (item.raw instanceof File ? [item.raw] : [])),
 )
@@ -138,6 +151,11 @@ function enabledLabel(enabled: boolean): string {
 
 function canTriggerParse(status: string): boolean {
   return status === 'PENDING' || status === 'FAILED'
+}
+
+function clearDocumentSelection(): void {
+  selectedDocuments.value = []
+  documentTableRef.value?.clearSelection?.()
 }
 
 function isParsing(documentId: number): boolean {
@@ -378,6 +396,76 @@ async function handleTriggerParse(document: KnowledgeBaseDocument): Promise<void
   }
 }
 
+function handleSelectionChange(rows: KnowledgeBaseDocument[]): void {
+  selectedDocuments.value = rows
+}
+
+async function handleBatchRetryParse(): Promise<void> {
+  if (!hasSelectedDocuments.value || batchRetrySubmitting.value) {
+    return
+  }
+  if (selectedRetryableDocumentCount.value === 0) {
+    ElMessage.warning('当前所选文档都不支持重新解析，请选择失败或待处理文档')
+    return
+  }
+
+  const skippedCount = selectedNonRetryableDocumentCount.value
+  try {
+    await ElMessageBox.confirm(
+      skippedCount > 0
+        ? `将批量重试 ${selectedRetryableDocumentCount.value} 个文档，另外 ${skippedCount} 个文档因状态不允许会被跳过，是否继续？`
+        : `确定批量重试 ${selectedRetryableDocumentCount.value} 个文档吗？`,
+      '确认批量重试',
+      {
+        confirmButtonText: '确认重试',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    return
+  }
+
+  batchRetrySubmitting.value = true
+  let successCount = 0
+  let failedCount = 0
+
+  try {
+    for (const document of selectedRetryableDocuments.value) {
+      if (isParsing(document.documentId)) {
+        continue
+      }
+      parsingDocumentIds.value = [...parsingDocumentIds.value, document.documentId]
+      try {
+        await triggerDocumentParse(document.documentId)
+        successCount += 1
+      } catch (error) {
+        failedCount += 1
+      } finally {
+        parsingDocumentIds.value = parsingDocumentIds.value.filter((id) => id !== document.documentId)
+      }
+    }
+
+    await loadDocuments()
+    clearDocumentSelection()
+
+    if (failedCount === 0) {
+      ElMessage.success(
+        skippedCount > 0
+          ? `已提交 ${successCount} 个文档的解析任务，跳过 ${skippedCount} 个`
+          : `已提交 ${successCount} 个文档的解析任务`,
+      )
+      return
+    }
+
+    ElMessage.warning(
+      `批量重试完成，成功 ${successCount} 个，失败 ${failedCount} 个${skippedCount > 0 ? `，跳过 ${skippedCount} 个` : ''}`,
+    )
+  } finally {
+    batchRetrySubmitting.value = false
+  }
+}
+
 async function handleDeleteDocument(document: KnowledgeBaseDocument): Promise<void> {
   try {
     await ElMessageBox.confirm(
@@ -406,6 +494,63 @@ async function handleDeleteDocument(document: KnowledgeBaseDocument): Promise<vo
     ElMessage.error(resolveErrorMessage(error))
   } finally {
     deletingDocumentIds.value = deletingDocumentIds.value.filter((id) => id !== document.documentId)
+  }
+}
+
+async function handleBatchDeleteDocuments(): Promise<void> {
+  if (!hasSelectedDocuments.value || batchDeleteSubmitting.value) {
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定批量删除 ${selectedDocumentCount.value} 个文档吗？删除后将同时清理解析任务、切片和引用关系。`,
+      '确认批量删除',
+      {
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    return
+  }
+
+  batchDeleteSubmitting.value = true
+  let successCount = 0
+  let failedCount = 0
+  const targetCount = selectedDocuments.value.length
+
+  try {
+    for (const document of [...selectedDocuments.value]) {
+      if (isDeletingDocument(document.documentId)) {
+        continue
+      }
+      deletingDocumentIds.value = [...deletingDocumentIds.value, document.documentId]
+      try {
+        await deleteKnowledgeBaseDocument(document.documentId)
+        successCount += 1
+      } catch (error) {
+        failedCount += 1
+      } finally {
+        deletingDocumentIds.value = deletingDocumentIds.value.filter((id) => id !== document.documentId)
+      }
+    }
+
+    if (successCount > 0 && successCount === documents.value.length && documentPagination.pageNo > 1) {
+      documentPagination.pageNo -= 1
+    }
+    await loadDocuments()
+    clearDocumentSelection()
+
+    if (failedCount === 0) {
+      ElMessage.success(`已删除 ${targetCount} 个文档`)
+      return
+    }
+
+    ElMessage.warning(`批量删除完成，成功 ${successCount} 个，失败 ${failedCount} 个`)
+  } finally {
+    batchDeleteSubmitting.value = false
   }
 }
 
@@ -444,6 +589,7 @@ async function loadDocuments(): Promise<void> {
     documentError.value = resolveErrorMessage(error)
   } finally {
     documentLoading.value = false
+    clearDocumentSelection()
   }
 }
 
@@ -675,6 +821,25 @@ onMounted(async () => {
             </el-select>
           </div>
           <div class="filter-actions">
+            <span v-if="hasSelectedDocuments" class="selection-summary">已选 {{ selectedDocumentCount }} 个文档</span>
+            <el-button
+              type="primary"
+              plain
+              :disabled="!hasSelectedDocuments || selectedRetryableDocumentCount === 0"
+              :loading="batchRetrySubmitting"
+              @click="handleBatchRetryParse"
+            >
+              批量重试
+            </el-button>
+            <el-button
+              type="danger"
+              plain
+              :disabled="!hasSelectedDocuments"
+              :loading="batchDeleteSubmitting"
+              @click="handleBatchDeleteDocuments"
+            >
+              批量删除
+            </el-button>
             <el-button @click="handleResetDocuments">重置</el-button>
             <el-button type="primary" @click="handleSearchDocuments">查询</el-button>
           </div>
@@ -690,7 +855,14 @@ onMounted(async () => {
         </section>
 
         <template v-else>
-          <el-table :data="documents" v-loading="documentLoading" empty-text="当前知识库暂无文档" stripe>
+          <el-table
+            ref="documentTableRef"
+            :data="documents"
+            v-loading="documentLoading"
+            empty-text="当前知识库暂无文档"
+            stripe
+            @selection-change="handleSelectionChange"
+          >
             <template #empty>
               <el-empty description="当前知识库还没有文档">
                 <template #description>
@@ -699,6 +871,7 @@ onMounted(async () => {
                 <el-button type="primary" @click="handleOpenUploadDialog">上传第一份文档</el-button>
               </el-empty>
             </template>
+            <el-table-column type="selection" width="52" />
             <el-table-column prop="documentId" label="文档编号" width="100" />
             <el-table-column prop="docName" label="文档名称" min-width="220" />
             <el-table-column prop="docType" label="类型" width="100" />
@@ -944,9 +1117,16 @@ onMounted(async () => {
 
 .filter-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 12px;
   margin-top: 16px;
+}
+
+.selection-summary {
+  margin-right: auto;
+  color: #7a6451;
+  font-size: 13px;
 }
 
 .overview-grid {
@@ -1201,6 +1381,10 @@ onMounted(async () => {
 
   .upload-option {
     align-items: flex-start;
+  }
+
+  .selection-summary {
+    margin-right: 0;
   }
 }
 </style>

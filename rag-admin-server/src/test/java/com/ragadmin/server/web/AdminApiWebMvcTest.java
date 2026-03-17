@@ -523,6 +523,20 @@ class AdminApiWebMvcTest {
         verify(modelService).delete(5L);
     }
 
+    @Test
+    void shouldDeleteKnowledgeBaseWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        doNothing().when(knowledgeBaseService).delete(21L);
+
+        protectedMockMvc.perform(delete("/api/admin/knowledge-bases/21")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        verify(knowledgeBaseService).delete(21L);
+    }
+
     private AuthenticatedUser authenticatedUser() {
         return new AuthenticatedUser()
                 .setUserId(1L)

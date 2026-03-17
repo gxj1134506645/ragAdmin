@@ -2,8 +2,20 @@ package com.ragadmin.server.knowledge.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.ragadmin.server.chat.entity.ChatSessionEntity;
+import com.ragadmin.server.chat.mapper.ChatSessionMapper;
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.common.model.PageResponse;
+import com.ragadmin.server.document.entity.ChunkEntity;
+import com.ragadmin.server.document.entity.ChunkVectorRefEntity;
+import com.ragadmin.server.document.entity.DocumentEntity;
+import com.ragadmin.server.document.entity.DocumentParseTaskEntity;
+import com.ragadmin.server.document.entity.DocumentVersionEntity;
+import com.ragadmin.server.document.mapper.ChunkMapper;
+import com.ragadmin.server.document.mapper.ChunkVectorRefMapper;
+import com.ragadmin.server.document.mapper.DocumentMapper;
+import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
+import com.ragadmin.server.document.mapper.DocumentVersionMapper;
 import com.ragadmin.server.knowledge.dto.CreateKnowledgeBaseRequest;
 import com.ragadmin.server.knowledge.dto.KnowledgeBaseResponse;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
@@ -13,9 +25,11 @@ import com.ragadmin.server.model.service.ModelService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -28,6 +42,24 @@ public class KnowledgeBaseService {
 
     @Autowired
     private ModelService modelService;
+
+    @Autowired
+    private DocumentMapper documentMapper;
+
+    @Autowired
+    private DocumentVersionMapper documentVersionMapper;
+
+    @Autowired
+    private DocumentParseTaskMapper documentParseTaskMapper;
+
+    @Autowired
+    private ChunkMapper chunkMapper;
+
+    @Autowired
+    private ChunkVectorRefMapper chunkVectorRefMapper;
+
+    @Autowired
+    private ChatSessionMapper chatSessionMapper;
 
     public PageResponse<KnowledgeBaseResponse> list(String keyword, String status, long pageNo, long pageSize) {
         LambdaQueryWrapper<KnowledgeBaseEntity> wrapper = new LambdaQueryWrapper<KnowledgeBaseEntity>()
@@ -140,6 +172,39 @@ public class KnowledgeBaseService {
         }
         entity.setStatus(status);
         knowledgeBaseMapper.updateById(entity);
+    }
+
+    @Transactional
+    public void delete(Long kbId) {
+        KnowledgeBaseEntity entity = requireById(kbId);
+        Long sessionCount = chatSessionMapper.selectCount(new LambdaQueryWrapper<ChatSessionEntity>()
+                .eq(ChatSessionEntity::getKbId, kbId));
+        if (sessionCount != null && sessionCount > 0) {
+            throw new BusinessException("KB_IN_USE", "知识库 " + entity.getKbName() + " 已存在对话会话，不能删除", HttpStatus.BAD_REQUEST);
+        }
+
+        List<Long> documentIds = documentMapper.selectList(new LambdaQueryWrapper<DocumentEntity>()
+                        .select(DocumentEntity::getId)
+                        .eq(DocumentEntity::getKbId, kbId))
+                .stream()
+                .map(DocumentEntity::getId)
+                .toList();
+
+        chunkVectorRefMapper.delete(new LambdaQueryWrapper<ChunkVectorRefEntity>()
+                .eq(ChunkVectorRefEntity::getKbId, kbId));
+        chunkMapper.delete(new LambdaQueryWrapper<ChunkEntity>()
+                .eq(ChunkEntity::getKbId, kbId));
+        documentParseTaskMapper.delete(new LambdaQueryWrapper<DocumentParseTaskEntity>()
+                .eq(DocumentParseTaskEntity::getKbId, kbId));
+
+        if (!documentIds.isEmpty()) {
+            documentVersionMapper.delete(new LambdaQueryWrapper<DocumentVersionEntity>()
+                    .in(DocumentVersionEntity::getDocumentId, documentIds));
+            documentMapper.delete(new LambdaQueryWrapper<DocumentEntity>()
+                    .in(DocumentEntity::getId, documentIds));
+        }
+
+        knowledgeBaseMapper.deleteById(kbId);
     }
 
     private KnowledgeBaseResponse toResponse(KnowledgeBaseEntity entity, Map<Long, AiModelEntity> modelMap) {

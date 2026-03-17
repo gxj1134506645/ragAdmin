@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { KnowledgeBase } from '@/types/knowledge-base'
-import { listKnowledgeBases } from '@/api/knowledge-base'
+import { deleteKnowledgeBase, listKnowledgeBases } from '@/api/knowledge-base'
 import { resolveErrorMessage } from '@/api/http'
 
 const route = useRoute()
@@ -71,6 +71,33 @@ async function handleEdit(id: number): Promise<void> {
 
 async function handleDetail(id: number): Promise<void> {
   await router.push(`/knowledge-bases/${id}`)
+}
+
+async function handleDelete(item: KnowledgeBase): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      `删除后将同时清理该知识库下的文档、版本、切片和解析任务，确定删除“${item.kbName}”吗？`,
+      '删除知识库',
+      {
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    return
+  }
+
+  try {
+    await deleteKnowledgeBase(item.id)
+    if (list.value.length === 1 && pagination.pageNo > 1) {
+      pagination.pageNo -= 1
+    }
+    await loadList()
+    ElMessage.success('知识库已删除')
+  } catch (error) {
+    ElMessage.error(resolveErrorMessage(error))
+  }
 }
 
 async function consumeCreatedFlag(): Promise<void> {
@@ -154,10 +181,11 @@ onMounted(async () => {
             {{ row.description || '暂无描述' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button link @click="handleDetail(row.id)">详情</el-button>
             <el-button link type="primary" @click="handleEdit(row.id)">编辑</el-button>
+            <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>

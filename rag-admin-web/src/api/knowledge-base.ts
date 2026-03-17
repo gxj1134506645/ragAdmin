@@ -128,6 +128,11 @@ export async function updateKnowledgeBase(
   unwrapResponse(response.data)
 }
 
+export async function deleteKnowledgeBase(id: number): Promise<void> {
+  const response = await http.delete<ApiResponse<null>>(`/admin/knowledge-bases/${id}`)
+  unwrapResponse(response.data)
+}
+
 export async function listKnowledgeBaseDocuments(
   id: number,
   query: KnowledgeBaseDocumentListQuery,

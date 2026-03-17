@@ -17,9 +17,11 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -41,6 +43,17 @@ public class TesseractOcrService {
         }
         if (!StringUtils.hasText(ocrProperties.getTesseractCommand())) {
             return new OcrCapability(true, false, "Tesseract 命令未配置", ocrProperties.getLanguage(), ocrProperties.getMaxPdfPages());
+        }
+        Path tessdataDir = resolveDataPath();
+        if (StringUtils.hasText(ocrProperties.getDataPath()) && (tessdataDir == null || !Files.isDirectory(tessdataDir))) {
+            String resolvedPath = tessdataDir == null ? ocrProperties.getDataPath().trim() : tessdataDir.toString();
+            return new OcrCapability(
+                    true,
+                    false,
+                    "OCR 数据目录不存在，请检查 tessdata 路径: " + resolvedPath,
+                    ocrProperties.getLanguage(),
+                    ocrProperties.getMaxPdfPages()
+            );
         }
         try {
             String output = runCommandForOutput(buildCommand("--version"));
@@ -185,9 +198,10 @@ public class TesseractOcrService {
         List<String> command = new ArrayList<>();
         command.add(ocrProperties.getTesseractCommand());
         command.addAll(List.of(args));
-        if (StringUtils.hasText(ocrProperties.getDataPath())) {
+        Path tessdataDir = resolveDataPath();
+        if (tessdataDir != null) {
             command.add("--tessdata-dir");
-            command.add(ocrProperties.getDataPath().trim());
+            command.add(tessdataDir.toString());
         }
         return command;
     }
@@ -201,6 +215,38 @@ public class TesseractOcrService {
             return defaultMessage;
         }
         String message = rawMessage.trim();
+        String lowercaseMessage = message.toLowerCase(Locale.ROOT);
+        if (lowercaseMessage.contains("no such file or directory") && lowercaseMessage.contains("tessdata")) {
+            Path tessdataDir = resolveDataPath();
+            String resolvedPath = tessdataDir == null ? ocrProperties.getDataPath() : tessdataDir.toString();
+            return "OCR 数据目录不存在，请检查 tessdata 路径: " + resolvedPath;
+        }
+        if (lowercaseMessage.contains("filesystem_error")) {
+            return defaultMessage;
+        }
         return message.length() > 500 ? message.substring(0, 500) : message;
+    }
+
+    Path resolveDataPath() {
+        return resolveDataPath(Paths.get("").toAbsolutePath().normalize());
+    }
+
+    Path resolveDataPath(Path workingDirectory) {
+        if (!StringUtils.hasText(ocrProperties.getDataPath())) {
+            return null;
+        }
+        Path configuredPath = Path.of(ocrProperties.getDataPath().trim());
+        if (configuredPath.isAbsolute()) {
+            return configuredPath.normalize();
+        }
+        Path directPath = workingDirectory.resolve(configuredPath).normalize();
+        if (Files.isDirectory(directPath)) {
+            return directPath;
+        }
+        Path modulePath = workingDirectory.resolve("rag-admin-server").resolve(configuredPath).normalize();
+        if (Files.isDirectory(modulePath)) {
+            return modulePath;
+        }
+        return directPath;
     }
 }

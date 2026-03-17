@@ -24,8 +24,12 @@ import com.ragadmin.server.knowledge.dto.KnowledgeBaseResponse;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.model.controller.ModelController;
+import com.ragadmin.server.model.controller.ModelProviderController;
 import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
+import com.ragadmin.server.model.dto.ModelProviderHealthCheckResponse;
+import com.ragadmin.server.model.dto.ModelProviderResponse;
 import com.ragadmin.server.model.dto.ModelResponse;
+import com.ragadmin.server.model.service.ModelProviderService;
 import com.ragadmin.server.model.service.ModelService;
 import com.ragadmin.server.system.controller.SystemHealthController;
 import com.ragadmin.server.system.dto.DependencyHealthResponse;
@@ -90,6 +94,9 @@ class AdminApiWebMvcTest {
     @Mock
     private ModelService modelService;
 
+    @Mock
+    private ModelProviderService modelProviderService;
+
     private MockMvc publicMockMvc;
     private MockMvc protectedMockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -121,6 +128,9 @@ class AdminApiWebMvcTest {
         ModelController modelController = new ModelController();
         ReflectionTestUtils.setField(modelController, "modelService", modelService);
 
+        ModelProviderController modelProviderController = new ModelProviderController();
+        ReflectionTestUtils.setField(modelProviderController, "modelProviderService", modelProviderService);
+
         GlobalExceptionHandler exceptionHandler = new GlobalExceptionHandler();
 
         AuthInterceptor authInterceptor = new AuthInterceptor();
@@ -137,7 +147,8 @@ class AdminApiWebMvcTest {
                         documentController,
                         fileController,
                         systemHealthController,
-                        modelController
+                        modelController,
+                        modelProviderController
                 )
                 .addInterceptors(authInterceptor)
                 .setControllerAdvice(exceptionHandler)
@@ -489,6 +500,34 @@ class AdminApiWebMvcTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.modelId").value(5))
+                .andExpect(jsonPath("$.data.status").value("UP"));
+    }
+
+    @Test
+    void shouldRunModelProviderHealthCheckWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(modelProviderService.get(1L)).thenReturn(new ModelProviderResponse(
+                1L,
+                "BAILIAN",
+                "阿里百炼",
+                "https://dashscope.aliyuncs.com",
+                "secret/bailian/api-key",
+                "ENABLED"
+        ));
+        when(modelProviderService.healthCheck(1L)).thenReturn(new ModelProviderHealthCheckResponse(
+                1L,
+                "BAILIAN",
+                "阿里百炼",
+                "UP",
+                "提供方探活成功",
+                List.of()
+        ));
+
+        protectedMockMvc.perform(post("/api/admin/model-providers/1/health-check")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.providerId").value(1))
                 .andExpect(jsonPath("$.data.status").value("UP"));
     }
 

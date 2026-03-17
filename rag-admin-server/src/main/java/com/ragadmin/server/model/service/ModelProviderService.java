@@ -66,6 +66,10 @@ public class ModelProviderService {
         return toResponse(entity);
     }
 
+    public ModelProviderResponse get(Long providerId) {
+        return toResponse(requireProvider(providerId));
+    }
+
     public AiProviderEntity requireProvider(Long providerId) {
         AiProviderEntity provider = aiProviderMapper.selectById(providerId);
         if (provider == null) {

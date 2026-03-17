@@ -2,7 +2,9 @@ package com.ragadmin.server.knowledge.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.ragadmin.server.chat.entity.ChatAnswerReferenceEntity;
 import com.ragadmin.server.chat.entity.ChatSessionEntity;
+import com.ragadmin.server.chat.mapper.ChatAnswerReferenceMapper;
 import com.ragadmin.server.chat.mapper.ChatSessionMapper;
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.common.model.PageResponse;
@@ -22,6 +24,10 @@ import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.mapper.KnowledgeBaseMapper;
 import com.ragadmin.server.model.entity.AiModelEntity;
 import com.ragadmin.server.model.service.ModelService;
+import com.ragadmin.server.task.entity.TaskRetryRecordEntity;
+import com.ragadmin.server.task.entity.TaskStepRecordEntity;
+import com.ragadmin.server.task.mapper.TaskRetryRecordMapper;
+import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -60,6 +66,15 @@ public class KnowledgeBaseService {
 
     @Autowired
     private ChatSessionMapper chatSessionMapper;
+
+    @Autowired
+    private ChatAnswerReferenceMapper chatAnswerReferenceMapper;
+
+    @Autowired
+    private TaskStepRecordMapper taskStepRecordMapper;
+
+    @Autowired
+    private TaskRetryRecordMapper taskRetryRecordMapper;
 
     public PageResponse<KnowledgeBaseResponse> list(String keyword, String status, long pageNo, long pageSize) {
         LambdaQueryWrapper<KnowledgeBaseEntity> wrapper = new LambdaQueryWrapper<KnowledgeBaseEntity>()
@@ -189,6 +204,30 @@ public class KnowledgeBaseService {
                 .stream()
                 .map(DocumentEntity::getId)
                 .toList();
+        List<Long> parseTaskIds = documentParseTaskMapper.selectList(new LambdaQueryWrapper<DocumentParseTaskEntity>()
+                        .select(DocumentParseTaskEntity::getId)
+                        .eq(DocumentParseTaskEntity::getKbId, kbId))
+                .stream()
+                .map(DocumentParseTaskEntity::getId)
+                .toList();
+        List<Long> chunkIds = chunkMapper.selectList(new LambdaQueryWrapper<ChunkEntity>()
+                        .select(ChunkEntity::getId)
+                        .eq(ChunkEntity::getKbId, kbId))
+                .stream()
+                .map(ChunkEntity::getId)
+                .toList();
+
+        if (!parseTaskIds.isEmpty()) {
+            taskStepRecordMapper.delete(new LambdaQueryWrapper<TaskStepRecordEntity>()
+                    .in(TaskStepRecordEntity::getTaskId, parseTaskIds));
+            taskRetryRecordMapper.delete(new LambdaQueryWrapper<TaskRetryRecordEntity>()
+                    .in(TaskRetryRecordEntity::getTaskId, parseTaskIds));
+        }
+
+        if (!chunkIds.isEmpty()) {
+            chatAnswerReferenceMapper.delete(new LambdaQueryWrapper<ChatAnswerReferenceEntity>()
+                    .in(ChatAnswerReferenceEntity::getChunkId, chunkIds));
+        }
 
         chunkVectorRefMapper.delete(new LambdaQueryWrapper<ChunkVectorRefEntity>()
                 .eq(ChunkVectorRefEntity::getKbId, kbId));

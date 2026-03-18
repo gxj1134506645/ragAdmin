@@ -75,6 +75,9 @@ public class AuditLogInterceptor implements HandlerInterceptor {
         if (path.contains("/auth")) {
             return "AUTH";
         }
+        if (path.contains("/chat/messages/") && path.contains("/feedback")) {
+            return "CHAT_FEEDBACK";
+        }
         if (path.contains("/knowledge-bases")) {
             return "KNOWLEDGE_BASE";
         }

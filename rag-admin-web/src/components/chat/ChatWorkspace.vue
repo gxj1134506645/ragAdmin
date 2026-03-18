@@ -57,6 +57,24 @@ const composerPlaceholder = computed(() =>
     ? '输入问题后，会基于当前知识库进行检索增强回答'
     : '输入问题后，将直接与默认聊天模型对话',
 )
+const feedbackSummary = computed(() => {
+  return messages.value.reduce(
+    (summary, item) => {
+      if (item.feedbackType === 'LIKE') {
+        summary.likeCount += 1
+      }
+      if (item.feedbackType === 'DISLIKE') {
+        summary.dislikeCount += 1
+      }
+      return summary
+    },
+    {
+      likeCount: 0,
+      dislikeCount: 0,
+    },
+  )
+})
+const showFeedbackSummary = computed(() => activeSessionId.value !== null || messages.value.length > 0)
 
 function resetConversationState(): void {
   messages.value = []
@@ -385,6 +403,16 @@ onUnmounted(() => {
         <p class="chat-eyebrow">{{ isKnowledgeBaseScene ? '知识库问答' : '通用问答' }}</p>
         <h2>{{ title }}</h2>
         <p>{{ description }}</p>
+        <div v-if="showFeedbackSummary" class="chat-metrics">
+          <article class="chat-metric">
+            <span>有帮助</span>
+            <strong>{{ feedbackSummary.likeCount }}</strong>
+          </article>
+          <article class="chat-metric is-warm">
+            <span>待改进</span>
+            <strong>{{ feedbackSummary.dislikeCount }}</strong>
+          </article>
+        </div>
       </div>
       <div class="chat-head-actions">
         <el-button :icon="RefreshRight" text @click="initialize">刷新会话</el-button>
@@ -606,6 +634,41 @@ onUnmounted(() => {
   margin: 10px 0 0;
   color: #6d5948;
   line-height: 1.7;
+}
+
+.chat-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.chat-metric {
+  min-width: 120px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: rgba(255, 250, 242, 0.82);
+  border: 1px solid rgba(179, 139, 96, 0.12);
+}
+
+.chat-metric.is-warm {
+  background: rgba(255, 244, 238, 0.86);
+}
+
+.chat-metric span {
+  display: block;
+  color: #9d7a58;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.chat-metric strong {
+  display: block;
+  margin-top: 8px;
+  color: #3a2c21;
+  font-family: "Noto Serif SC", serif;
+  font-size: 24px;
 }
 
 .chat-head-actions {

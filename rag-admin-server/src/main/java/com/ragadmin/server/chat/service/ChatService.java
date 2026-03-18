@@ -256,10 +256,12 @@ public class ChatService {
     }
 
     /**
-     * 会话记忆需要同时包含用户维度和会话维度，避免同一用户多会话串上下文。
+     * 会话记忆需要显式区分场景和知识库，避免首页通用会话、不同知识库会话之间互相污染。
      */
     private String buildConversationId(ChatSessionEntity session) {
-        return "chat-user-" + session.getUserId() + "-session-" + session.getId();
+        return "chat-scene-kb-user-" + session.getUserId()
+                + "-kb-" + session.getKbId()
+                + "-session-" + session.getId();
     }
 
     /**

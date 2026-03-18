@@ -77,17 +77,26 @@
 
 ## 4. conversationId 设计
 
-不能直接只用 `userId` 作为 `conversationId`，否则同一用户的多个会话会串上下文。
+不能直接只用 `userId` 作为 `conversationId`，否则首页通用对话、知识库内对话以及同一用户的多会话都会串上下文。
 
-本次采用以下格式：
+当前知识库内会话采用以下格式：
 
-`chat-user-{userId}-session-{sessionId}`
+`chat-scene-kb-user-{userId}-kb-{kbId}-session-{sessionId}`
 
 这样做的原因：
 
+- 包含 `scene`，显式区分“知识库内会话”和“首页通用会话”
 - 包含 `userId`，满足用户隔离要求
+- 包含 `kbId`，避免不同知识库之间共享同一段模型记忆
 - 包含 `sessionId`，避免同一用户不同会话相互污染
 - 可以稳定映射回现有 `chat_session`
+
+首页通用模型对话当前还未落地，预留规则如下：
+
+- 如果首页只保留“每用户一个默认会话”，可采用 `chat-scene-home-user-{userId}`
+- 如果首页后续也支持多会话列表，则扩展为 `chat-scene-home-user-{userId}-session-{sessionId}`
+
+这样可以保证首页会话与知识库会话天然分桶，后续扩展不会与当前知识库 memory 数据混用。
 
 ## 5. 数据流设计
 

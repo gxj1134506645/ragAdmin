@@ -15,6 +15,7 @@ import com.ragadmin.server.task.service.TaskRealtimeEventService;
 import com.ragadmin.server.document.support.ChunkVectorizationService;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,12 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+
+import static com.ragadmin.server.common.config.AsyncExecutionConfiguration.IO_VIRTUAL_TASK_EXECUTOR;
 
 @Component
 public class DocumentParseProcessor {
@@ -42,7 +49,10 @@ public class DocumentParseProcessor {
     private final KnowledgeBaseService knowledgeBaseService;
     private final ChunkVectorizationService chunkVectorizationService;
     private final TaskRealtimeEventService taskRealtimeEventService;
+    private final DocumentParseProperties documentParseProperties;
+    private final ExecutorService documentParseExecutor;
     private final TransactionTemplate transactionTemplate;
+    private final Set<Long> inFlightTaskIds = ConcurrentHashMap.newKeySet();
 
     public DocumentParseProcessor(
             DocumentParseTaskMapper documentParseTaskMapper,
@@ -54,6 +64,8 @@ public class DocumentParseProcessor {
             KnowledgeBaseService knowledgeBaseService,
             ChunkVectorizationService chunkVectorizationService,
             TaskRealtimeEventService taskRealtimeEventService,
+            DocumentParseProperties documentParseProperties,
+            @Qualifier(IO_VIRTUAL_TASK_EXECUTOR) ExecutorService documentParseExecutor,
             PlatformTransactionManager transactionManager
     ) {
         this.documentParseTaskMapper = documentParseTaskMapper;
@@ -65,18 +77,44 @@ public class DocumentParseProcessor {
         this.knowledgeBaseService = knowledgeBaseService;
         this.chunkVectorizationService = chunkVectorizationService;
         this.taskRealtimeEventService = taskRealtimeEventService;
+        this.documentParseProperties = documentParseProperties;
+        this.documentParseExecutor = documentParseExecutor;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     public void processWaitingTasks() {
         recoverStaleRunningTasks();
 
+        int maxConcurrency = Math.max(1, documentParseProperties.getMaxConcurrency());
+        int availableSlots = Math.max(0, maxConcurrency - inFlightTaskIds.size());
+        if (availableSlots <= 0) {
+            return;
+        }
+        int dispatchLimit = Math.min(availableSlots, Math.max(1, documentParseProperties.getDispatchBatchSize()));
         List<DocumentParseTaskEntity> tasks = documentParseTaskMapper.selectList(new LambdaQueryWrapper<DocumentParseTaskEntity>()
                 .eq(DocumentParseTaskEntity::getTaskStatus, "WAITING")
                 .orderByAsc(DocumentParseTaskEntity::getId)
-                .last("LIMIT 3"));
+                .last("LIMIT " + dispatchLimit));
         for (DocumentParseTaskEntity task : tasks) {
-            processSingleTask(task.getId());
+            dispatchTask(task.getId());
+        }
+    }
+
+    private void dispatchTask(Long taskId) {
+        if (!inFlightTaskIds.add(taskId)) {
+            return;
+        }
+        try {
+            documentParseExecutor.submit(() -> {
+                try {
+                    processSingleTask(taskId);
+                } finally {
+                    inFlightTaskIds.remove(taskId);
+                }
+            });
+        } catch (RejectedExecutionException ex) {
+            inFlightTaskIds.remove(taskId);
+            log.warn("解析任务分发失败，taskId={}, reason={}", taskId, ex.getMessage());
         }
     }
 

@@ -32,6 +32,14 @@ logging:
   config: classpath:logback-spring.xml
 
 rag:
+  async:
+    application:
+      core-size: 8
+      max-size: 16
+      queue-capacity: 200
+      keep-alive-seconds: 60
+    scheduler:
+      pool-size: 1
   auth:
     access-token-ttl-seconds: 7200
     refresh-token-ttl-seconds: 604800
@@ -62,6 +70,9 @@ rag:
     max-context-chars: 4000
     reference-snippet-chars: 200
   document:
+    parse:
+      max-concurrency: 4
+      dispatch-batch-size: 4
     ocr:
       enabled: false
       tesseract-command: tesseract

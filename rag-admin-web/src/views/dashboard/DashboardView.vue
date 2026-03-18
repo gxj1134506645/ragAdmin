@@ -1,10 +1,20 @@
 <script setup lang="ts">
-import { Collection, Connection, List, Plus } from '@element-plus/icons-vue'
+import { ChatDotRound, Collection, Connection, List, Plus } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
 const quickEntries = [
+  {
+    key: 'general-chat',
+    eyebrow: '问答',
+    title: '打开智能问答',
+    description: '进入首页通用模型对话，适合做不依赖知识库的即时交流和试问。',
+    actionText: '立即对话',
+    path: '/chat',
+    icon: ChatDotRound,
+    accent: 'is-primary',
+  },
   {
     key: 'knowledge-bases',
     eyebrow: '知识库',
@@ -13,7 +23,7 @@ const quickEntries = [
     actionText: '打开列表',
     path: '/knowledge-bases',
     icon: Collection,
-    accent: 'is-primary',
+    accent: 'is-light',
   },
   {
     key: 'knowledge-base-create',

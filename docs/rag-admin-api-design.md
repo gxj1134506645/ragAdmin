@@ -545,7 +545,48 @@
 }
 ```
 
-### 7.5 提交反馈
+### 7.5 发起流式 RAG 问答
+
+- `POST /api/admin/chat/sessions/{sessionId}/messages/stream`
+- `Content-Type: application/json`
+- `Accept: text/event-stream`
+
+请求体：
+
+```json
+{
+  "question": "公司年假规则是什么？",
+  "kbId": 1
+}
+```
+
+说明：
+
+- 当前服务主体仍为 `Spring MVC`，流式接口通过 `Flux<ServerSentEvent<...>>` 输出 `SSE`
+- 知识库内会话必须携带匹配的 `kbId`
+- 首页通用会话不得携带 `kbId`
+- `stream` 字段不再作为流式开关，是否流式由接口路径决定
+
+事件类型：
+
+- `DELTA`：增量文本片段
+- `COMPLETE`：回答完成，同时返回落库后的消息主键、引用和用量信息
+- `ERROR`：流式执行失败，当前轮回答不落业务消息
+
+事件示例：
+
+```text
+event: delta
+data: {"eventType":"DELTA","delta":"根据员工手册，"}
+
+event: delta
+data: {"eventType":"DELTA","delta":"年假按工龄分段计算。"}
+
+event: complete
+data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年假按工龄分段计算。","references":[{"documentId":11,"documentName":"员工手册.pdf","chunkId":201,"score":0.92,"contentSnippet":"员工累计工作满 1 年不满 10 年..."}],"usage":{"promptTokens":600,"completionTokens":120}}
+```
+
+### 7.6 提交反馈
 
 - `POST /api/admin/chat/messages/{messageId}/feedback`
 
@@ -607,6 +648,7 @@
 - `GET /api/admin/tasks`
 - `POST /api/admin/chat/sessions`
 - `POST /api/admin/chat/sessions/{sessionId}/messages`
+- `POST /api/admin/chat/sessions/{sessionId}/messages/stream`
 
 ### P1
 
@@ -624,4 +666,4 @@
 
 ---
 
-这份接口设计用于首期开发对齐，默认后续会补充 OpenAPI 文档、错误码枚举和流式问答接口细节。
+这份接口设计用于首期开发对齐，默认后续会继续补充 OpenAPI 文档和更完整的错误码枚举。

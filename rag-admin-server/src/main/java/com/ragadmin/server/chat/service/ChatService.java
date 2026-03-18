@@ -9,6 +9,7 @@ import com.ragadmin.server.chat.dto.ChatReferenceResponse;
 import com.ragadmin.server.chat.dto.ChatRequest;
 import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatSessionResponse;
+import com.ragadmin.server.chat.dto.ChatStreamEventResponse;
 import com.ragadmin.server.chat.dto.ChatUsageResponse;
 import com.ragadmin.server.chat.dto.CreateChatSessionRequest;
 import com.ragadmin.server.chat.entity.ChatAnswerReferenceEntity;
@@ -36,6 +37,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
 import java.math.BigDecimal;
@@ -43,6 +46,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 @Service
@@ -77,6 +82,9 @@ public class ChatService {
 
     @Autowired
     private ChunkMapper chunkMapper;
+
+    @Autowired
+    private ChatExchangePersistenceService chatExchangePersistenceService;
 
     public ChatSessionResponse createSession(CreateChatSessionRequest request, AuthenticatedUser user) {
         String sceneType = normalizeSceneType(request.getSceneType());
@@ -153,90 +161,70 @@ public class ChatService {
 
     @Transactional
     public ChatResponse chat(Long sessionId, ChatRequest request, AuthenticatedUser user) {
-        ChatSessionEntity session = requireSession(sessionId, user.getUserId());
-        String sceneType = normalizeSceneType(session.getSceneType());
-
-        RetrievalService.RetrievalResult retrievalResult;
-        ModelService.ChatModelDescriptor chatModel;
-        List<ChatModelClient.ChatMessage> promptMessages;
-        if (ChatSceneTypes.KNOWLEDGE_BASE.equals(sceneType)) {
-            Long kbId = requireKnowledgeBaseId(session.getKbId());
-            if (!kbId.equals(request.getKbId())) {
-                throw new BusinessException("CHAT_KB_MISMATCH", "会话与知识库不匹配", HttpStatus.BAD_REQUEST);
-            }
-            KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(kbId);
-            retrievalResult = retrievalService.retrieve(knowledgeBase, request.getQuestion());
-            chatModel = modelService.resolveChatModelDescriptor(knowledgeBase.getChatModelId());
-            promptMessages = List.of(
-                    new ChatModelClient.ChatMessage("system", buildKnowledgeBaseSystemPrompt()),
-                    new ChatModelClient.ChatMessage("user", buildKnowledgeBaseUserPrompt(request.getQuestion(), retrievalResult.context()))
-            );
-        } else {
-            if (request.getKbId() != null) {
-                throw new BusinessException("CHAT_SCENE_INVALID", "首页通用会话不允许携带知识库标识", HttpStatus.BAD_REQUEST);
-            }
-            retrievalResult = new RetrievalService.RetrievalResult(List.of(), "");
-            chatModel = modelService.resolveChatModelDescriptor(null);
-            promptMessages = List.of(
-                    new ChatModelClient.ChatMessage("system", buildGeneralSystemPrompt()),
-                    new ChatModelClient.ChatMessage("user", request.getQuestion())
-            );
-        }
-        List<ChatModelClient.ChatMessage> historyMessages = buildHistoryMessages(session.getId());
+        PreparedChatExecution execution = prepareChatExecution(sessionId, request, user);
 
         Instant start = Instant.now();
         ChatModelClient.ChatCompletionResult completion = conversationChatClient.chat(
-                chatModel.providerCode(),
-                chatModel.modelCode(),
-                buildConversationId(session),
-                promptMessages,
-                historyMessages
+                execution.chatModel().providerCode(),
+                execution.chatModel().modelCode(),
+                execution.conversationId(),
+                execution.promptMessages(),
+                execution.historyMessages()
         );
         int latencyMs = (int) Duration.between(start, Instant.now()).toMillis();
 
-        ChatMessageEntity message = new ChatMessageEntity();
-        message.setSessionId(session.getId());
-        message.setUserId(user.getUserId());
-        message.setMessageType("RAG");
-        message.setQuestionText(request.getQuestion());
-        message.setAnswerText(completion.content());
-        message.setModelId(chatModel.modelId());
-        message.setPromptTokens(completion.promptTokens());
-        message.setCompletionTokens(completion.completionTokens());
-        message.setLatencyMs(latencyMs);
-        chatMessageMapper.insert(message);
-
-        for (int i = 0; i < retrievalResult.chunks().size(); i++) {
-            var chunk = retrievalResult.chunks().get(i);
-            ChatAnswerReferenceEntity ref = new ChatAnswerReferenceEntity();
-            ref.setMessageId(message.getId());
-            ref.setChunkId(chunk.chunk().getId());
-            ref.setScore(BigDecimal.valueOf(chunk.score()));
-            ref.setRankNo(i + 1);
-            chatAnswerReferenceMapper.insert(ref);
-        }
-
-        List<Long> documentIds = retrievalResult.chunks().stream()
-                .map(item -> item.chunk().getDocumentId())
-                .distinct()
-                .toList();
-        Map<Long, String> documentNameResolver = documentIds.isEmpty()
-                ? Map.of()
-                : documentMapper.selectBatchIds(documentIds)
-                .stream()
-                .collect(Collectors.toMap(DocumentEntity::getId, DocumentEntity::getDocName));
-
-        List<ChatReferenceResponse> references = retrievalService.toReferenceResponses(
-                retrievalResult.chunks(),
-                documentId -> documentNameResolver.get(documentId)
-        );
-
-        return new ChatResponse(
-                message.getId(),
+        return chatExchangePersistenceService.persistExchange(
+                execution.session(),
+                user.getUserId(),
+                request.getQuestion(),
                 completion.content(),
-                references,
-                new ChatUsageResponse(completion.promptTokens(), completion.completionTokens())
+                execution.chatModel().modelId(),
+                completion.promptTokens(),
+                completion.completionTokens(),
+                latencyMs,
+                execution.retrievalResult()
         );
+    }
+
+    public Flux<ChatStreamEventResponse> streamChat(Long sessionId, ChatRequest request, AuthenticatedUser user) {
+        PreparedChatExecution execution = prepareChatExecution(sessionId, request, user);
+        StringBuilder answerBuilder = new StringBuilder();
+        Instant start = Instant.now();
+        AtomicReference<Integer> promptTokensRef = new AtomicReference<>();
+        AtomicReference<Integer> completionTokensRef = new AtomicReference<>();
+
+        return conversationChatClient.stream(
+                        execution.chatModel().providerCode(),
+                        execution.chatModel().modelCode(),
+                        execution.conversationId(),
+                        execution.promptMessages(),
+                        execution.historyMessages()
+                )
+                .map(chunk -> {
+                    updateUsage(chunk, promptTokensRef, completionTokensRef);
+                    String delta = extractStreamText(chunk);
+                    if (!StringUtils.hasLength(delta)) {
+                        return null;
+                    }
+                    answerBuilder.append(delta);
+                    return ChatStreamEventResponse.delta(delta);
+                })
+                .filter(Objects::nonNull)
+                .concatWith(Mono.fromSupplier(() -> {
+                    ChatResponse response = chatExchangePersistenceService.persistExchange(
+                            execution.session(),
+                            user.getUserId(),
+                            request.getQuestion(),
+                            answerBuilder.toString(),
+                            execution.chatModel().modelId(),
+                            promptTokensRef.get(),
+                            completionTokensRef.get(),
+                            (int) Duration.between(start, Instant.now()).toMillis(),
+                            execution.retrievalResult()
+                    );
+                    return ChatStreamEventResponse.complete(response);
+                }))
+                .onErrorResume(ex -> Flux.just(ChatStreamEventResponse.error(resolveStreamErrorMessage(ex))));
     }
 
     @Transactional
@@ -330,6 +318,75 @@ public class ChatService {
         return messages;
     }
 
+    private PreparedChatExecution prepareChatExecution(Long sessionId, ChatRequest request, AuthenticatedUser user) {
+        ChatSessionEntity session = requireSession(sessionId, user.getUserId());
+        String sceneType = normalizeSceneType(session.getSceneType());
+
+        RetrievalService.RetrievalResult retrievalResult;
+        ModelService.ChatModelDescriptor chatModel;
+        List<ChatModelClient.ChatMessage> promptMessages;
+        if (ChatSceneTypes.KNOWLEDGE_BASE.equals(sceneType)) {
+            Long kbId = requireKnowledgeBaseId(session.getKbId());
+            if (!kbId.equals(request.getKbId())) {
+                throw new BusinessException("CHAT_KB_MISMATCH", "会话与知识库不匹配", HttpStatus.BAD_REQUEST);
+            }
+            KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(kbId);
+            retrievalResult = retrievalService.retrieve(knowledgeBase, request.getQuestion());
+            chatModel = modelService.resolveChatModelDescriptor(knowledgeBase.getChatModelId());
+            promptMessages = List.of(
+                    new ChatModelClient.ChatMessage("system", buildKnowledgeBaseSystemPrompt()),
+                    new ChatModelClient.ChatMessage("user", buildKnowledgeBaseUserPrompt(request.getQuestion(), retrievalResult.context()))
+            );
+        } else {
+            if (request.getKbId() != null) {
+                throw new BusinessException("CHAT_SCENE_INVALID", "首页通用会话不允许携带知识库标识", HttpStatus.BAD_REQUEST);
+            }
+            retrievalResult = new RetrievalService.RetrievalResult(List.of(), "");
+            chatModel = modelService.resolveChatModelDescriptor(null);
+            promptMessages = List.of(
+                    new ChatModelClient.ChatMessage("system", buildGeneralSystemPrompt()),
+                    new ChatModelClient.ChatMessage("user", request.getQuestion())
+            );
+        }
+        return new PreparedChatExecution(
+                session,
+                chatModel,
+                retrievalResult,
+                promptMessages,
+                buildHistoryMessages(session.getId()),
+                buildConversationId(session)
+        );
+    }
+
+    private void updateUsage(
+            org.springframework.ai.chat.model.ChatResponse chunk,
+            AtomicReference<Integer> promptTokensRef,
+            AtomicReference<Integer> completionTokensRef
+    ) {
+        if (chunk == null || chunk.getMetadata() == null || chunk.getMetadata().getUsage() == null) {
+            return;
+        }
+        if (chunk.getMetadata().getUsage().getPromptTokens() != null) {
+            promptTokensRef.set(chunk.getMetadata().getUsage().getPromptTokens());
+        }
+        if (chunk.getMetadata().getUsage().getCompletionTokens() != null) {
+            completionTokensRef.set(chunk.getMetadata().getUsage().getCompletionTokens());
+        }
+    }
+
+    private String extractStreamText(org.springframework.ai.chat.model.ChatResponse chunk) {
+        if (chunk == null || chunk.getResult() == null || chunk.getResult().getOutput() == null) {
+            return "";
+        }
+        String text = chunk.getResult().getOutput().getText();
+        return text == null ? "" : text;
+    }
+
+    private String resolveStreamErrorMessage(Throwable ex) {
+        String message = ex.getMessage();
+        return StringUtils.hasText(message) ? message : "流式问答失败";
+    }
+
     private String normalizeSceneType(String sceneType) {
         if (!StringUtils.hasText(sceneType)) {
             return ChatSceneTypes.KNOWLEDGE_BASE;
@@ -359,6 +416,16 @@ public class ChatService {
         if (request.getKbId() != null) {
             throw new BusinessException("CHAT_SCENE_INVALID", "首页通用会话不允许绑定知识库", HttpStatus.BAD_REQUEST);
         }
+    }
+
+    private record PreparedChatExecution(
+            ChatSessionEntity session,
+            ModelService.ChatModelDescriptor chatModel,
+            RetrievalService.RetrievalResult retrievalResult,
+            List<ChatModelClient.ChatMessage> promptMessages,
+            List<ChatModelClient.ChatMessage> historyMessages,
+            String conversationId
+    ) {
     }
 
     private Map<Long, String> resolveDocumentNames(List<Long> chunkIds) {

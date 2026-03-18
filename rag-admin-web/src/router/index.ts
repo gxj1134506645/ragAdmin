@@ -34,6 +34,14 @@ const router = createRouter({
           },
         },
         {
+          path: 'chat',
+          name: 'general-chat',
+          component: () => import('@/views/chat/GeneralChatView.vue'),
+          meta: {
+            title: '智能问答',
+          },
+        },
+        {
           path: 'knowledge-bases',
           name: 'knowledge-bases',
           component: () => import('@/views/knowledge-base/KnowledgeBaseListView.vue'),

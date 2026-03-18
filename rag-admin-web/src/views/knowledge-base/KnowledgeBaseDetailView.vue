@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElButton, ElEmpty, ElMessage, ElMessageBox, ElSkeleton } from 'element-plus'
 import type { UploadFile, UploadFiles, UploadUserFile } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
+import ChatWorkspace from '@/components/chat/ChatWorkspace.vue'
 import { subscribeKnowledgeBaseDocumentEvents, type RealtimeStreamHandle } from '@/api/realtime'
 import {
   createKnowledgeBaseDocument,
@@ -899,6 +900,15 @@ onUnmounted(() => {
           </article>
         </div>
       </section>
+
+      <ChatWorkspace
+        scene-type="KNOWLEDGE_BASE"
+        :kb-id="knowledgeBase.id"
+        :title="`${knowledgeBase.kbName} 专属问答`"
+        description="当前会话只使用这个知识库的检索上下文，和首页通用会话完全隔离。"
+        empty-title="开始一个知识库会话"
+        empty-description="发送第一条问题后，会自动为当前知识库创建新会话。"
+      />
 
       <section class="document-panel soft-panel">
         <div class="section-head">

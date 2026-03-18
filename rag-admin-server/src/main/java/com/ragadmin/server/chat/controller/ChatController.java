@@ -7,6 +7,7 @@ import com.ragadmin.server.chat.dto.ChatFeedbackRequest;
 import com.ragadmin.server.chat.dto.ChatRequest;
 import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatSessionResponse;
+import com.ragadmin.server.chat.dto.ChatStreamEventResponse;
 import com.ragadmin.server.chat.dto.CreateChatSessionRequest;
 import com.ragadmin.server.chat.service.ChatService;
 import com.ragadmin.server.common.model.ApiResponse;
@@ -14,6 +15,8 @@ import com.ragadmin.server.common.model.PageResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -65,6 +69,19 @@ public class ChatController {
             HttpServletRequest httpServletRequest
     ) {
         return ApiResponse.success(chatService.chat(sessionId, request, currentUser(httpServletRequest)));
+    }
+
+    @PostMapping(value = "/sessions/{sessionId}/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<ChatStreamEventResponse>> streamChat(
+            @PathVariable Long sessionId,
+            @Valid @RequestBody ChatRequest request,
+            HttpServletRequest httpServletRequest
+    ) {
+        return chatService.streamChat(sessionId, request, currentUser(httpServletRequest))
+                .map(event -> ServerSentEvent.<ChatStreamEventResponse>builder()
+                        .event(event.eventType().toLowerCase())
+                        .data(event)
+                        .build());
     }
 
     @PostMapping("/messages/{messageId}/feedback")

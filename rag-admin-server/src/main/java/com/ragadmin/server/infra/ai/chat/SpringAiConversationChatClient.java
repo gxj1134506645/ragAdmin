@@ -10,6 +10,7 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -50,6 +51,34 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
                 .call()
                 .chatResponse();
         return SpringAiModelSupport.toChatCompletionResult(response);
+    }
+
+    @Override
+    public Flux<org.springframework.ai.chat.model.ChatResponse> stream(
+            String providerCode,
+            String modelCode,
+            String conversationId,
+            List<ChatModelClient.ChatMessage> promptMessages,
+            List<ChatModelClient.ChatMessage> historyMessages
+    ) {
+        if (!StringUtils.hasText(conversationId)) {
+            throw new BusinessException("CHAT_CONVERSATION_ID_INVALID", "会话记忆 conversationId 不能为空", HttpStatus.BAD_REQUEST);
+        }
+        if (promptMessages == null || promptMessages.isEmpty()) {
+            throw new BusinessException("CHAT_PROMPT_EMPTY", "聊天提示消息不能为空", HttpStatus.BAD_REQUEST);
+        }
+
+        seedConversationMemoryIfNecessary(conversationId, historyMessages);
+
+        var chatModel = springAiModelFactory.createChatModel(providerCode, modelCode);
+        ChatClient chatClient = ChatClient.create(chatModel);
+        return chatClient.prompt()
+                .messages(SpringAiModelSupport.toSpringMessages(promptMessages))
+                .advisors(spec -> spec
+                        .advisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                        .param(ChatMemory.CONVERSATION_ID, conversationId))
+                .stream()
+                .chatResponse();
     }
 
     private void seedConversationMemoryIfNecessary(

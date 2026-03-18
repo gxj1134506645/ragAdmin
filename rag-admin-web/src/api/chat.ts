@@ -3,6 +3,7 @@ import { http, resolveErrorMessage, unwrapResponse } from '@/api/http'
 import type { PageResponse } from '@/types/api'
 import type {
   ChatExchange,
+  ChatFeedbackRequest,
   ChatRequest,
   ChatSceneType,
   ChatSession,
@@ -20,6 +21,15 @@ interface ChatSessionQuery {
   sceneType?: ChatSceneType
   pageNo?: number
   pageSize?: number
+}
+
+interface ChatMessagePayload {
+  messageId: number
+  question: string
+  answer: string
+  references: ChatExchange['references']
+  feedbackType?: ChatExchange['feedbackType']
+  feedbackComment?: string | null
 }
 
 interface StreamChatOptions {
@@ -46,7 +56,22 @@ export async function listChatSessions(params: ChatSessionQuery): Promise<PageRe
 
 export async function listChatMessages(sessionId: number): Promise<ChatExchange[]> {
   const response = await http.get(`/admin/chat/sessions/${sessionId}/messages`)
-  return unwrapResponse(response.data)
+  return unwrapResponse<ChatMessagePayload[]>(response.data).map((item) => ({
+    id: item.messageId,
+    questionText: item.question,
+    answerText: item.answer,
+    references: item.references ?? [],
+    feedbackType: item.feedbackType ?? null,
+    feedbackComment: item.feedbackComment ?? null,
+  }))
+}
+
+export async function submitChatFeedback(
+  messageId: number,
+  payload: ChatFeedbackRequest,
+): Promise<void> {
+  const response = await http.post(`/admin/chat/messages/${messageId}/feedback`, payload)
+  unwrapResponse(response.data)
 }
 
 export function streamChatMessage(
@@ -56,6 +81,7 @@ export function streamChatMessage(
 ): ChatStreamHandle {
   const controller = new AbortController()
   const token = getAccessToken()
+  let completed = false
 
   void fetchEventSource(`/api/admin/chat/sessions/${sessionId}/messages/stream`, {
     method: 'POST',
@@ -68,7 +94,6 @@ export function streamChatMessage(
     },
     body: JSON.stringify({
       ...payload,
-      stream: true,
     }),
     async onopen(response) {
       if (response.ok) {
@@ -90,13 +115,21 @@ export function streamChatMessage(
         return
       }
       try {
-        options.onEvent(JSON.parse(message.data) as ChatStreamEvent)
+        const event = JSON.parse(message.data) as ChatStreamEvent
+        if (event.eventType === 'COMPLETE' || event.eventType === 'ERROR') {
+          completed = true
+        }
+        options.onEvent(event)
       } catch (error) {
-        options.onError?.(error)
+        throw error
+      }
+    },
+    onclose() {
+      if (!completed && !controller.signal.aborted) {
+        throw new Error('流式连接已中断，请重新发送上一条问题')
       }
     },
     onerror(error) {
-      options.onError?.(error)
       throw error
     },
   }).catch((error) => {

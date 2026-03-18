@@ -1,4 +1,5 @@
 export type ChatSceneType = 'GENERAL' | 'KNOWLEDGE_BASE'
+export type ChatFeedbackType = 'LIKE' | 'DISLIKE'
 
 export interface ChatReference {
   documentId: number | null
@@ -18,6 +19,8 @@ export interface ChatExchange {
   questionText: string
   answerText: string
   references: ChatReference[]
+  feedbackType: ChatFeedbackType | null
+  feedbackComment: string | null
 }
 
 export interface ChatSession {
@@ -55,4 +58,9 @@ export interface ChatStreamEvent {
   references?: ChatReference[] | null
   usage?: ChatUsage | null
   errorMessage?: string | null
+}
+
+export interface ChatFeedbackRequest {
+  feedbackType: ChatFeedbackType
+  comment?: string
 }

@@ -491,6 +491,33 @@
 
 - `GET /api/admin/chat/sessions/{sessionId}/messages`
 
+响应体示例：
+
+```json
+{
+  "code": "OK",
+  "message": "success",
+  "data": [
+    {
+      "messageId": 101,
+      "question": "公司年假规则是什么？",
+      "answer": "根据员工手册，年假按工龄分段计算。",
+      "references": [
+        {
+          "documentId": 11,
+          "documentName": "员工手册.pdf",
+          "chunkId": 201,
+          "score": 0.92,
+          "contentSnippet": "员工累计工作满 1 年不满 10 年..."
+        }
+      ],
+      "feedbackType": "LIKE",
+      "feedbackComment": null
+    }
+  ]
+}
+```
+
 ### 7.4 发起 RAG 问答
 
 - `POST /api/admin/chat/sessions/{sessionId}/messages`

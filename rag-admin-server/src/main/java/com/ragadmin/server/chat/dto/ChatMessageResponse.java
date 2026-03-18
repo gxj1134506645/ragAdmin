@@ -6,6 +6,8 @@ public record ChatMessageResponse(
         Long messageId,
         String question,
         String answer,
-        List<ChatReferenceResponse> references
+        List<ChatReferenceResponse> references,
+        String feedbackType,
+        String feedbackComment
 ) {
 }

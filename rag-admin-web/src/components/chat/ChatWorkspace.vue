@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { Plus, Promotion, RefreshRight, Tickets } from '@element-plus/icons-vue'
+import { CollectionTag, Plus, Promotion, RefreshRight, Tickets } from '@element-plus/icons-vue'
 import { ElButton, ElEmpty, ElInput, ElMessage, ElSkeleton } from 'element-plus'
 import {
   createChatSession,
   listChatMessages,
   listChatSessions,
   resolveChatStreamError,
+  submitChatFeedback,
   streamChatMessage,
   type ChatStreamHandle,
 } from '@/api/chat'
-import type { ChatExchange, ChatReference, ChatSceneType, ChatSession } from '@/types/chat'
+import type { ChatExchange, ChatFeedbackType, ChatReference, ChatSceneType, ChatSession } from '@/types/chat'
 
 interface Props {
   sceneType: ChatSceneType
@@ -25,6 +26,8 @@ interface PendingExchange {
   question: string
   answer: string
   references: ChatReference[]
+  status: 'STREAMING' | 'FAILED'
+  errorMessage: string | null
 }
 
 const props = defineProps<Props>()
@@ -39,6 +42,8 @@ const draftQuestion = ref('')
 const streaming = ref(false)
 const pendingExchange = ref<PendingExchange | null>(null)
 const conversationBodyRef = ref<HTMLElement | null>(null)
+const expandedReferenceMessageIds = ref<number[]>([])
+const feedbackSubmittingMessageIds = ref<number[]>([])
 
 let streamHandle: ChatStreamHandle | null = null
 
@@ -54,6 +59,7 @@ const composerPlaceholder = computed(() =>
 function resetConversationState(): void {
   messages.value = []
   pendingExchange.value = null
+  expandedReferenceMessageIds.value = []
   loadingError.value = ''
 }
 
@@ -162,6 +168,30 @@ async function handleSelectSession(sessionId: number): Promise<void> {
   await loadMessages(sessionId)
 }
 
+function isReferenceExpanded(messageId: number): boolean {
+  return expandedReferenceMessageIds.value.includes(messageId)
+}
+
+function toggleReferencePanel(messageId: number): void {
+  if (isReferenceExpanded(messageId)) {
+    expandedReferenceMessageIds.value = expandedReferenceMessageIds.value.filter((id) => id !== messageId)
+    return
+  }
+  expandedReferenceMessageIds.value = [...expandedReferenceMessageIds.value, messageId]
+}
+
+function isFeedbackSubmitting(messageId: number): boolean {
+  return feedbackSubmittingMessageIds.value.includes(messageId)
+}
+
+function markPendingExchangeFailed(errorMessage: string): void {
+  if (!pendingExchange.value) {
+    return
+  }
+  pendingExchange.value.status = 'FAILED'
+  pendingExchange.value.errorMessage = errorMessage
+}
+
 function handleStartNewSession(): void {
   if (!isKnowledgeBaseScene.value || streaming.value) {
     return
@@ -186,8 +216,8 @@ async function ensureSessionForQuestion(question: string): Promise<number> {
   return session.id
 }
 
-async function handleSendQuestion(): Promise<void> {
-  const question = draftQuestion.value.trim()
+async function handleSendQuestion(questionOverride?: string): Promise<void> {
+  const question = (questionOverride ?? draftQuestion.value).trim()
   if (!question || streaming.value) {
     return
   }
@@ -197,7 +227,9 @@ async function handleSendQuestion(): Promise<void> {
   }
 
   loadingError.value = ''
-  draftQuestion.value = ''
+  if (!questionOverride) {
+    draftQuestion.value = ''
+  }
   closeStream()
 
   let sessionId: number
@@ -212,6 +244,8 @@ async function handleSendQuestion(): Promise<void> {
     question,
     answer: '',
     references: [],
+    status: 'STREAMING',
+    errorMessage: null,
   }
   streaming.value = true
   await scrollToBottom()
@@ -221,7 +255,6 @@ async function handleSendQuestion(): Promise<void> {
     {
       question,
       kbId: isKnowledgeBaseScene.value ? props.kbId ?? undefined : undefined,
-      stream: true,
     },
     {
       onEvent(event) {
@@ -243,6 +276,8 @@ async function handleSendQuestion(): Promise<void> {
               questionText: question,
               answerText,
               references: event.references ?? [],
+              feedbackType: null,
+              feedbackComment: null,
             },
           ]
           pendingExchange.value = null
@@ -252,18 +287,44 @@ async function handleSendQuestion(): Promise<void> {
         }
 
         if (event.eventType === 'ERROR') {
-          pendingExchange.value = null
+          markPendingExchangeFailed(event.errorMessage || '流式问答失败')
           closeStream()
           ElMessage.error(event.errorMessage || '流式问答失败')
         }
       },
       onError(error) {
-        pendingExchange.value = null
+        const errorMessage = resolveChatStreamError(error)
+        markPendingExchangeFailed(errorMessage)
         closeStream()
-        ElMessage.error(resolveChatStreamError(error))
+        ElMessage.error(errorMessage)
       },
     },
   )
+}
+
+function handleRetryPendingExchange(): void {
+  if (!pendingExchange.value || pendingExchange.value.status !== 'FAILED') {
+    return
+  }
+  void handleSendQuestion(pendingExchange.value.question)
+}
+
+async function handleSubmitFeedback(messageId: number, feedbackType: ChatFeedbackType): Promise<void> {
+  const targetMessage = messages.value.find((item) => item.id === messageId)
+  if (!targetMessage || isFeedbackSubmitting(messageId) || targetMessage.feedbackType === feedbackType) {
+    return
+  }
+
+  feedbackSubmittingMessageIds.value = [...feedbackSubmittingMessageIds.value, messageId]
+  try {
+    await submitChatFeedback(messageId, { feedbackType })
+    targetMessage.feedbackType = feedbackType
+    ElMessage.success(feedbackType === 'LIKE' ? '已记录为有帮助' : '已记录为待改进')
+  } catch (error) {
+    ElMessage.error(resolveChatStreamError(error))
+  } finally {
+    feedbackSubmittingMessageIds.value = feedbackSubmittingMessageIds.value.filter((id) => id !== messageId)
+  }
 }
 
 function handleComposerKeydown(event: Event | KeyboardEvent): void {
@@ -274,6 +335,10 @@ function handleComposerKeydown(event: Event | KeyboardEvent): void {
     return
   }
   event.preventDefault()
+  void handleSendQuestion()
+}
+
+function handleSendButtonClick(): void {
   void handleSendQuestion()
 }
 
@@ -362,7 +427,45 @@ onUnmounted(() => {
               <article class="bubble bubble-assistant">
                 <span class="bubble-role">助手</span>
                 <p>{{ message.answerText || '模型没有返回内容。' }}</p>
-                <div v-if="message.references.length > 0" class="reference-list">
+                <div class="assistant-actions">
+                  <button
+                    v-if="message.references.length > 0"
+                    type="button"
+                    class="assistant-action assistant-reference-toggle"
+                    @click="toggleReferencePanel(message.id)"
+                  >
+                    <el-icon><CollectionTag /></el-icon>
+                    <span>{{ isReferenceExpanded(message.id) ? '收起引用' : '查看引用' }}</span>
+                    <strong>{{ message.references.length }}</strong>
+                  </button>
+                  <div class="assistant-feedback">
+                    <el-button
+                      text
+                      size="small"
+                      :type="message.feedbackType === 'LIKE' ? 'primary' : undefined"
+                      :disabled="isFeedbackSubmitting(message.id)"
+                      @click="handleSubmitFeedback(message.id, 'LIKE')"
+                    >
+                      有帮助
+                    </el-button>
+                    <el-button
+                      text
+                      size="small"
+                      :type="message.feedbackType === 'DISLIKE' ? 'danger' : undefined"
+                      :disabled="isFeedbackSubmitting(message.id)"
+                      @click="handleSubmitFeedback(message.id, 'DISLIKE')"
+                    >
+                      待改进
+                    </el-button>
+                  </div>
+                </div>
+                <p v-if="message.feedbackType" class="feedback-hint">
+                  {{ message.feedbackType === 'LIKE' ? '你已标记这条回答有帮助。' : '你已标记这条回答需要改进。' }}
+                </p>
+                <div
+                  v-if="message.references.length > 0 && isReferenceExpanded(message.id)"
+                  class="reference-list"
+                >
                   <div
                     v-for="reference in message.references"
                     :key="`${message.id}-${reference.chunkId}`"
@@ -383,9 +486,19 @@ onUnmounted(() => {
                 <span class="bubble-role">你</span>
                 <p>{{ pendingExchange.question }}</p>
               </article>
-              <article class="bubble bubble-assistant is-streaming">
+              <article
+                class="bubble bubble-assistant"
+                :class="{
+                  'is-streaming': pendingExchange.status === 'STREAMING',
+                  'is-failed': pendingExchange.status === 'FAILED',
+                }"
+              >
                 <span class="bubble-role">助手</span>
                 <p>{{ pendingExchange.answer || '正在组织回答...' }}</p>
+                <p v-if="pendingExchange.errorMessage" class="pending-error">{{ pendingExchange.errorMessage }}</p>
+                <div v-if="pendingExchange.status === 'FAILED'" class="pending-actions">
+                  <el-button text :icon="RefreshRight" @click="handleRetryPendingExchange">重新发送上一问</el-button>
+                </div>
               </article>
             </div>
           </template>
@@ -420,7 +533,7 @@ onUnmounted(() => {
               :icon="Promotion"
               :loading="streaming"
               :disabled="!draftQuestion.trim()"
-              @click="handleSendQuestion"
+              @click="handleSendButtonClick"
             >
               {{ streaming ? '生成中' : '发送问题' }}
             </el-button>
@@ -607,6 +720,11 @@ onUnmounted(() => {
   border: 1px dashed rgba(198, 107, 34, 0.28);
 }
 
+.bubble-assistant.is-failed {
+  border: 1px solid rgba(192, 57, 43, 0.22);
+  background: rgba(255, 247, 244, 0.9);
+}
+
 .bubble-role {
   display: inline-flex;
   align-items: center;
@@ -617,6 +735,63 @@ onUnmounted(() => {
   font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.assistant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(168, 127, 88, 0.14);
+}
+
+.assistant-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(246, 236, 224, 0.78);
+  color: #805d3f;
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease;
+}
+
+.assistant-action:hover {
+  transform: translateY(-1px);
+  background: rgba(240, 224, 207, 0.92);
+}
+
+.assistant-action strong {
+  color: #c66b22;
+  font-size: 12px;
+}
+
+.assistant-feedback {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.feedback-hint,
+.pending-error {
+  margin: 12px 0 0;
+  color: #8d6a4d;
+  font-size: 13px;
+}
+
+.pending-error {
+  color: #b0493d;
+}
+
+.pending-actions {
+  margin-top: 8px;
 }
 
 .reference-list {
@@ -630,6 +805,7 @@ onUnmounted(() => {
   padding: 12px 14px;
   border-radius: 14px;
   background: rgba(246, 236, 224, 0.72);
+  border-left: 3px solid rgba(198, 107, 34, 0.42);
 }
 
 .reference-head {
@@ -704,7 +880,8 @@ onUnmounted(() => {
   .chat-head,
   .chat-head-actions,
   .composer-actions,
-  .reference-head {
+  .reference-head,
+  .assistant-actions {
     flex-direction: column;
     align-items: flex-start;
   }

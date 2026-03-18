@@ -146,16 +146,30 @@ public class ChatService {
                         .toList())
                 .stream()
                 .collect(Collectors.toMap(ChunkEntity::getId, java.util.function.Function.identity()));
+        Map<Long, ChatFeedbackEntity> feedbackByMessageId = chatFeedbackMapper.selectList(new LambdaQueryWrapper<ChatFeedbackEntity>()
+                        .in(ChatFeedbackEntity::getMessageId, messages.stream().map(ChatMessageEntity::getId).toList())
+                        .eq(ChatFeedbackEntity::getUserId, user.getUserId()))
+                .stream()
+                .collect(Collectors.toMap(
+                        ChatFeedbackEntity::getMessageId,
+                        java.util.function.Function.identity(),
+                        (left, right) -> right
+                ));
 
         return messages.stream()
-                .map(message -> new ChatMessageResponse(
-                        message.getId(),
-                        message.getQuestionText(),
-                        message.getAnswerText(),
-                        refsByMessageId.getOrDefault(message.getId(), List.of()).stream()
-                                .map(ref -> toReferenceResponse(ref, chunkMap.get(ref.getChunkId()), documentNameMap))
-                                .toList()
-                ))
+                .map(message -> {
+                    ChatFeedbackEntity feedback = feedbackByMessageId.get(message.getId());
+                    return new ChatMessageResponse(
+                            message.getId(),
+                            message.getQuestionText(),
+                            message.getAnswerText(),
+                            refsByMessageId.getOrDefault(message.getId(), List.of()).stream()
+                                    .map(ref -> toReferenceResponse(ref, chunkMap.get(ref.getChunkId()), documentNameMap))
+                                    .toList(),
+                            feedback == null ? null : feedback.getFeedbackType(),
+                            feedback == null ? null : feedback.getCommentText()
+                    );
+                })
                 .toList();
     }
 

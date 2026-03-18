@@ -17,7 +17,8 @@ import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -39,6 +40,7 @@ public class DocumentParseProcessor {
     private final TaskStepRecordMapper taskStepRecordMapper;
     private final KnowledgeBaseService knowledgeBaseService;
     private final ChunkVectorizationService chunkVectorizationService;
+    private final TransactionTemplate transactionTemplate;
 
     public DocumentParseProcessor(
             DocumentParseTaskMapper documentParseTaskMapper,
@@ -48,7 +50,8 @@ public class DocumentParseProcessor {
             DocumentContentExtractor documentContentExtractor,
             TaskStepRecordMapper taskStepRecordMapper,
             KnowledgeBaseService knowledgeBaseService,
-            ChunkVectorizationService chunkVectorizationService
+            ChunkVectorizationService chunkVectorizationService,
+            PlatformTransactionManager transactionManager
     ) {
         this.documentParseTaskMapper = documentParseTaskMapper;
         this.documentMapper = documentMapper;
@@ -58,6 +61,7 @@ public class DocumentParseProcessor {
         this.taskStepRecordMapper = taskStepRecordMapper;
         this.knowledgeBaseService = knowledgeBaseService;
         this.chunkVectorizationService = chunkVectorizationService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     public void processWaitingTasks() {
@@ -92,7 +96,7 @@ public class DocumentParseProcessor {
             context = markRunning(taskId);
         } catch (IllegalStateException ex) {
             // 调度轮询与多实例并发场景下，任务可能已被其他工作线程抢占，这里按已处理跳过，避免误标记失败。
-            log.warn("解析任务跳过执行，taskId={}, reason={}", taskId, ex.getMessage());
+            log.info("解析任务跳过执行，taskId={}, reason={}", taskId, ex.getMessage());
             return;
         }
 
@@ -120,136 +124,142 @@ public class DocumentParseProcessor {
         }
     }
 
-    @Transactional
     protected ProcessingContext markRunning(Long taskId) {
-        DocumentParseTaskEntity task = documentParseTaskMapper.selectById(taskId);
-        if (task == null || !"WAITING".equals(task.getTaskStatus())) {
-            throw new IllegalStateException("任务不存在或状态已变更");
-        }
-        DocumentEntity document = documentMapper.selectById(task.getDocumentId());
-        DocumentVersionEntity version = documentVersionMapper.selectById(task.getDocumentVersionId());
-        if (document == null || version == null) {
-            throw new IllegalStateException("文档或文档版本不存在");
-        }
+        return transactionTemplate.execute(status -> {
+            DocumentParseTaskEntity task = documentParseTaskMapper.selectById(taskId);
+            if (task == null || !"WAITING".equals(task.getTaskStatus())) {
+                throw new IllegalStateException("任务不存在或状态已变更");
+            }
+            DocumentEntity document = documentMapper.selectById(task.getDocumentId());
+            DocumentVersionEntity version = documentVersionMapper.selectById(task.getDocumentVersionId());
+            if (document == null || version == null) {
+                throw new IllegalStateException("文档或文档版本不存在");
+            }
 
-        task.setTaskStatus("RUNNING");
-        task.setStartedAt(LocalDateTime.now());
-        task.setErrorMessage(null);
-        documentParseTaskMapper.updateById(task);
+            task.setTaskStatus("RUNNING");
+            task.setStartedAt(LocalDateTime.now());
+            task.setErrorMessage(null);
+            documentParseTaskMapper.updateById(task);
 
-        document.setParseStatus("PROCESSING");
-        documentMapper.updateById(document);
-        version.setParseStatus("PROCESSING");
-        version.setParseStartedAt(LocalDateTime.now());
-        version.setParseFinishedAt(null);
-        documentVersionMapper.updateById(version);
-
-        return new ProcessingContext(task, document, version);
-    }
-
-    @Transactional
-    protected TaskStepRecordEntity startStep(Long taskId, String stepCode, String stepName) {
-        TaskStepRecordEntity step = new TaskStepRecordEntity();
-        step.setTaskId(taskId);
-        step.setStepCode(stepCode);
-        step.setStepName(stepName);
-        step.setStepStatus("RUNNING");
-        step.setStartedAt(LocalDateTime.now());
-        taskStepRecordMapper.insert(step);
-        return step;
-    }
-
-    @Transactional
-    protected void completeStep(TaskStepRecordEntity step) {
-        step.setStepStatus("SUCCESS");
-        step.setFinishedAt(LocalDateTime.now());
-        step.setErrorMessage(null);
-        taskStepRecordMapper.updateById(step);
-    }
-
-    @Transactional
-    protected List<ChunkEntity> persistChunks(ProcessingContext context, List<String> chunks) {
-        List<ChunkEntity> existingChunks = chunkMapper.selectList(new LambdaQueryWrapper<ChunkEntity>()
-                .eq(ChunkEntity::getDocumentVersionId, context.version().getId())
-                .orderByAsc(ChunkEntity::getChunkNo));
-        chunkVectorizationService.deleteRefsByChunkIds(existingChunks.stream().map(ChunkEntity::getId).toList());
-        chunkMapper.delete(new LambdaQueryWrapper<ChunkEntity>()
-                .eq(ChunkEntity::getDocumentVersionId, context.version().getId()));
-
-        int chunkNo = 1;
-        List<ChunkEntity> persistedChunks = new ArrayList<>();
-        for (String chunkText : chunks) {
-            ChunkEntity entity = new ChunkEntity();
-            entity.setKbId(context.document().getKbId());
-            entity.setDocumentId(context.document().getId());
-            entity.setDocumentVersionId(context.version().getId());
-            entity.setChunkNo(chunkNo++);
-            entity.setChunkText(chunkText);
-            entity.setTokenCount(estimateTokenCount(chunkText));
-            entity.setCharCount(chunkText.length());
-            entity.setMetadataJson(null);
-            entity.setEnabled(Boolean.TRUE);
-            chunkMapper.insert(entity);
-            persistedChunks.add(entity);
-        }
-        return persistedChunks;
-    }
-
-    @Transactional
-    protected void markSuccess(ProcessingContext context) {
-        LocalDateTime now = LocalDateTime.now();
-        DocumentParseTaskEntity task = context.task();
-        DocumentEntity document = context.document();
-        DocumentVersionEntity version = context.version();
-
-        task.setTaskStatus("SUCCESS");
-        task.setFinishedAt(now);
-        task.setErrorMessage(null);
-        documentParseTaskMapper.updateById(task);
-
-        document.setParseStatus("SUCCESS");
-        documentMapper.updateById(document);
-        version.setParseStatus("SUCCESS");
-        version.setParseFinishedAt(now);
-        documentVersionMapper.updateById(version);
-    }
-
-    @Transactional
-    protected void markFailed(Long taskId, Exception ex) {
-        DocumentParseTaskEntity task = documentParseTaskMapper.selectById(taskId);
-        if (task == null) {
-            return;
-        }
-        DocumentEntity document = documentMapper.selectById(task.getDocumentId());
-        DocumentVersionEntity version = documentVersionMapper.selectById(task.getDocumentVersionId());
-        LocalDateTime now = LocalDateTime.now();
-
-        task.setTaskStatus("FAILED");
-        task.setFinishedAt(now);
-        task.setErrorMessage(buildErrorMessage(ex));
-        documentParseTaskMapper.updateById(task);
-
-        if (document != null) {
-            document.setParseStatus("FAILED");
+            document.setParseStatus("PROCESSING");
             documentMapper.updateById(document);
-        }
-        if (version != null) {
-            version.setParseStatus("FAILED");
+            version.setParseStatus("PROCESSING");
+            version.setParseStartedAt(LocalDateTime.now());
+            version.setParseFinishedAt(null);
+            documentVersionMapper.updateById(version);
+
+            return new ProcessingContext(task, document, version);
+        });
+    }
+
+    protected TaskStepRecordEntity startStep(Long taskId, String stepCode, String stepName) {
+        return transactionTemplate.execute(status -> {
+            TaskStepRecordEntity step = new TaskStepRecordEntity();
+            step.setTaskId(taskId);
+            step.setStepCode(stepCode);
+            step.setStepName(stepName);
+            step.setStepStatus("RUNNING");
+            step.setStartedAt(LocalDateTime.now());
+            taskStepRecordMapper.insert(step);
+            return step;
+        });
+    }
+
+    protected void completeStep(TaskStepRecordEntity step) {
+        transactionTemplate.executeWithoutResult(status -> {
+            step.setStepStatus("SUCCESS");
+            step.setFinishedAt(LocalDateTime.now());
+            step.setErrorMessage(null);
+            taskStepRecordMapper.updateById(step);
+        });
+    }
+
+    protected List<ChunkEntity> persistChunks(ProcessingContext context, List<String> chunks) {
+        return transactionTemplate.execute(status -> {
+            List<ChunkEntity> existingChunks = chunkMapper.selectList(new LambdaQueryWrapper<ChunkEntity>()
+                    .eq(ChunkEntity::getDocumentVersionId, context.version().getId())
+                    .orderByAsc(ChunkEntity::getChunkNo));
+            chunkVectorizationService.deleteRefsByChunkIds(existingChunks.stream().map(ChunkEntity::getId).toList());
+            chunkMapper.delete(new LambdaQueryWrapper<ChunkEntity>()
+                    .eq(ChunkEntity::getDocumentVersionId, context.version().getId()));
+
+            int chunkNo = 1;
+            List<ChunkEntity> persistedChunks = new ArrayList<>();
+            for (String chunkText : chunks) {
+                ChunkEntity entity = new ChunkEntity();
+                entity.setKbId(context.document().getKbId());
+                entity.setDocumentId(context.document().getId());
+                entity.setDocumentVersionId(context.version().getId());
+                entity.setChunkNo(chunkNo++);
+                entity.setChunkText(chunkText);
+                entity.setTokenCount(estimateTokenCount(chunkText));
+                entity.setCharCount(chunkText.length());
+                entity.setMetadataJson(null);
+                entity.setEnabled(Boolean.TRUE);
+                chunkMapper.insert(entity);
+                persistedChunks.add(entity);
+            }
+            return persistedChunks;
+        });
+    }
+
+    protected void markSuccess(ProcessingContext context) {
+        transactionTemplate.executeWithoutResult(status -> {
+            LocalDateTime now = LocalDateTime.now();
+            DocumentParseTaskEntity task = context.task();
+            DocumentEntity document = context.document();
+            DocumentVersionEntity version = context.version();
+
+            task.setTaskStatus("SUCCESS");
+            task.setFinishedAt(now);
+            task.setErrorMessage(null);
+            documentParseTaskMapper.updateById(task);
+
+            document.setParseStatus("SUCCESS");
+            documentMapper.updateById(document);
+            version.setParseStatus("SUCCESS");
             version.setParseFinishedAt(now);
             documentVersionMapper.updateById(version);
-        }
+        });
+    }
 
-        TaskStepRecordEntity runningStep = taskStepRecordMapper.selectOne(new LambdaQueryWrapper<TaskStepRecordEntity>()
-                .eq(TaskStepRecordEntity::getTaskId, taskId)
-                .eq(TaskStepRecordEntity::getStepStatus, "RUNNING")
-                .orderByDesc(TaskStepRecordEntity::getId)
-                .last("LIMIT 1"));
-        if (runningStep != null) {
-            runningStep.setStepStatus("FAILED");
-            runningStep.setFinishedAt(now);
-            runningStep.setErrorMessage(buildErrorMessage(ex));
-            taskStepRecordMapper.updateById(runningStep);
-        }
+    protected void markFailed(Long taskId, Exception ex) {
+        transactionTemplate.executeWithoutResult(status -> {
+            DocumentParseTaskEntity task = documentParseTaskMapper.selectById(taskId);
+            if (task == null) {
+                return;
+            }
+            DocumentEntity document = documentMapper.selectById(task.getDocumentId());
+            DocumentVersionEntity version = documentVersionMapper.selectById(task.getDocumentVersionId());
+            LocalDateTime now = LocalDateTime.now();
+
+            task.setTaskStatus("FAILED");
+            task.setFinishedAt(now);
+            task.setErrorMessage(buildErrorMessage(ex));
+            documentParseTaskMapper.updateById(task);
+
+            if (document != null) {
+                document.setParseStatus("FAILED");
+                documentMapper.updateById(document);
+            }
+            if (version != null) {
+                version.setParseStatus("FAILED");
+                version.setParseFinishedAt(now);
+                documentVersionMapper.updateById(version);
+            }
+
+            TaskStepRecordEntity runningStep = taskStepRecordMapper.selectOne(new LambdaQueryWrapper<TaskStepRecordEntity>()
+                    .eq(TaskStepRecordEntity::getTaskId, taskId)
+                    .eq(TaskStepRecordEntity::getStepStatus, "RUNNING")
+                    .orderByDesc(TaskStepRecordEntity::getId)
+                    .last("LIMIT 1"));
+            if (runningStep != null) {
+                runningStep.setStepStatus("FAILED");
+                runningStep.setFinishedAt(now);
+                runningStep.setErrorMessage(buildErrorMessage(ex));
+                taskStepRecordMapper.updateById(runningStep);
+            }
+        });
     }
 
     private ParsedContent parseContent(DocumentEntity document, DocumentVersionEntity version) throws Exception {

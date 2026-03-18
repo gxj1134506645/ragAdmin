@@ -114,6 +114,7 @@ public class RetrievalService {
                         item.chunk().getDocumentId(),
                         documentNameResolver.apply(item.chunk().getDocumentId()),
                         item.chunk().getId(),
+                        item.chunk().getChunkNo(),
                         item.score(),
                         snippet(item.chunk().getChunkText())
                 ))

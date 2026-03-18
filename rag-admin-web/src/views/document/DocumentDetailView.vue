@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-import { ElButton, ElEmpty, ElMessage, ElMessageBox, ElSkeleton } from 'element-plus'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { ElAlert, ElButton, ElEmpty, ElMessage, ElMessageBox, ElSkeleton } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { subscribeDocumentEvents, type RealtimeStreamHandle } from '@/api/realtime'
 import {
@@ -48,6 +48,7 @@ const chunkLoading = ref(false)
 const chunkError = ref('')
 const chunks = ref<DocumentChunk[]>([])
 const expandedChunkIds = ref<number[]>([])
+const chunkTableWrapperRef = ref<HTMLElement | null>(null)
 const chunkPagination = reactive({
   pageNo: 1,
   pageSize: 10,
@@ -61,6 +62,9 @@ const documentId = computed(() => Number(route.params.id))
 const hasVersions = computed(() => versions.value.length > 0)
 const hasChunks = computed(() => chunks.value.length > 0)
 const parseProgressState = computed(() => buildParseProgressState(detail.value?.parseStatus, realtimeEvent.value))
+const routeChunkId = computed(() => parsePositiveInteger(route.query.chunkId))
+const routeChunkNo = computed(() => parsePositiveInteger(route.query.chunkNo))
+const hasRouteChunkFocus = computed(() => route.query.source === 'chat' && (routeChunkId.value !== null || routeChunkNo.value !== null))
 
 function parseStatusType(status: string): 'success' | 'warning' | 'danger' | 'info' {
   if (status === 'SUCCESS') {
@@ -84,6 +88,20 @@ function formatTime(value: string | null | undefined): string {
     return value
   }
   return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+function parsePositiveInteger(value: unknown): number | null {
+  if (Array.isArray(value)) {
+    return parsePositiveInteger(value[0])
+  }
+  if (typeof value !== 'string' || !value.trim()) {
+    return null
+  }
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return null
+  }
+  return parsed
 }
 
 function clearDocumentRealtimeRefreshTimer(): void {
@@ -175,6 +193,45 @@ function toggleChunk(chunkId: number): void {
   expandedChunkIds.value = [...expandedChunkIds.value, chunkId]
 }
 
+function chunkRowClassName({ row }: { row: DocumentChunk }): string {
+  if (routeChunkId.value !== null && row.chunkId === routeChunkId.value) {
+    return `chunk-row chunk-row-${row.chunkId} is-route-highlight`
+  }
+  return `chunk-row chunk-row-${row.chunkId}`
+}
+
+async function scrollToChunkRow(chunkId: number): Promise<void> {
+  await nextTick()
+  const row = chunkTableWrapperRef.value?.querySelector(`.chunk-row-${chunkId}`) as HTMLElement | null
+  row?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+  })
+}
+
+async function alignChunkViewToRoute(): Promise<void> {
+  const targetChunkId = routeChunkId.value
+  const targetChunkNo = routeChunkNo.value
+  if (targetChunkId === null && targetChunkNo === null) {
+    return
+  }
+
+  if (targetChunkNo !== null) {
+    const targetPageNo = Math.max(1, Math.ceil(targetChunkNo / chunkPagination.pageSize))
+    if (chunkPagination.pageNo !== targetPageNo) {
+      chunkPagination.pageNo = targetPageNo
+      await loadChunks()
+    }
+  }
+
+  if (targetChunkId !== null && chunks.value.some((item) => item.chunkId === targetChunkId)) {
+    if (!expandedChunkIds.value.includes(targetChunkId)) {
+      expandedChunkIds.value = [...expandedChunkIds.value, targetChunkId]
+    }
+    await scrollToChunkRow(targetChunkId)
+  }
+}
+
 async function uploadToObjectStorage(upload: UploadUrlResponse, file: File): Promise<void> {
   const response = await fetch(upload.uploadUrl, {
     method: 'PUT',
@@ -246,6 +303,7 @@ async function initialize(): Promise<void> {
   if (!detailError.value) {
     await loadVersions()
     await loadChunks()
+    await alignChunkViewToRoute()
   }
 }
 
@@ -394,6 +452,24 @@ onMounted(async () => {
     connectDocumentRealtimeStream()
   }
 })
+
+watch(
+  () => [documentId.value, routeChunkId.value, routeChunkNo.value],
+  async ([nextDocumentId, nextChunkId, nextChunkNo], [prevDocumentId, prevChunkId, prevChunkNo]) => {
+    if (nextDocumentId !== prevDocumentId) {
+      realtimeEvent.value = null
+      closeDocumentRealtimeStream()
+      await initialize()
+      if (!detailError.value) {
+        connectDocumentRealtimeStream()
+      }
+      return
+    }
+    if (nextChunkId !== prevChunkId || nextChunkNo !== prevChunkNo) {
+      await alignChunkViewToRoute()
+    }
+  },
+)
 
 onUnmounted(() => {
   clearDocumentRealtimeRefreshTimer()
@@ -608,6 +684,21 @@ onUnmounted(() => {
           <el-button :loading="chunkLoading" @click="handleRetryChunks">刷新切片</el-button>
         </div>
 
+        <el-alert
+          v-if="hasRouteChunkFocus"
+          type="info"
+          :closable="false"
+          show-icon
+          class="chunk-focus-alert"
+          title="当前页面已按问答引用定位到命中切片。"
+        >
+          <template #default>
+            <p class="chunk-focus-text">
+              系统会自动切到对应分页，并高亮目标切片，方便你直接核对问答引用原文。
+            </p>
+          </template>
+        </el-alert>
+
         <section v-if="chunkError" class="chunk-error">
           <el-empty description="切片列表加载失败">
             <template #description>
@@ -618,7 +709,15 @@ onUnmounted(() => {
         </section>
 
         <template v-else>
-          <el-table :data="chunks" v-loading="chunkLoading" empty-text="当前文档暂无切片数据" stripe>
+          <div ref="chunkTableWrapperRef">
+            <el-table
+              :data="chunks"
+              v-loading="chunkLoading"
+              empty-text="当前文档暂无切片数据"
+              stripe
+              row-key="chunkId"
+              :row-class-name="chunkRowClassName"
+            >
             <el-table-column prop="chunkId" label="切片 ID" width="100" />
             <el-table-column label="序号" width="100">
               <template #default="{ row, $index }">
@@ -655,7 +754,8 @@ onUnmounted(() => {
                 {{ row.charCount ?? '-' }}
               </template>
             </el-table-column>
-          </el-table>
+            </el-table>
+          </div>
 
           <div class="table-footer" v-if="hasChunks || chunkPagination.total > 0">
             <el-pagination
@@ -892,12 +992,31 @@ onUnmounted(() => {
   padding: 8px 0;
 }
 
+.chunk-focus-alert {
+  margin-bottom: 16px;
+}
+
+.chunk-focus-text {
+  margin: 0;
+  color: #6d5948;
+}
+
 .chunk-content p {
   margin: 0;
   color: #5d4736;
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+:deep(.el-table .chunk-row.is-route-highlight > td.el-table__cell) {
+  background:
+    linear-gradient(90deg, rgba(226, 160, 87, 0.22), rgba(255, 246, 232, 0.92));
+}
+
+:deep(.el-table .chunk-row.is-route-highlight .cell) {
+  color: #4e361f;
+  font-weight: 600;
 }
 
 .upload-dialog {

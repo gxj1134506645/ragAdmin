@@ -507,6 +507,7 @@
           "documentId": 11,
           "documentName": "员工手册.pdf",
           "chunkId": 201,
+          "chunkNo": 35,
           "score": 0.92,
           "contentSnippet": "员工累计工作满 1 年不满 10 年..."
         }
@@ -560,6 +561,7 @@
         "documentId": 11,
         "documentName": "员工手册.pdf",
         "chunkId": 201,
+        "chunkNo": 35,
         "score": 0.92,
         "contentSnippet": "员工累计工作满 1 年不满 10 年..."
       }
@@ -610,7 +612,7 @@ event: delta
 data: {"eventType":"DELTA","delta":"年假按工龄分段计算。"}
 
 event: complete
-data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年假按工龄分段计算。","references":[{"documentId":11,"documentName":"员工手册.pdf","chunkId":201,"score":0.92,"contentSnippet":"员工累计工作满 1 年不满 10 年..."}],"usage":{"promptTokens":600,"completionTokens":120}}
+data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年假按工龄分段计算。","references":[{"documentId":11,"documentName":"员工手册.pdf","chunkId":201,"chunkNo":35,"score":0.92,"contentSnippet":"员工累计工作满 1 年不满 10 年..."}],"usage":{"promptTokens":600,"completionTokens":120}}
 ```
 
 ### 7.6 提交反馈

@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { CollectionTag, Plus, Promotion, RefreshRight, Tickets } from '@element-plus/icons-vue'
 import { ElButton, ElEmpty, ElInput, ElMessage, ElSkeleton } from 'element-plus'
+import { useRouter } from 'vue-router'
 import {
   createChatSession,
   listChatMessages,
@@ -31,6 +32,7 @@ interface PendingExchange {
 }
 
 const props = defineProps<Props>()
+const router = useRouter()
 
 const sessionLoading = ref(false)
 const messageLoading = ref(false)
@@ -327,6 +329,24 @@ async function handleSubmitFeedback(messageId: number, feedbackType: ChatFeedbac
   }
 }
 
+async function handleOpenReference(reference: ChatReference): Promise<void> {
+  if (!reference.documentId) {
+    ElMessage.warning('当前引用未关联具体文档，暂时无法跳转')
+    return
+  }
+  await router.push({
+    name: 'document-detail',
+    params: {
+      id: reference.documentId,
+    },
+    query: {
+      chunkId: String(reference.chunkId),
+      ...(reference.chunkNo ? { chunkNo: String(reference.chunkNo) } : {}),
+      source: 'chat',
+    },
+  })
+}
+
 function handleComposerKeydown(event: Event | KeyboardEvent): void {
   if (!(event instanceof KeyboardEvent)) {
     return
@@ -476,6 +496,12 @@ onUnmounted(() => {
                       <span>相似度 {{ reference.score.toFixed(2) }}</span>
                     </div>
                     <p>{{ reference.contentSnippet }}</p>
+                    <div class="reference-actions">
+                      <el-button link type="primary" @click="handleOpenReference(reference)">
+                        查看原文
+                      </el-button>
+                      <span v-if="reference.chunkNo" class="reference-meta">定位切片 #{{ reference.chunkNo }}</span>
+                    </div>
                   </div>
                 </div>
               </article>
@@ -820,6 +846,19 @@ onUnmounted(() => {
   margin: 8px 0 0;
   color: #5f4a38;
   font-size: 13px;
+}
+
+.reference-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.reference-meta {
+  color: #9d7a58;
+  font-size: 12px;
 }
 
 .conversation-empty {

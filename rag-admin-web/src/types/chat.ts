@@ -5,6 +5,7 @@ export interface ChatReference {
   documentId: number | null
   documentName: string | null
   chunkId: number
+  chunkNo?: number | null
   score: number
   contentSnippet: string
 }

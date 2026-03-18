@@ -4,6 +4,7 @@ public record ChatReferenceResponse(
         Long documentId,
         String documentName,
         Long chunkId,
+        Integer chunkNo,
         double score,
         String contentSnippet
 ) {

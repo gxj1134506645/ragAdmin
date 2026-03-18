@@ -43,6 +43,27 @@ public final class SpringAiModelSupport {
         return baseUrl.trim();
     }
 
+    /**
+     * 当前文档解析与检索链路走的是纯文本切片输入，因此需要显式拦截百炼多模态向量模型，
+     * 避免把底层 `input.contents/url error` 直接暴露给上层业务。
+     */
+    public static String requireSupportedDashScopeTextEmbeddingModel(String modelCode) {
+        if (!StringUtils.hasText(modelCode)) {
+            throw new BusinessException("EMBEDDING_MODEL_INVALID", "Embedding 模型编码不能为空", HttpStatus.BAD_REQUEST);
+        }
+        String resolvedModelCode = modelCode.trim();
+        String normalizedModelCode = resolvedModelCode.toLowerCase();
+        if (normalizedModelCode.contains("vl-embedding") || normalizedModelCode.contains("multimodal-embedding")) {
+            throw new BusinessException(
+                    "EMBEDDING_MODEL_UNSUPPORTED",
+                    "当前文档解析与检索链路仅支持文本 Embedding 模型，请改用 text-embedding-v3 或 text-embedding-v4；当前模型 "
+                            + resolvedModelCode + " 属于多模态向量模型，需要 input.contents/url 输入。",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        return resolvedModelCode;
+    }
+
     public static String normalizeOllamaOpenAiBaseUrl(String baseUrl) {
         if (!StringUtils.hasText(baseUrl)) {
             throw new BusinessException("OLLAMA_BASE_URL_MISSING", "Ollama baseUrl 未配置", HttpStatus.SERVICE_UNAVAILABLE);

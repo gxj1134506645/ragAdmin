@@ -30,7 +30,8 @@ public class BailianEmbeddingClient implements EmbeddingModelClient {
 
     @Override
     public List<List<Float>> embed(String modelCode, List<String> inputs) {
-        EmbeddingResponse response = springAiModelFactory.createEmbeddingModel("BAILIAN", modelCode)
+        String resolvedModelCode = SpringAiModelSupport.requireSupportedDashScopeTextEmbeddingModel(modelCode);
+        EmbeddingResponse response = springAiModelFactory.createEmbeddingModel("BAILIAN", resolvedModelCode)
                 .call(new EmbeddingRequest(inputs, null));
         if (response == null || response.getResults() == null || response.getResults().isEmpty()) {
             throw new BusinessException("EMBEDDING_FAILED", "百炼 Embedding 返回为空", HttpStatus.BAD_GATEWAY);

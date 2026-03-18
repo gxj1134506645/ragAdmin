@@ -10,6 +10,7 @@ import com.ragadmin.server.document.entity.ChunkVectorRefEntity;
 import com.ragadmin.server.document.mapper.ChunkVectorRefMapper;
 import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
 import com.ragadmin.server.infra.ai.AiProperties;
+import com.ragadmin.server.infra.ai.SpringAiModelSupport;
 import com.ragadmin.server.infra.ai.bailian.BailianProperties;
 import com.ragadmin.server.infra.ai.chat.ChatClientRegistry;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
@@ -213,12 +214,7 @@ public class ModelService {
         if (provider == null) {
             throw new BusinessException("PROVIDER_NOT_FOUND", "模型提供方不存在", HttpStatus.NOT_FOUND);
         }
-        return new EmbeddingModelDescriptor(
-                model.getId(),
-                model.getModelCode(),
-                provider.getProviderCode(),
-                provider.getProviderName()
-        );
+        return toEmbeddingDescriptor(model, provider);
     }
 
     public EmbeddingModelDescriptor resolveEmbeddingModelDescriptor(Long modelId) {
@@ -309,8 +305,9 @@ public class ModelService {
                 return new ModelCapabilityHealthResponse(capabilityType, "UP", "聊天能力可用");
             }
             if ("EMBEDDING".equals(capabilityType)) {
+                String modelCode = resolveEmbeddingModelCode(provider, model);
                 embeddingClientRegistry.getClient(provider.getProviderCode())
-                        .embed(model.getModelCode(), List.of("health check"));
+                        .embed(modelCode, List.of("health check"));
                 return new ModelCapabilityHealthResponse(capabilityType, "UP", "向量能力可用");
             }
             return new ModelCapabilityHealthResponse(capabilityType, "DOWN", "当前未实现该能力探活");
@@ -436,7 +433,7 @@ public class ModelService {
     private EmbeddingModelDescriptor requireEmbeddingDescriptorByProviderAndCode(String providerCode, String modelCode) {
         AiProviderEntity provider = requireProviderByCode(providerCode);
         AiModelEntity model = requireModelByProviderAndCapability(provider.getId(), modelCode, "EMBEDDING");
-        return new EmbeddingModelDescriptor(model.getId(), model.getModelCode(), provider.getProviderCode(), provider.getProviderName());
+        return toEmbeddingDescriptor(model, provider);
     }
 
     private ChatModelDescriptor requireChatDescriptorByProviderAndCode(String providerCode, String modelCode) {
@@ -475,6 +472,22 @@ public class ModelService {
         }
         requireModelWithCapability(model.getId(), capabilityType);
         return model;
+    }
+
+    private EmbeddingModelDescriptor toEmbeddingDescriptor(AiModelEntity model, AiProviderEntity provider) {
+        return new EmbeddingModelDescriptor(
+                model.getId(),
+                resolveEmbeddingModelCode(provider, model),
+                provider.getProviderCode(),
+                provider.getProviderName()
+        );
+    }
+
+    private String resolveEmbeddingModelCode(AiProviderEntity provider, AiModelEntity model) {
+        if ("BAILIAN".equalsIgnoreCase(provider.getProviderCode())) {
+            return SpringAiModelSupport.requireSupportedDashScopeTextEmbeddingModel(model.getModelCode());
+        }
+        return model.getModelCode();
     }
 
     private ModelResponse toResponse(AiModelEntity entity, AiProviderEntity provider, List<String> capabilityTypes) {

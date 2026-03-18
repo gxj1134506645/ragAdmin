@@ -43,4 +43,19 @@ class BailianApiClientInitializationTest {
 
         assertEquals("BAILIAN_API_KEY_MISSING", exception.getCode());
     }
+
+    @Test
+    void shouldRejectMultimodalEmbeddingModelBeforeCallingDashScope() {
+        BailianProperties properties = new BailianProperties();
+        SpringAiModelFactory springAiModelFactory = new SpringAiModelFactory(List.of(new BailianModelFactory(properties)));
+
+        BailianEmbeddingClient client = new BailianEmbeddingClient(springAiModelFactory);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> client.embed("qwen2.5-vl-embedding", List.of("ping"))
+        );
+
+        assertEquals("EMBEDDING_MODEL_UNSUPPORTED", exception.getCode());
+    }
 }

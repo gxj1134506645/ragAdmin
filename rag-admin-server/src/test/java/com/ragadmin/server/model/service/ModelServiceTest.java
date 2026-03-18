@@ -116,6 +116,32 @@ class ModelServiceTest {
     }
 
     @Test
+    void shouldRejectDashScopeMultimodalEmbeddingModelForTextPipeline() {
+        AiModelEntity model = new AiModelEntity();
+        model.setId(7L);
+        model.setProviderId(70L);
+        model.setModelCode("qwen2.5-vl-embedding");
+
+        AiProviderEntity provider = new AiProviderEntity();
+        provider.setId(70L);
+        provider.setProviderCode("BAILIAN");
+        provider.setProviderName("百炼");
+
+        when(aiModelMapper.selectById(7L)).thenReturn(model);
+        when(aiModelCapabilityMapper.selectEnabledByModelIds(List.of(7L)))
+                .thenReturn(List.of(capability(7L, "EMBEDDING")));
+        when(aiProviderMapper.selectById(70L)).thenReturn(provider);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> modelService.requireEmbeddingModelDescriptor(7L)
+        );
+
+        assertEquals("EMBEDDING_MODEL_UNSUPPORTED", exception.getCode());
+        assertTrue(exception.getMessage().contains("text-embedding-v3"));
+    }
+
+    @Test
     void shouldResolveDefaultChatModelDescriptorWhenKnowledgeBaseModelIsEmpty() {
         AiProviderEntity provider = new AiProviderEntity();
         provider.setId(50L);

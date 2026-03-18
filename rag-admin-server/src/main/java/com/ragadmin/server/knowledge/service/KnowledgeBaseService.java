@@ -113,7 +113,7 @@ public class KnowledgeBaseService {
         }
 
         if (request.getEmbeddingModelId() != null) {
-            modelService.requireModelWithCapability(request.getEmbeddingModelId(), "EMBEDDING");
+            modelService.requireEmbeddingModelDescriptor(request.getEmbeddingModelId());
         }
         if (request.getChatModelId() != null) {
             modelService.requireModelWithCapability(request.getChatModelId(), "TEXT_GENERATION");
@@ -144,7 +144,7 @@ public class KnowledgeBaseService {
         }
 
         if (request.getEmbeddingModelId() != null) {
-            modelService.requireModelWithCapability(request.getEmbeddingModelId(), "EMBEDDING");
+            modelService.requireEmbeddingModelDescriptor(request.getEmbeddingModelId());
         }
         if (request.getChatModelId() != null) {
             modelService.requireModelWithCapability(request.getChatModelId(), "TEXT_GENERATION");

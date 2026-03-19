@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ragadmin.server.chat.entity.ChatAnswerReferenceEntity;
 import com.ragadmin.server.chat.entity.ChatSessionEntity;
+import com.ragadmin.server.chat.entity.ChatSessionKnowledgeBaseRelEntity;
 import com.ragadmin.server.chat.mapper.ChatAnswerReferenceMapper;
 import com.ragadmin.server.chat.mapper.ChatSessionMapper;
+import com.ragadmin.server.chat.mapper.ChatSessionKnowledgeBaseRelMapper;
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.document.entity.ChunkEntity;
@@ -66,6 +68,9 @@ public class KnowledgeBaseService {
 
     @Autowired
     private ChatSessionMapper chatSessionMapper;
+
+    @Autowired
+    private ChatSessionKnowledgeBaseRelMapper chatSessionKnowledgeBaseRelMapper;
 
     @Autowired
     private ChatAnswerReferenceMapper chatAnswerReferenceMapper;
@@ -196,6 +201,11 @@ public class KnowledgeBaseService {
                 .eq(ChatSessionEntity::getKbId, kbId));
         if (sessionCount != null && sessionCount > 0) {
             throw new BusinessException("KB_IN_USE", "知识库 " + entity.getKbName() + " 已存在对话会话，不能删除", HttpStatus.BAD_REQUEST);
+        }
+        Long sessionRelCount = chatSessionKnowledgeBaseRelMapper.selectCount(new LambdaQueryWrapper<ChatSessionKnowledgeBaseRelEntity>()
+                .eq(ChatSessionKnowledgeBaseRelEntity::getKbId, kbId));
+        if (sessionRelCount != null && sessionRelCount > 0) {
+            throw new BusinessException("KB_IN_USE", "知识库 " + entity.getKbName() + " 已被会话绑定使用，不能删除", HttpStatus.BAD_REQUEST);
         }
 
         List<Long> documentIds = documentMapper.selectList(new LambdaQueryWrapper<DocumentEntity>()

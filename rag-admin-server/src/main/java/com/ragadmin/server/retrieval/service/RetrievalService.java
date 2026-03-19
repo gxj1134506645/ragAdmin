@@ -21,6 +21,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -103,6 +104,29 @@ public class RetrievalService {
 
         String context = buildContext(chunks);
         return new RetrievalResult(chunks, context);
+    }
+
+    /**
+     * 前台允许一个会话动态选择多个知识库，这里按“逐库检索再合并结果”的最小方案复用现有单库检索能力。
+     */
+    public RetrievalResult retrieveAcrossKnowledgeBases(List<KnowledgeBaseEntity> knowledgeBases, String question) {
+        if (knowledgeBases == null || knowledgeBases.isEmpty()) {
+            return new RetrievalResult(List.of(), "");
+        }
+        List<RetrievedChunk> mergedChunks = knowledgeBases.stream()
+                .filter(Objects::nonNull)
+                .flatMap(knowledgeBase -> retrieve(knowledgeBase, question).chunks().stream())
+                .sorted(Comparator.comparing(RetrievedChunk::score).reversed())
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toMap(
+                                item -> item.chunk().getId(),
+                                Function.identity(),
+                                (left, right) -> left,
+                                LinkedHashMap::new
+                        ),
+                        map -> map.values().stream().toList()
+                ));
+        return new RetrievalResult(mergedChunks, buildContext(mergedChunks));
     }
 
     public List<ChatReferenceResponse> toReferenceResponses(List<RetrievedChunk> chunks, java.util.function.Function<Long, String> documentNameResolver) {

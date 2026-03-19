@@ -43,6 +43,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -315,6 +316,46 @@ class AppApiWebMvcTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data[0].messageId").value(101))
                 .andExpect(jsonPath("$.data[0].answer").value("今天需要完成接口联调。"));
+    }
+
+    @Test
+    void shouldRenameAppChatSessionWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(appChatService.renameSession(eq(22L), eq("新的会话名"), any())).thenReturn(new AppChatSessionResponse(
+                22L,
+                null,
+                "GENERAL",
+                "新的会话名",
+                1L,
+                false,
+                List.of(11L, 12L),
+                "ENABLED"
+        ));
+
+        protectedMockMvc.perform(put("/api/app/chat/sessions/22")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "sessionName": "新的会话名"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.sessionName").value("新的会话名"))
+                .andExpect(jsonPath("$.data.selectedKbIds[1]").value(12));
+    }
+
+    @Test
+    void shouldDeleteAppChatSessionWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+
+        protectedMockMvc.perform(delete("/api/app/chat/sessions/22")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"));
+
+        verify(appChatService).deleteSession(eq(22L), any());
     }
 
     @Test

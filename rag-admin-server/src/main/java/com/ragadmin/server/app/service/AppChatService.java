@@ -31,6 +31,7 @@ import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
@@ -83,6 +84,9 @@ public class AppChatService {
 
     @Autowired
     private ConversationChatClient conversationChatClient;
+
+    @Autowired
+    private ConversationMemoryManager conversationMemoryManager;
 
     @Autowired
     private DocumentMapper documentMapper;
@@ -185,6 +189,44 @@ public class AppChatService {
                     );
                 })
                 .toList();
+    }
+
+    @Transactional
+    public AppChatSessionResponse renameSession(Long sessionId, String sessionName, AuthenticatedUser user) {
+        ChatSessionEntity session = requireAppSession(sessionId, user.getUserId());
+        String normalizedSessionName = sessionName.trim();
+        if (!Objects.equals(normalizedSessionName, session.getSessionName())) {
+            session.setSessionName(normalizedSessionName);
+            chatSessionMapper.updateById(session);
+        }
+        return toSessionResponse(
+                session,
+                loadSelectedKnowledgeBaseIds(session.getId()).getOrDefault(session.getId(), defaultSelectedKnowledgeBaseIds(session))
+        );
+    }
+
+    @Transactional
+    public void deleteSession(Long sessionId, AuthenticatedUser user) {
+        ChatSessionEntity session = requireAppSession(sessionId, user.getUserId());
+        List<Long> messageIds = chatMessageMapper.selectList(new LambdaQueryWrapper<ChatMessageEntity>()
+                        .eq(ChatMessageEntity::getSessionId, session.getId()))
+                .stream()
+                .map(ChatMessageEntity::getId)
+                .toList();
+
+        if (!messageIds.isEmpty()) {
+            chatAnswerReferenceMapper.delete(new LambdaQueryWrapper<ChatAnswerReferenceEntity>()
+                    .in(ChatAnswerReferenceEntity::getMessageId, messageIds));
+            chatFeedbackMapper.delete(new LambdaQueryWrapper<ChatFeedbackEntity>()
+                    .in(ChatFeedbackEntity::getMessageId, messageIds));
+        }
+
+        chatMessageMapper.delete(new LambdaQueryWrapper<ChatMessageEntity>()
+                .eq(ChatMessageEntity::getSessionId, session.getId()));
+        chatSessionKnowledgeBaseRelMapper.delete(new LambdaQueryWrapper<ChatSessionKnowledgeBaseRelEntity>()
+                .eq(ChatSessionKnowledgeBaseRelEntity::getSessionId, session.getId()));
+        conversationMemoryManager.clear(buildConversationId(session));
+        chatSessionMapper.deleteById(session.getId());
     }
 
     @Transactional

@@ -19,6 +19,7 @@ import com.ragadmin.server.chat.service.ChatExchangePersistenceService;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
+import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.service.ModelService;
@@ -70,6 +71,9 @@ class AppChatServiceTest {
 
     @Mock
     private ConversationChatClient conversationChatClient;
+
+    @Mock
+    private ConversationMemoryManager conversationMemoryManager;
 
     @Mock
     private DocumentMapper documentMapper;
@@ -156,6 +160,60 @@ class AppChatServiceTest {
 
         assertEquals(201L, response.id());
         assertIterableEquals(List.of(88L), response.selectedKbIds());
+    }
+
+    @Test
+    void shouldRenameOwnedAppSessionAndKeepSelection() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(301L);
+        session.setUserId(4001L);
+        session.setSceneType(ChatSceneTypes.GENERAL);
+        session.setTerminalType(ChatTerminalTypes.APP);
+        session.setSessionName("旧名称");
+        session.setStatus("ENABLED");
+
+        ChatSessionKnowledgeBaseRelEntity rel = new ChatSessionKnowledgeBaseRelEntity();
+        rel.setSessionId(301L);
+        rel.setKbId(66L);
+        rel.setSortNo(1);
+
+        when(chatSessionMapper.selectById(301L)).thenReturn(session);
+        when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of(rel));
+
+        AppChatSessionResponse response = appChatService.renameSession(301L, "  新名称  ", user(4001L));
+
+        ArgumentCaptor<ChatSessionEntity> sessionCaptor = ArgumentCaptor.forClass(ChatSessionEntity.class);
+        verify(chatSessionMapper).updateById(sessionCaptor.capture());
+        assertEquals("新名称", sessionCaptor.getValue().getSessionName());
+        assertEquals("新名称", response.sessionName());
+        assertIterableEquals(List.of(66L), response.selectedKbIds());
+    }
+
+    @Test
+    void shouldDeleteOwnedAppSessionWithMessagesAndConversationMemory() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(401L);
+        session.setUserId(5001L);
+        session.setSceneType(ChatSceneTypes.GENERAL);
+        session.setTerminalType(ChatTerminalTypes.APP);
+        session.setStatus("ENABLED");
+
+        ChatMessageEntity message1 = new ChatMessageEntity();
+        message1.setId(701L);
+        ChatMessageEntity message2 = new ChatMessageEntity();
+        message2.setId(702L);
+
+        when(chatSessionMapper.selectById(401L)).thenReturn(session);
+        when(chatMessageMapper.selectList(any())).thenReturn(List.of(message1, message2));
+
+        appChatService.deleteSession(401L, user(5001L));
+
+        verify(chatAnswerReferenceMapper).delete(any());
+        verify(chatFeedbackMapper).delete(any());
+        verify(chatMessageMapper).delete(any());
+        verify(chatSessionKnowledgeBaseRelMapper).delete(any());
+        verify(conversationMemoryManager).clear("chat-terminal-app-scene-general-user-5001-session-401");
+        verify(chatSessionMapper).deleteById(401L);
     }
 
     private AuthenticatedUser user(Long userId) {

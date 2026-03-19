@@ -10,6 +10,7 @@ import type {
   ChatSession,
   ChatStreamEvent,
   CreateChatSessionRequest,
+  UpdateChatSessionRequest,
   UpdateSessionKnowledgeBasesRequest,
 } from '@/types/chat'
 import { getAccessToken } from '@/utils/token-storage'
@@ -66,6 +67,19 @@ export async function listChatMessages(sessionId: number): Promise<ChatExchange[
     feedbackType: item.feedbackType ?? null,
     feedbackComment: item.feedbackComment ?? null,
   }))
+}
+
+export async function updateChatSession(
+  sessionId: number,
+  payload: UpdateChatSessionRequest,
+): Promise<ChatSession> {
+  const response = await http.put(`/app/chat/sessions/${sessionId}`, payload)
+  return unwrapResponse(response.data)
+}
+
+export async function deleteChatSession(sessionId: number): Promise<void> {
+  const response = await http.delete(`/app/chat/sessions/${sessionId}`)
+  unwrapResponse(response.data)
 }
 
 export async function updateSessionKnowledgeBases(

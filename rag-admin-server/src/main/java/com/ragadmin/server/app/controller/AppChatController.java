@@ -3,6 +3,7 @@ package com.ragadmin.server.app.controller;
 import com.ragadmin.server.app.dto.AppChatRequest;
 import com.ragadmin.server.app.dto.AppChatSessionResponse;
 import com.ragadmin.server.app.dto.AppCreateChatSessionRequest;
+import com.ragadmin.server.app.dto.AppUpdateChatSessionRequest;
 import com.ragadmin.server.app.dto.AppUpdateSessionKnowledgeBasesRequest;
 import com.ragadmin.server.app.service.AppChatService;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
@@ -18,6 +19,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -62,6 +64,28 @@ public class AppChatController {
             HttpServletRequest httpServletRequest
     ) {
         return ApiResponse.success(appChatService.listMessages(sessionId, currentUser(httpServletRequest)));
+    }
+
+    @PutMapping("/sessions/{sessionId}")
+    public ApiResponse<AppChatSessionResponse> updateSession(
+            @PathVariable Long sessionId,
+            @Valid @RequestBody AppUpdateChatSessionRequest request,
+            HttpServletRequest httpServletRequest
+    ) {
+        return ApiResponse.success(appChatService.renameSession(
+                sessionId,
+                request.getSessionName(),
+                currentUser(httpServletRequest)
+        ));
+    }
+
+    @DeleteMapping("/sessions/{sessionId}")
+    public ApiResponse<Void> deleteSession(
+            @PathVariable Long sessionId,
+            HttpServletRequest httpServletRequest
+    ) {
+        appChatService.deleteSession(sessionId, currentUser(httpServletRequest));
+        return ApiResponse.success(null);
     }
 
     @PutMapping("/sessions/{sessionId}/knowledge-bases")

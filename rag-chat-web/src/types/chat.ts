@@ -50,6 +50,10 @@ export interface UpdateSessionKnowledgeBasesRequest {
   selectedKbIds: number[]
 }
 
+export interface UpdateChatSessionRequest {
+  sessionName: string
+}
+
 export interface ChatRequest {
   question: string
   chatModelId?: number

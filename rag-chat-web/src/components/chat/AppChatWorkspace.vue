@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ChatDotRound, Compass, Connection, Plus, RefreshRight } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ChatDotRound, Compass, Connection, MoreFilled, Plus, RefreshRight } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   createChatSession,
+  deleteChatSession,
   listChatMessages,
   listChatSessions,
   resolveChatStreamError,
   streamChatMessage,
   type ChatStreamHandle,
+  updateChatSession,
 } from '@/api/chat'
 import { listKnowledgeBases } from '@/api/knowledge-base'
 import { listModels } from '@/api/model'
@@ -50,6 +52,7 @@ const draftQuestion = ref('')
 const pendingExchange = ref<PendingExchange | null>(null)
 const loadingError = ref('')
 const streaming = ref(false)
+const sessionActionLoadingId = ref<number | null>(null)
 
 let streamHandle: ChatStreamHandle | null = null
 
@@ -376,6 +379,75 @@ function handleClearView(): void {
   pendingExchange.value = null
 }
 
+async function handleRenameSession(session: ChatSession): Promise<void> {
+  if (streaming.value || sessionActionLoadingId.value !== null) {
+    return
+  }
+  try {
+    const { value } = await ElMessageBox.prompt('请输入新的会话名称', '重命名会话', {
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputValue: session.sessionName,
+      inputValidator: (inputValue) => inputValue.trim().length > 0 || '会话名称不能为空',
+    })
+    const normalizedName = value.trim()
+    if (!normalizedName || normalizedName === session.sessionName) {
+      return
+    }
+    sessionActionLoadingId.value = session.id
+    const updated = await updateChatSession(session.id, { sessionName: normalizedName })
+    replaceSessionLocal(session.id, updated)
+    if (session.id === activeSessionId.value) {
+      applySessionPreferences(updated)
+    }
+    ElMessage.success('会话已重命名')
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+    ElMessage.error(resolveChatStreamError(error))
+  } finally {
+    sessionActionLoadingId.value = null
+  }
+}
+
+async function handleDeleteSession(session: ChatSession): Promise<void> {
+  if (streaming.value || sessionActionLoadingId.value !== null) {
+    return
+  }
+  try {
+    await ElMessageBox.confirm(`删除后该会话的历史消息与知识库选择会一并清理，确定删除“${session.sessionName}”吗？`, '删除会话', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      confirmButtonClass: 'el-button--danger',
+    })
+    sessionActionLoadingId.value = session.id
+    await deleteChatSession(session.id)
+    if (session.id === activeSessionId.value) {
+      messages.value = []
+      pendingExchange.value = null
+    }
+    await loadSessions()
+    ElMessage.success('会话已删除')
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+    ElMessage.error(resolveChatStreamError(error))
+  } finally {
+    sessionActionLoadingId.value = null
+  }
+}
+
+function handleSessionCommand(session: ChatSession, command: unknown): void {
+  if (command === 'rename') {
+    void handleRenameSession(session)
+    return
+  }
+  void handleDeleteSession(session)
+}
+
 function handleComposerKeydown(event: KeyboardEvent): void {
   if (event.key !== 'Enter' || event.shiftKey) {
     return
@@ -457,23 +529,52 @@ onUnmounted(() => {
         </div>
         <div class="session-list thin-scrollbar">
           <div v-if="sessionLoading" class="session-placeholder">正在加载会话...</div>
-          <button
+          <div
             v-for="session in sessions"
             :key="session.id"
-            type="button"
             class="session-item"
             :class="{ 'is-active': session.id === activeSessionId }"
-            @click="handleSelectSession(session)"
           >
-            <strong>{{ session.sessionName }}</strong>
-            <span>
-              {{
-                session.selectedKbIds.length > 0
-                  ? `${session.selectedKbIds.length} 个知识库参与检索`
-                  : '纯模型上下文'
-              }}
-            </span>
-          </button>
+            <button
+              type="button"
+              class="session-main"
+              :disabled="streaming"
+              @click="handleSelectSession(session)"
+            >
+              <strong>{{ session.sessionName }}</strong>
+              <span>
+                {{
+                  session.selectedKbIds.length > 0
+                    ? `${session.selectedKbIds.length} 个知识库参与检索`
+                    : '纯模型上下文'
+                }}
+              </span>
+            </button>
+            <div class="session-item-tools">
+              <el-dropdown
+                trigger="click"
+                :teleported="false"
+                :disabled="streaming || sessionActionLoadingId === session.id"
+                @command="handleSessionCommand(session, $event)"
+              >
+                <el-button
+                  text
+                  circle
+                  class="session-action-trigger"
+                  :disabled="streaming || sessionActionLoadingId === session.id"
+                  @click.stop
+                >
+                  <el-icon><MoreFilled /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="rename">重命名</el-dropdown-item>
+                    <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+          </div>
           <div v-if="!sessionLoading && sessions.length === 0" class="session-placeholder">
             {{ sessionEmptyText }}
           </div>
@@ -758,13 +859,13 @@ onUnmounted(() => {
 }
 
 .session-item {
-  padding: 16px;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px;
   border-radius: 18px;
   border: 1px solid rgba(122, 89, 53, 0.08);
   background: rgba(255, 255, 255, 0.58);
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
   transition:
     transform 180ms ease,
     border-color 180ms ease,
@@ -778,15 +879,51 @@ onUnmounted(() => {
   box-shadow: 0 14px 28px rgba(91, 58, 24, 0.08);
 }
 
-.session-item strong,
-.session-item span {
+.session-main {
+  flex: 1;
+  min-width: 0;
+  padding: 6px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.session-main:disabled {
+  cursor: not-allowed;
+}
+
+.session-main strong,
+.session-main span {
   display: block;
 }
 
-.session-item span {
+.session-main strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-main span {
   margin-top: 8px;
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.session-item-tools {
+  display: flex;
+  align-items: flex-start;
+}
+
+.session-action-trigger {
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.session-action-trigger:hover,
+.session-item.is-active .session-action-trigger {
+  color: var(--brand-strong);
 }
 
 .session-placeholder {

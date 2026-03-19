@@ -36,10 +36,18 @@ interface PendingExchange {
   errorMessage: string | null
 }
 
+interface KnowledgeBaseMentionState {
+  keyword: string
+  start: number
+  end: number
+}
+
 const props = defineProps<Props>()
 const router = useRouter()
+const KNOWLEDGE_BASE_MENTION_STOP_PATTERN = /[\s@,，.。!！?？:：;；()（）\[\]【】]/
 
 const messageContainerRef = ref<HTMLElement | null>(null)
+const composerInputRef = ref<{ textarea?: HTMLTextAreaElement | null } | null>(null)
 const optionLoading = ref(false)
 const sessionLoading = ref(false)
 const messageLoading = ref(false)
@@ -60,8 +68,11 @@ const feedbackSubmittingMessageIds = ref<number[]>([])
 const expandedReferenceMessageIds = ref<number[]>([])
 const knowledgeBasePickerVisible = ref(false)
 const knowledgeBasePickerKeyword = ref('')
+const knowledgeBaseMentionState = ref<KnowledgeBaseMentionState | null>(null)
+const knowledgeBaseMentionActiveIndex = ref(0)
 
 let streamHandle: ChatStreamHandle | null = null
+let composerBlurTimer: number | null = null
 
 const isKnowledgeBaseScene = computed(() => props.sceneType === 'KNOWLEDGE_BASE')
 const sessionPanelTitle = computed(() => {
@@ -104,6 +115,32 @@ const filteredKnowledgeBases = computed<KnowledgeBaseSummary[]>(() => {
       const rightSelected = selectedIdSet.has(right.id) ? 1 : 0
       return rightSelected - leftSelected
     })
+})
+
+const mentionKnowledgeBases = computed<KnowledgeBaseSummary[]>(() => {
+  if (isKnowledgeBaseScene.value || knowledgeBaseMentionState.value === null) {
+    return []
+  }
+
+  const keyword = knowledgeBaseMentionState.value.keyword.trim().toLowerCase()
+  const selectedIdSet = new Set(selectedKbIds.value)
+
+  return availableKnowledgeBases.value
+    .filter((item) => {
+      if (!keyword) {
+        return true
+      }
+      return item.kbName.toLowerCase().includes(keyword) || item.kbCode.toLowerCase().includes(keyword)
+    })
+    .sort((left, right) => {
+      const leftSelected = selectedIdSet.has(left.id) ? 1 : 0
+      const rightSelected = selectedIdSet.has(right.id) ? 1 : 0
+      return leftSelected - rightSelected
+    })
+})
+
+const mentionPanelVisible = computed(() => {
+  return !isKnowledgeBaseScene.value && knowledgeBaseMentionState.value !== null
 })
 
 const currentModelName = computed(() => {
@@ -149,6 +186,8 @@ function resetConversationViewState(): void {
 function resetKnowledgeBasePickerState(): void {
   knowledgeBasePickerVisible.value = false
   knowledgeBasePickerKeyword.value = ''
+  knowledgeBaseMentionState.value = null
+  knowledgeBaseMentionActiveIndex.value = 0
 }
 
 function applySessionPreferences(session: ChatSession | null): void {
@@ -450,6 +489,167 @@ function clearSelectedKnowledgeBases(): void {
   selectedKbIds.value = []
 }
 
+function isKnowledgeBaseMentionBoundary(value?: string): boolean {
+  return !value || KNOWLEDGE_BASE_MENTION_STOP_PATTERN.test(value)
+}
+
+function extractKnowledgeBaseMentionSuffix(value: string): string {
+  let index = 0
+  while (index < value.length && !isKnowledgeBaseMentionBoundary(value[index])) {
+    index += 1
+  }
+  return value.slice(0, index)
+}
+
+function getComposerTextarea(): HTMLTextAreaElement | null {
+  return composerInputRef.value?.textarea ?? null
+}
+
+function clearComposerBlurTimer(): void {
+  if (composerBlurTimer === null) {
+    return
+  }
+  window.clearTimeout(composerBlurTimer)
+  composerBlurTimer = null
+}
+
+// 只把独立 token 里的 @ 视为知识库 mention，避免邮箱等普通文本被误识别。
+function resolveKnowledgeBaseMentionState(question: string, cursorPosition: number): KnowledgeBaseMentionState | null {
+  if (isKnowledgeBaseScene.value) {
+    return null
+  }
+
+  const safeCursorPosition = Math.min(Math.max(cursorPosition, 0), question.length)
+  const prefix = question.slice(0, safeCursorPosition)
+  const mentionStart = prefix.lastIndexOf('@')
+
+  if (mentionStart < 0 || !isKnowledgeBaseMentionBoundary(question[mentionStart - 1])) {
+    return null
+  }
+
+  const tokenPrefix = question.slice(mentionStart + 1, safeCursorPosition)
+  if ([...tokenPrefix].some((char) => isKnowledgeBaseMentionBoundary(char))) {
+    return null
+  }
+
+  const suffix = extractKnowledgeBaseMentionSuffix(question.slice(safeCursorPosition))
+  return {
+    keyword: `${tokenPrefix}${suffix}`,
+    start: mentionStart,
+    end: safeCursorPosition + suffix.length,
+  }
+}
+
+function syncKnowledgeBaseMentionState(cursorPosition?: number | null): void {
+  if (isKnowledgeBaseScene.value) {
+    knowledgeBaseMentionState.value = null
+    knowledgeBaseMentionActiveIndex.value = 0
+    return
+  }
+
+  const textarea = getComposerTextarea()
+  const nextCursorPosition = typeof cursorPosition === 'number'
+    ? cursorPosition
+    : (textarea?.selectionStart ?? draftQuestion.value.length)
+
+  knowledgeBaseMentionState.value = resolveKnowledgeBaseMentionState(draftQuestion.value, nextCursorPosition)
+  if (knowledgeBaseMentionState.value === null) {
+    knowledgeBaseMentionActiveIndex.value = 0
+    return
+  }
+  knowledgeBasePickerVisible.value = false
+}
+
+function focusComposerTextarea(cursorPosition?: number): void {
+  void nextTick(() => {
+    const textarea = getComposerTextarea()
+    if (!textarea) {
+      return
+    }
+    textarea.focus()
+    if (typeof cursorPosition === 'number') {
+      textarea.setSelectionRange(cursorPosition, cursorPosition)
+    }
+  })
+}
+
+// 选中知识库后只移除当前 mention token，本轮真实问题文本保持原位继续编辑。
+function buildQuestionWithoutMention(question: string, mentionState: KnowledgeBaseMentionState): { value: string; cursorPosition: number } {
+  const before = question.slice(0, mentionState.start)
+  const after = question.slice(mentionState.end)
+
+  if (!before && /^\s+/.test(after)) {
+    return {
+      value: after.replace(/^\s+/, ''),
+      cursorPosition: 0,
+    }
+  }
+
+  if (/\s$/.test(before) && /^\s/.test(after)) {
+    return {
+      value: `${before}${after.replace(/^\s+/, '')}`,
+      cursorPosition: before.length,
+    }
+  }
+
+  if (before && after && !/\s$/.test(before) && !/^\s/.test(after)) {
+    return {
+      value: `${before} ${after}`,
+      cursorPosition: before.length + 1,
+    }
+  }
+
+  return {
+    value: `${before}${after}`,
+    cursorPosition: before.length,
+  }
+}
+
+function moveMentionActiveIndex(offset: number): void {
+  if (mentionKnowledgeBases.value.length === 0) {
+    return
+  }
+
+  const total = mentionKnowledgeBases.value.length
+  knowledgeBaseMentionActiveIndex.value = (knowledgeBaseMentionActiveIndex.value + offset + total) % total
+}
+
+function selectKnowledgeBaseFromMention(knowledgeBase: KnowledgeBaseSummary): void {
+  const mentionState = knowledgeBaseMentionState.value
+  selectedKbIds.value = normalizeSelectedKbIds([...selectedKbIds.value, knowledgeBase.id])
+
+  if (mentionState === null) {
+    focusComposerTextarea()
+    return
+  }
+
+  const nextQuestion = buildQuestionWithoutMention(draftQuestion.value, mentionState)
+  draftQuestion.value = nextQuestion.value
+  knowledgeBaseMentionState.value = null
+  knowledgeBaseMentionActiveIndex.value = 0
+  focusComposerTextarea(nextQuestion.cursorPosition)
+}
+
+function handleComposerCursorChange(event?: Event): void {
+  clearComposerBlurTimer()
+  const target = event?.target as HTMLTextAreaElement | null
+  syncKnowledgeBaseMentionState(target?.selectionStart ?? null)
+}
+
+function handleComposerFocus(): void {
+  clearComposerBlurTimer()
+  syncKnowledgeBaseMentionState()
+}
+
+function handleComposerBlur(): void {
+  clearComposerBlurTimer()
+  composerBlurTimer = window.setTimeout(() => {
+    knowledgeBaseMentionState.value = null
+    knowledgeBaseMentionActiveIndex.value = 0
+    composerBlurTimer = null
+  }, 120)
+}
+
 function isFeedbackSubmitting(messageId: number): boolean {
   return feedbackSubmittingMessageIds.value.includes(messageId)
 }
@@ -576,6 +776,36 @@ function handleSessionCommand(session: ChatSession, command: unknown): void {
 }
 
 function handleComposerKeydown(event: KeyboardEvent): void {
+  if (mentionPanelVisible.value) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      moveMentionActiveIndex(1)
+      return
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      moveMentionActiveIndex(-1)
+      return
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      knowledgeBaseMentionState.value = null
+      knowledgeBaseMentionActiveIndex.value = 0
+      return
+    }
+
+    if (!event.shiftKey && (event.key === 'Enter' || event.key === 'Tab')) {
+      const activeKnowledgeBase = mentionKnowledgeBases.value[knowledgeBaseMentionActiveIndex.value]
+      if (activeKnowledgeBase) {
+        event.preventDefault()
+        selectKnowledgeBaseFromMention(activeKnowledgeBase)
+        return
+      }
+    }
+  }
+
   if (event.key !== 'Enter' || event.shiftKey) {
     return
   }
@@ -591,11 +821,30 @@ watch(
   },
 )
 
+watch(draftQuestion, () => {
+  void nextTick(() => {
+    syncKnowledgeBaseMentionState()
+  })
+})
+
 watch(knowledgeBasePickerVisible, (visible) => {
   if (visible) {
+    knowledgeBaseMentionState.value = null
+    knowledgeBaseMentionActiveIndex.value = 0
     return
   }
   knowledgeBasePickerKeyword.value = ''
+})
+
+watch(mentionKnowledgeBases, (list) => {
+  if (list.length === 0) {
+    knowledgeBaseMentionActiveIndex.value = 0
+    return
+  }
+
+  if (knowledgeBaseMentionActiveIndex.value >= list.length) {
+    knowledgeBaseMentionActiveIndex.value = 0
+  }
 })
 
 onMounted(async () => {
@@ -604,6 +853,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   closeStream()
+  clearComposerBlurTimer()
 })
 </script>
 
@@ -925,7 +1175,7 @@ onUnmounted(() => {
                   </div>
                 </div>
               </el-popover>
-              <span class="composer-tip">Enter 发送，Shift + Enter 换行</span>
+              <span class="composer-tip">输入 @ 可接入知识库，Enter 发送，Shift + Enter 换行</span>
             </div>
           </div>
           <div v-if="!isKnowledgeBaseScene" class="composer-kb-strip">
@@ -944,14 +1194,52 @@ onUnmounted(() => {
             </div>
             <span v-else class="composer-kb-strip-empty">未选择，当前将走纯模型问答</span>
           </div>
-          <el-input
-            v-model="draftQuestion"
-            type="textarea"
-            :rows="5"
-            resize="none"
-            :placeholder="composerPlaceholder"
-            @keydown="handleComposerKeydown"
-          />
+          <div class="composer-input-shell">
+            <div v-if="mentionPanelVisible" class="composer-mention-panel">
+              <div class="composer-mention-head">
+                <strong>@知识库</strong>
+                <span>
+                  {{ knowledgeBaseMentionState?.keyword ? `匹配“${knowledgeBaseMentionState.keyword}”` : '输入名称或编码快速接入' }}
+                </span>
+              </div>
+              <div v-if="mentionKnowledgeBases.length > 0" class="composer-mention-list thin-scrollbar">
+                <button
+                  v-for="(knowledgeBase, index) in mentionKnowledgeBases"
+                  :key="`mention-${knowledgeBase.id}`"
+                  type="button"
+                  class="composer-mention-item"
+                  :class="{
+                    'is-active': index === knowledgeBaseMentionActiveIndex,
+                    'is-selected': selectedKbIds.includes(knowledgeBase.id),
+                  }"
+                  @mousedown.prevent="selectKnowledgeBaseFromMention(knowledgeBase)"
+                  @mouseenter="knowledgeBaseMentionActiveIndex = index"
+                >
+                  <div class="composer-mention-copy">
+                    <strong>{{ knowledgeBase.kbName }}</strong>
+                    <span>{{ knowledgeBase.kbCode }}</span>
+                  </div>
+                  <small>{{ selectedKbIds.includes(knowledgeBase.id) ? '已接入' : '按 Enter 选择' }}</small>
+                </button>
+              </div>
+              <div v-else class="composer-mention-empty">
+                未找到匹配知识库，继续输入可缩小范围
+              </div>
+            </div>
+            <el-input
+              ref="composerInputRef"
+              v-model="draftQuestion"
+              type="textarea"
+              :rows="5"
+              resize="none"
+              :placeholder="composerPlaceholder"
+              @blur="handleComposerBlur"
+              @click="handleComposerCursorChange"
+              @focus="handleComposerFocus"
+              @keydown="handleComposerKeydown"
+              @keyup="handleComposerCursorChange"
+            />
+          </div>
           <div class="composer-actions">
             <p v-if="loadingError" class="composer-error">{{ loadingError }}</p>
             <div class="composer-action-buttons">
@@ -1591,6 +1879,113 @@ onUnmounted(() => {
   display: grid;
   place-items: center;
   min-height: 120px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.composer-input-shell {
+  position: relative;
+}
+
+.composer-mention-panel {
+  margin-bottom: 10px;
+  padding: 14px;
+  border: 1px solid rgba(157, 91, 47, 0.16);
+  border-radius: 20px;
+  background: rgba(255, 250, 244, 0.96);
+  box-shadow: 0 18px 36px rgba(91, 58, 24, 0.1);
+}
+
+.composer-mention-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.composer-mention-head strong {
+  display: block;
+}
+
+.composer-mention-head span {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.composer-mention-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  margin-top: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.composer-mention-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(122, 89, 53, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.composer-mention-item:hover,
+.composer-mention-item.is-active,
+.composer-mention-item.is-selected {
+  transform: translateY(-1px);
+  border-color: rgba(157, 91, 47, 0.26);
+  box-shadow: 0 12px 24px rgba(91, 58, 24, 0.08);
+}
+
+.composer-mention-item.is-active {
+  background: rgba(255, 245, 234, 0.96);
+}
+
+.composer-mention-item.is-selected {
+  background: rgba(246, 237, 226, 0.96);
+}
+
+.composer-mention-item small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.composer-mention-copy {
+  min-width: 0;
+}
+
+.composer-mention-copy strong,
+.composer-mention-copy span {
+  display: block;
+}
+
+.composer-mention-copy span {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.composer-mention-empty {
+  display: grid;
+  place-items: center;
+  min-height: 84px;
+  margin-top: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.84);
   color: var(--text-muted);
   font-size: 12px;
 }

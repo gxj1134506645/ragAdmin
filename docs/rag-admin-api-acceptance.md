@@ -20,6 +20,7 @@
 - 上传签名与文档登记
 - 文档解析与任务查询
 - 会话创建与 RAG 问答
+- `/api/app` 前台问答闭环
 
 本文档以 Windows PowerShell 环境为默认示例。
 
@@ -65,6 +66,8 @@ $DocumentId = 0
 $TaskId = 0
 $SessionId = 0
 $MessageId = 0
+$AppAccessToken = ""
+$AppSessionId = 0
 $UploadBucket = ""
 $UploadObjectKey = ""
 $UploadUrl = ""
@@ -414,6 +417,106 @@ Invoke-RestMethod `
   -Headers @{ Authorization = "Bearer $AccessToken" }
 ```
 
+### 5.18 前台登录
+
+```powershell
+$AppLoginBody = @'
+{
+  "loginId": "admin",
+  "password": "Admin@123456"
+}
+'@
+
+$AppLoginResp = Invoke-RestMethod `
+  -Method Post `
+  -Uri "$BaseUrl/api/app/auth/login" `
+  -ContentType "application/json" `
+  -Body $AppLoginBody
+
+$AppAccessToken = $AppLoginResp.data.accessToken
+$AppAccessToken
+```
+
+### 5.19 前台查询知识库与模型
+
+```powershell
+curl.exe `
+  -H "Authorization: Bearer $AppAccessToken" `
+  "$BaseUrl/api/app/knowledge-bases?pageNo=1&pageSize=20"
+```
+
+```powershell
+curl.exe `
+  -H "Authorization: Bearer $AppAccessToken" `
+  "$BaseUrl/api/app/models?pageNo=1&pageSize=20"
+```
+
+### 5.20 创建前台通用会话
+
+```powershell
+$AppSessionBody = @'
+{
+  "sceneType": "GENERAL",
+  "sessionName": "前台验收会话",
+  "selectedKbIds": []
+}
+'@
+
+$AppSessionResp = Invoke-RestMethod `
+  -Method Post `
+  -Uri "$BaseUrl/api/app/chat/sessions" `
+  -Headers @{ Authorization = "Bearer $AppAccessToken" } `
+  -ContentType "application/json" `
+  -Body $AppSessionBody
+
+$AppSessionId = $AppSessionResp.data.id
+$AppSessionId
+```
+
+### 5.21 前台发起普通问答
+
+```powershell
+$AppChatBody = @'
+{
+  "question": "请简单介绍这个知识库平台能做什么",
+  "selectedKbIds": [],
+  "webSearchEnabled": false
+}
+'@
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "$BaseUrl/api/app/chat/sessions/$AppSessionId/messages" `
+  -Headers @{ Authorization = "Bearer $AppAccessToken" } `
+  -ContentType "application/json" `
+  -Body $AppChatBody
+```
+
+### 5.22 前台验证流式输出
+
+```powershell
+curl.exe -N `
+  -X POST `
+  -H "Authorization: Bearer $AppAccessToken" `
+  -H "Content-Type: application/json" `
+  "$BaseUrl/api/app/chat/sessions/$AppSessionId/messages/stream" `
+  -d "{\"question\":\"请再用两句话总结一次\",\"selectedKbIds\":[],\"webSearchEnabled\":false}"
+```
+
+判定要点：
+
+- 返回头为 `text/event-stream`
+- 能持续收到 `DELTA` / `COMPLETE` 事件
+- 最终可在消息列表中看到落库消息
+
+### 5.23 查询前台消息列表
+
+```powershell
+curl.exe `
+  -H "Authorization: Bearer $AppAccessToken" `
+  "$BaseUrl/api/app/chat/sessions/$AppSessionId/messages"
+```
+
 ## 6. 结果判定
 
 满足以下条件，可认为当前首期主链路验收通过：
@@ -425,6 +528,8 @@ Invoke-RestMethod `
 - 文档登记成功，解析任务最终进入 `SUCCESS`
 - 文档切片可查询
 - 会话创建成功，问答返回答案和引用
+- `/api/app` 登录成功，前台会话可创建
+- 前台普通问答与 SSE 流式问答均可用
 - 反馈提交成功
 
 如任一步骤失败，优先结合以下文档排查：

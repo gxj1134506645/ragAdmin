@@ -2,7 +2,7 @@
 
 `ragAdmin` 是一个面向内部使用的 RAG 知识库管理平台。
 
-当前仓库已经完成首期后端单体的大部分主链路，重点覆盖：
+当前仓库已经完成首期单后端双前端形态的大部分主链路，重点覆盖：
 
 - 认证与用户管理
 - 模型提供方、模型定义、模型探活
@@ -12,9 +12,10 @@
 - 图片 OCR 与扫描 PDF OCR 兜底解析
 - 向量化与 Milvus 引用写入
 - 单知识库 RAG 问答
+- 独立问答前台与多知识库临时联查
 - 审计日志、统计接口、系统健康检查
 
-当前整体状态已经进入收口尾声：后端主链路基本完成，前端一期基础管理台已落库，剩余重点是控制文档数量并完成真实环境联调验收。
+当前整体状态已经进入收口尾声：后端主链路基本完成，管理后台与独立问答前台均已落地，剩余重点是控制文档数量并完成真实环境联调验收。
 
 ## 目录
 
@@ -33,11 +34,16 @@ ragAdmin/
     compose/
   rag-admin-server/
   rag-admin-web/
+  rag-chat-web/
   AGENTS.md
   pom.xml
 ```
 
-当前以后端 `rag-admin-server` 为主，`rag-admin-web` 已完成一期基础管理台能力并可继续联调迭代。
+当前仓库采用单后端双前端结构：
+
+- `rag-admin-server`：统一后端，承载 `/api/admin`、`/api/app`、`/api/internal`
+- `rag-admin-web`：后台管理端，默认开发端口 `5173`
+- `rag-chat-web`：独立问答前台，默认开发端口 `5174`
 
 ## 2. 技术栈
 
@@ -92,16 +98,20 @@ ragAdmin/
 - 基于 Milvus 的检索问答
 - 回答引用落库
 - 问答反馈
+- `/api/app` 前台登录、知识库列表、模型列表
+- 首页通用聊天与知识库内聊天
+- 多知识库临时联查
+- SSE 流式输出
 
 ## 4. 本地启动
 
-先编译：
+先编译后端：
 
 ```bash
 mvn -q -pl rag-admin-server -am -DskipTests compile
 ```
 
-再启动：
+再启动后端：
 
 ```bash
 mvn -q -pl rag-admin-server spring-boot:run
@@ -110,6 +120,23 @@ mvn -q -pl rag-admin-server spring-boot:run
 默认启动端口：
 
 - `9212`
+
+前端本地启动：
+
+```bash
+npm --prefix rag-admin-web install
+npm --prefix rag-admin-web run dev
+```
+
+```bash
+npm --prefix rag-chat-web install
+npm --prefix rag-chat-web run dev
+```
+
+默认前端端口：
+
+- `rag-admin-web`：`5173`
+- `rag-chat-web`：`5174`
 
 发布前检查口径统一以 `9212` 为准。若联调时为避免端口冲突临时改到其他端口，只作为一次性排障手段，不作为仓库默认运行口径。
 
@@ -158,4 +185,6 @@ docker compose --env-file docker/compose/.env -f docker/compose/docker-compose.y
 - 后端完成度清单：[docs/rag-admin-backend-completion-checklist.md](docs/rag-admin-backend-completion-checklist.md)
 - 后端联调说明：[docs/rag-admin-backend-debug-guide.md](docs/rag-admin-backend-debug-guide.md)
 - API 验收脚本说明：[docs/rag-admin-api-acceptance.md](docs/rag-admin-api-acceptance.md)
+- 前台架构设计：[docs/plans/2026-03-19-app-chat-frontend-architecture-design.md](docs/plans/2026-03-19-app-chat-frontend-architecture-design.md)
+- 前台实施计划：[docs/plans/2026-03-19-app-chat-frontend-implementation-plan.md](docs/plans/2026-03-19-app-chat-frontend-implementation-plan.md)
 - 项目协作规则：[AGENTS.md](AGENTS.md)

@@ -12,11 +12,12 @@
 
 ## 1. 目的
 
-本文档用于说明当前 `rag-admin-server` 的最小联调方式，目标是让开发者能够在本地快速验证：
+本文档用于说明当前 `ragAdmin` 的最小联调方式，目标是让开发者能够在本地快速验证：
 
 - 基础认证是否可用
 - 模型管理、知识库管理、文档管理是否可用
 - 文档解析、向量化、检索问答链路是否可用
+- `rag-admin-web` 与 `rag-chat-web` 是否能正常接入
 - 审计、统计、健康检查是否可用
 
 ## 2. 当前联调范围
@@ -32,6 +33,9 @@
 - 图片 OCR 与扫描 PDF OCR 兜底
 - 向量化、Milvus 引用写入
 - RAG 会话、问答、引用落库、问答反馈
+- `/api/app` 前台登录、模型列表、知识库列表、问答会话
+- `rag-admin-web` 管理后台
+- `rag-chat-web` 独立问答前台
 - 审计日志查询
 - 模型调用统计、知识库问答统计
 - 系统健康检查
@@ -41,8 +45,8 @@
 
 - 多模型路由策略
 - 复杂重排
-- 多知识库联合检索
-- 前端页面
+- 对外开放注册
+- 更复杂的前台会话运营能力
 
 ## 3. 依赖准备
 
@@ -161,7 +165,28 @@ mvn -q -pl rag-admin-server spring-boot:run
 
 联调与发布前检查默认统一以 `9212` 作为标准端口。若本地已有历史 Java 进程占用 `9212`，应先清理残留进程；只有在临时排障时才允许改用其他端口，排障结束后仍应回归 `9212`。
 
-### 4.3 首先验证健康检查
+### 4.3 启动两个前端
+
+管理后台：
+
+```bash
+npm --prefix rag-admin-web install
+npm --prefix rag-admin-web run dev
+```
+
+独立问答前台：
+
+```bash
+npm --prefix rag-chat-web install
+npm --prefix rag-chat-web run dev
+```
+
+默认端口：
+
+- `rag-admin-web`：`5173`
+- `rag-chat-web`：`5174`
+
+### 4.4 首先验证健康检查
 
 ```http
 GET /api/admin/system/health
@@ -214,7 +239,17 @@ GET /api/admin/system/health
 3. 查看消息列表
 4. 提交反馈
 
-### 5.5 治理与统计
+### 5.5 前台问答联调
+
+1. 前台登录
+2. 首页通用聊天
+3. 首页勾选多个知识库后提问
+4. 切入知识库内聊天
+5. 切换聊天模型
+6. 打开或关闭联网开关
+7. 验证 SSE 流式输出
+
+### 5.6 治理与统计
 
 1. 查询审计日志
 2. 查询模型调用统计
@@ -281,6 +316,21 @@ GET /api/admin/system/health
 - `GET /api/admin/statistics/knowledge-bases/{kbId}/chat`
 - `GET /api/admin/system/health`
 
+### 6.8 前台问答接口
+
+- `POST /api/app/auth/login`
+- `POST /api/app/auth/refresh`
+- `POST /api/app/auth/logout`
+- `GET /api/app/auth/me`
+- `GET /api/app/knowledge-bases`
+- `GET /api/app/models`
+- `POST /api/app/chat/sessions`
+- `GET /api/app/chat/sessions`
+- `GET /api/app/chat/sessions/{sessionId}/messages`
+- `PUT /api/app/chat/sessions/{sessionId}/knowledge-bases`
+- `POST /api/app/chat/sessions/{sessionId}/messages`
+- `POST /api/app/chat/sessions/{sessionId}/messages/stream`
+
 ## 7. 常见排查点
 
 ### 7.1 登录失败
@@ -327,7 +377,16 @@ GET /api/admin/system/health
 - `kb_chunk_vector_ref` 是否已回写
 - Milvus collection 是否已写入向量
 
-### 7.6 审计与统计为空
+### 7.6 前台流式问答没有返回
+
+优先检查：
+
+- 浏览器 Network 中 `text/event-stream` 请求是否已建立
+- `/api/app/chat/sessions/{sessionId}/messages/stream` 是否返回了 401 或 5xx
+- 当前前台会话是否已经绑定正确知识库
+- 选中的 `chatModelId` 是否为可用聊天模型
+
+### 7.7 审计与统计为空
 
 优先检查：
 

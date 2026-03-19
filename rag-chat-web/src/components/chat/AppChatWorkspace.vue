@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ChatDotRound, Compass, Connection, MoreFilled, Plus, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -17,7 +18,7 @@ import { listKnowledgeBases } from '@/api/knowledge-base'
 import { listModels } from '@/api/model'
 import KnowledgeBaseSelector from '@/components/chat/KnowledgeBaseSelector.vue'
 import ModelSelector from '@/components/chat/ModelSelector.vue'
-import type { ChatExchange, ChatFeedbackType, ChatSceneType, ChatSession, ChatStreamEvent } from '@/types/chat'
+import type { ChatExchange, ChatFeedbackType, ChatReference, ChatSceneType, ChatSession, ChatStreamEvent } from '@/types/chat'
 import type { KnowledgeBaseSummary } from '@/types/knowledge-base'
 import type { ModelSummary } from '@/types/model'
 
@@ -36,6 +37,7 @@ interface PendingExchange {
 }
 
 const props = defineProps<Props>()
+const router = useRouter()
 
 const messageContainerRef = ref<HTMLElement | null>(null)
 const optionLoading = ref(false)
@@ -426,6 +428,27 @@ async function handleSubmitFeedback(messageId: number, feedbackType: ChatFeedbac
   }
 }
 
+async function handleOpenReference(reference: ChatReference): Promise<void> {
+  if (!reference.kbId) {
+    ElMessage.warning('当前引用未关联知识库，暂时无法定位来源')
+    return
+  }
+  await router.push({
+    name: 'app-knowledge-base-chat',
+    params: {
+      kbId: reference.kbId,
+    },
+    query: {
+      source: 'reference',
+      ...(reference.documentName ? { documentName: reference.documentName } : {}),
+      ...(reference.documentId ? { documentId: String(reference.documentId) } : {}),
+      chunkId: String(reference.chunkId),
+      ...(reference.chunkNo ? { chunkNo: String(reference.chunkNo) } : {}),
+      ...(reference.contentSnippet ? { snippet: reference.contentSnippet } : {}),
+    },
+  })
+}
+
 async function handleRenameSession(session: ChatSession): Promise<void> {
   if (streaming.value || sessionActionLoadingId.value !== null) {
     return
@@ -706,6 +729,12 @@ onUnmounted(() => {
                       <span>相似度 {{ reference.score.toFixed(2) }}</span>
                     </div>
                     <p>{{ reference.contentSnippet }}</p>
+                    <div class="reference-actions">
+                      <el-button link type="primary" @click="handleOpenReference(reference)">
+                        进入知识库
+                      </el-button>
+                      <span v-if="reference.chunkNo" class="reference-meta">定位切片 #{{ reference.chunkNo }}</span>
+                    </div>
                   </div>
                 </div>
                 <p v-if="message.feedbackType" class="feedback-hint">
@@ -1137,6 +1166,19 @@ onUnmounted(() => {
 .reference-item p {
   margin-top: 8px;
   color: var(--text-secondary);
+}
+
+.reference-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.reference-meta {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .assistant-actions {

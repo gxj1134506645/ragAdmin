@@ -643,9 +643,10 @@ public class AppChatService {
             Map<Long, String> documentNameMap
     ) {
         if (chunk == null) {
-            return new ChatReferenceResponse(null, null, ref.getChunkId(), null, ref.getScore() == null ? 0D : ref.getScore().doubleValue(), "");
+            return new ChatReferenceResponse(null, null, null, ref.getChunkId(), null, ref.getScore() == null ? 0D : ref.getScore().doubleValue(), "");
         }
         return new ChatReferenceResponse(
+                chunk.getKbId(),
                 chunk.getDocumentId(),
                 documentNameMap.get(chunk.getDocumentId()),
                 ref.getChunkId(),

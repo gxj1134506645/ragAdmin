@@ -173,6 +173,7 @@ class ChatServiceTest {
                 901L,
                 "制度要求按时提交周报。",
                 List.of(new com.ragadmin.server.chat.dto.ChatReferenceResponse(
+                        401L,
                         701L,
                         "员工制度.md",
                         601L,

@@ -3,6 +3,7 @@ export type ChatSceneType = 'GENERAL' | 'KNOWLEDGE_BASE'
 export type ChatFeedbackType = 'LIKE' | 'DISLIKE'
 
 export interface ChatReference {
+  kbId: number | null
   documentId: number | null
   documentName: string | null
   chunkId: number

@@ -129,6 +129,7 @@ class RetrievalServiceTest {
         );
 
         assertEquals(1, responses.size());
+        assertEquals(900L, responses.getFirst().kbId());
         assertEquals("0123456789", responses.getFirst().contentSnippet());
     }
 
@@ -141,6 +142,7 @@ class RetrievalServiceTest {
     private ChunkEntity chunk(Long id, int chunkNo, String text) {
         ChunkEntity entity = new ChunkEntity();
         entity.setId(id);
+        entity.setKbId(900L);
         entity.setDocumentId(1000L);
         entity.setChunkNo(chunkNo);
         entity.setChunkText(text);

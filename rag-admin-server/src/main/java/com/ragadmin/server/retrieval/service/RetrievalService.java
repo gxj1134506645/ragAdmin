@@ -135,6 +135,7 @@ public class RetrievalService {
         }
         return chunks.stream()
                 .map(item -> new ChatReferenceResponse(
+                        item.chunk().getKbId(),
                         item.chunk().getDocumentId(),
                         documentNameResolver.apply(item.chunk().getDocumentId()),
                         item.chunk().getId(),

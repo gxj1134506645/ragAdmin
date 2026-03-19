@@ -19,6 +19,8 @@ public class AuthWebMvcConfiguration implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/api/admin/auth/login",
                         "/api/admin/auth/refresh",
+                        "/api/app/auth/login",
+                        "/api/app/auth/refresh",
                         "/api/internal/**"
                 );
     }

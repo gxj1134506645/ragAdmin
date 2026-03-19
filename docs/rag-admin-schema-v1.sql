@@ -268,17 +268,37 @@ CREATE TABLE IF NOT EXISTS chat_session (
     kb_id               BIGINT,
     user_id             BIGINT NOT NULL,
     scene_type          VARCHAR(32) NOT NULL DEFAULT 'KNOWLEDGE_BASE',
+    terminal_type       VARCHAR(32) NOT NULL DEFAULT 'ADMIN',
     session_name        VARCHAR(200) NOT NULL,
+    model_id            BIGINT,
+    web_search_enabled  BOOLEAN NOT NULL DEFAULT FALSE,
     status              VARCHAR(16) NOT NULL DEFAULT 'ENABLED',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_chat_session_kb FOREIGN KEY (kb_id) REFERENCES kb_knowledge_base (id),
-    CONSTRAINT fk_chat_session_user FOREIGN KEY (user_id) REFERENCES sys_user (id)
+    CONSTRAINT fk_chat_session_user FOREIGN KEY (user_id) REFERENCES sys_user (id),
+    CONSTRAINT fk_chat_session_model FOREIGN KEY (model_id) REFERENCES ai_model (id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_chat_session_kb_user ON chat_session (kb_id, user_id);
-CREATE INDEX IF NOT EXISTS idx_chat_session_user_scene ON chat_session (user_id, scene_type);
-CREATE UNIQUE INDEX IF NOT EXISTS uk_chat_session_general_user ON chat_session (user_id, scene_type) WHERE scene_type = 'GENERAL';
+CREATE INDEX IF NOT EXISTS idx_chat_session_user_terminal_scene ON chat_session (user_id, terminal_type, scene_type);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_chat_session_general_user_terminal
+    ON chat_session (user_id, terminal_type, scene_type)
+    WHERE scene_type = 'GENERAL';
+
+CREATE TABLE IF NOT EXISTS chat_session_kb_rel (
+    id                  BIGSERIAL PRIMARY KEY,
+    session_id          BIGINT NOT NULL,
+    kb_id               BIGINT NOT NULL,
+    sort_no             INTEGER NOT NULL DEFAULT 1,
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (session_id, kb_id),
+    CONSTRAINT fk_chat_session_kb_rel_session FOREIGN KEY (session_id) REFERENCES chat_session (id),
+    CONSTRAINT fk_chat_session_kb_rel_kb FOREIGN KEY (kb_id) REFERENCES kb_knowledge_base (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_session_kb_rel_session_id ON chat_session_kb_rel (session_id);
+CREATE INDEX IF NOT EXISTS idx_chat_session_kb_rel_kb_id ON chat_session_kb_rel (kb_id);
 
 CREATE TABLE IF NOT EXISTS chat_message (
     id                  BIGSERIAL PRIMARY KEY,
@@ -387,5 +407,6 @@ VALUES
     ('ADMIN', '系统管理员'),
     ('KB_ADMIN', '知识库管理员'),
     ('USER', '普通用户'),
+    ('APP_USER', '问答前台用户'),
     ('AUDITOR', '审计用户')
 ON CONFLICT (role_code) DO NOTHING;

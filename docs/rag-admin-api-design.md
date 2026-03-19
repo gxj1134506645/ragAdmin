@@ -30,6 +30,7 @@
 ### 2.1 基础路径
 
 - 管理台 API 前缀：`/api/admin`
+- 问答前台 API 前缀：`/api/app`
 - 内部任务回调前缀：`/api/internal`
 
 ### 2.2 统一响应
@@ -79,7 +80,7 @@
 ### 2.4 鉴权约定
 
 - 登录成功后返回 `accessToken` 与 `refreshToken`
-- 管理台请求头使用 `Authorization: Bearer <token>`
+- 管理台与问答前台请求头统一使用 `Authorization: Bearer <token>`
 - 首期建议使用 JWT + Redis 会话控制
 
 ### 2.5 状态字段建议
@@ -93,6 +94,7 @@
 ### 3.1 用户登录
 
 - `POST /api/admin/auth/login`
+- `POST /api/app/auth/login`
 
 请求体：
 
@@ -127,10 +129,12 @@
 ### 3.2 获取当前用户信息
 
 - `GET /api/admin/auth/me`
+- `GET /api/app/auth/me`
 
 ### 3.3 刷新 Token
 
 - `POST /api/admin/auth/refresh`
+- `POST /api/app/auth/refresh`
 
 请求体：
 
@@ -143,6 +147,7 @@
 ### 3.4 用户退出
 
 - `POST /api/admin/auth/logout`
+- `POST /api/app/auth/logout`
 
 ### 3.4 用户列表
 
@@ -211,6 +216,15 @@
 - `pageNo`
 - `pageSize`
 
+### 4.3.1 前台可用聊天模型列表
+
+- `GET /api/app/models`
+
+说明：
+
+- 仅返回 `status=ENABLED` 且 `modelType=CHAT` 的模型
+- 作为问答前台运行时可选聊天模型数据源
+
 ### 4.4 新增模型定义
 
 - `POST /api/admin/models`
@@ -256,6 +270,21 @@
 - `status`
 - `pageNo`
 - `pageSize`
+
+### 5.1.1 前台可见知识库列表
+
+- `GET /api/app/knowledge-bases`
+
+查询参数：
+
+- `keyword`
+- `pageNo`
+- `pageSize`
+
+说明：
+
+- 首期仅返回 `status=ENABLED` 的知识库
+- 作为问答前台的知识库选择数据源
 
 ### 5.2 创建知识库
 
@@ -456,6 +485,12 @@
 
 ## 7. RAG 问答接口
 
+说明：
+
+- 后台管理端和问答前台共用问答核心链路，但必须通过不同接口域和不同会话终端类型隔离
+- 会话隔离至少依赖 `terminalType + sceneType + sessionId`
+- 对于问答前台，知识库集合通过会话关系表维护，运行时允许切换聊天模型与联网开关
+
 ### 7.1 创建会话
 
 - `POST /api/admin/chat/sessions`
@@ -628,6 +663,82 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 }
 ```
 
+### 7.7 前台创建会话
+
+- `POST /api/app/chat/sessions`
+
+请求体：
+
+```json
+{
+  "sceneType": "GENERAL",
+  "kbId": null,
+  "sessionName": "今天的工作梳理",
+  "chatModelId": 1,
+  "webSearchEnabled": false,
+  "selectedKbIds": [1, 3]
+}
+```
+
+说明：
+
+- 前台首页通用会话允许 `selectedKbIds` 为空
+- 前台知识库内会话创建时，`kbId` 作为当前主知识库锚点，同时仍会把知识库集合写入关系表
+
+### 7.8 前台会话列表
+
+- `GET /api/app/chat/sessions`
+
+查询参数：
+
+- `sceneType`
+- `kbId`
+- `pageNo`
+- `pageSize`
+
+### 7.9 前台获取会话消息
+
+- `GET /api/app/chat/sessions/{sessionId}/messages`
+
+### 7.10 前台更新会话知识库集合
+
+- `PUT /api/app/chat/sessions/{sessionId}/knowledge-bases`
+
+请求体：
+
+```json
+{
+  "selectedKbIds": [1, 3, 5]
+}
+```
+
+### 7.11 前台发起流式问答
+
+- `POST /api/app/chat/sessions/{sessionId}/messages/stream`
+- `Content-Type: application/json`
+- `Accept: text/event-stream`
+
+请求体：
+
+```json
+{
+  "question": "请结合制度库和研发规范库总结上线前检查项",
+  "chatModelId": 1,
+  "selectedKbIds": [1, 3],
+  "webSearchEnabled": true
+}
+```
+
+说明：
+
+- `selectedKbIds` 为空时，走纯模型问答
+- `chatModelId` 为运行时模型选择，优先级高于知识库默认聊天模型
+- `webSearchEnabled=true` 时，由后端按 `WebSearchProvider` 配置决定是否补充联网搜索上下文
+
+### 7.12 前台提交反馈
+
+- `POST /api/app/chat/messages/{messageId}/feedback`
+
 ## 8. 审计与运维接口
 
 ### 8.1 审计日志列表
@@ -672,23 +783,31 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 ### P0
 
 - `POST /api/admin/auth/login`
+- `POST /api/app/auth/login`
 - `GET /api/admin/auth/me`
+- `GET /api/app/auth/me`
 - `GET /api/admin/models`
+- `GET /api/app/models`
 - `GET /api/admin/knowledge-bases`
+- `GET /api/app/knowledge-bases`
 - `POST /api/admin/knowledge-bases`
 - `POST /api/admin/files/upload-url`
 - `POST /api/admin/knowledge-bases/{kbId}/documents`
 - `POST /api/admin/documents/{documentId}/parse`
 - `GET /api/admin/tasks`
 - `POST /api/admin/chat/sessions`
+- `POST /api/app/chat/sessions`
 - `POST /api/admin/chat/sessions/{sessionId}/messages`
 - `POST /api/admin/chat/sessions/{sessionId}/messages/stream`
+- `POST /api/app/chat/sessions/{sessionId}/messages/stream`
 
 ### P1
 
 - `GET /api/admin/documents/{documentId}/chunks`
 - `POST /api/admin/tasks/{taskId}/retry`
 - `POST /api/admin/chat/messages/{messageId}/feedback`
+- `PUT /api/app/chat/sessions/{sessionId}/knowledge-bases`
+- `POST /api/app/chat/messages/{messageId}/feedback`
 - `GET /api/admin/audit-logs`
 - `GET /api/admin/system/health`
 

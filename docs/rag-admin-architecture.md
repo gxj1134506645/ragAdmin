@@ -35,7 +35,8 @@
 
 - 后端：`JDK 21 + Spring Boot 3`
 - AI 接入：`Spring AI Alibaba` 作为阿里百炼接入基础，但外层必须封装自定义模型适配层
-- 前端管理台：`TypeScript + Vue 3` 或 `TypeScript + React`
+- 前端管理台：`TypeScript + Vue 3`
+- 前端问答端：`TypeScript + Vue 3`
 - 关系型数据库：`PostgreSQL 16`
 - Redis：首期即接入，承担会话控制、热点缓存、限流、防重复提交、任务去重与分布式锁能力
 - 向量检索：
@@ -73,8 +74,10 @@ Node.js/TypeScript 适合快速做 MVP，但本项目目标已经明显超出“
 
 ```mermaid
 flowchart LR
-    U[内部用户] --> W[Web 管理台]
-    W --> G[API 网关 / 后端服务]
+    U1[后台管理员] --> W1[Web 管理台]
+    U2[组织内用户] --> W2[Web 问答前台]
+    W1 --> G[API 网关 / 后端服务]
+    W2 --> G
 
     G --> A1[认证与权限]
     G --> A2[知识库管理]
@@ -118,6 +121,22 @@ flowchart LR
 - `Knowledge Pipeline`：文件上传、解析、切片、Embedding、入向量库、版本管理
 - `Retrieval Orchestrator`：查询改写、召回、过滤、重排、上下文拼装、回答生成
 - `Admin Governance`：权限、审计、任务、配置、监控
+
+### 3.3 终端与接口分域
+
+当前系统需要同时支撑后台治理端和组织内问答端，因此后端接口应显式分域：
+
+- `/api/admin/*`：后台管理端
+- `/api/app/*`：前台问答端
+- `/api/internal/*`：内部回调与内部调用
+
+同时会话与记忆链路应增加终端隔离维度，避免同一用户在后台和前台之间共享会话上下文。
+
+建议最小隔离维度：
+
+- `terminal_type`：`ADMIN` / `APP`
+- `scene_type`：`GENERAL` / `KNOWLEDGE_BASE`
+- `session_id`：同一终端、同一场景下的独立会话主键
 
 ## 4. 核心模块划分
 
@@ -236,6 +255,22 @@ flowchart LR
 - 普通业务用户
 - 审计查看用户
 
+### 4.7 前台问答门户模块
+
+职责：
+
+- 提供独立于后台管理台的简洁聊天界面
+- 支持首页通用会话与知识库内会话两种入口
+- 支持运行时切换聊天模型
+- 支持动态选择一个或多个知识库
+- 支持联网搜索开关
+
+设计约束：
+
+- 前台不单独建设账号体系，继续复用后台维护的用户源
+- 前台问答运行时的聊天模型不再强绑定单知识库，而是采用“请求显式模型 > 知识库默认模型 > 系统默认模型”的优先级
+- 多知识库选择通过会话关系表维护，不把知识库集合硬编码进 `conversationId`
+
 ## 5. 关键业务流程
 
 ### 5.1 文档入库流程
@@ -299,7 +334,8 @@ sequenceDiagram
 ```mermaid
 flowchart TB
     LB[内部访问入口]
-    FE[前端管理台]
+    FE1[后台管理台]
+    FE2[问答前台]
     BE[Spring Boot 后端]
     JOB[任务处理 Worker]
     PG[(PostgreSQL)]
@@ -308,7 +344,8 @@ flowchart TB
     ALI[阿里百炼]
     LOG[日志与监控]
 
-    LB --> FE
+    LB --> FE1
+    LB --> FE2
     LB --> BE
     BE --> PG
     BE --> MI
@@ -324,7 +361,7 @@ flowchart TB
 
 部署建议：
 
-- 前后端分离部署
+- 管理台前端与问答前端独立部署
 - 文档处理 Worker 与主 API 服务拆开
 - PostgreSQL 与向量检索实例独立部署
 - MinIO 独立部署并开启生命周期管理
@@ -412,10 +449,19 @@ flowchart TB
 | 表名 | 说明 |
 |------|------|
 | `chat_session` | 会话表 |
+| `chat_session_kb_rel` | 会话与知识库关系表 |
 | `chat_message` | 消息表 |
 | `spring_ai_chat_memory` | Spring AI 会话记忆表 |
 | `chat_answer_reference` | 回答引用切片 |
 | `chat_feedback` | 用户反馈 |
+
+其中建议重点补充以下字段与关系：
+
+- `chat_session.terminal_type`：区分后台管理端与问答前台
+- `chat_session.scene_type`：区分首页通用会话与知识库内会话
+- `chat_session.model_id`：保存当前会话默认聊天模型
+- `chat_session.web_search_enabled`：保存当前会话默认联网开关
+- `chat_session_kb_rel`：保存当前会话绑定的知识库集合，支撑首页 `@知识库` 与多知识库问答
 
 ### 7.5 任务与运行记录
 
@@ -438,6 +484,7 @@ flowchart TB
 - 文档上传到 MinIO
 - 文档解析、切片、向量化、入库
 - 基于单知识库的 RAG 问答
+- 独立问答前台最小聊天闭环
 - 阿里百炼文本模型和 Embedding 模型接入
 - 问答记录和引用片段展示
 
@@ -476,11 +523,15 @@ flowchart TB
 rag-admin/
   docs/
   rag-admin-web/
+  rag-chat-web/
   rag-admin-server/
-  rag-admin-worker/
-  rag-admin-common/
-  rag-admin-infra/
 ```
+
+其中：
+
+- `rag-admin-web` 负责后台治理
+- `rag-chat-web` 负责终端问答体验
+- `rag-admin-server` 统一承载鉴权、知识库管理、检索编排、模型调用和会话持久化
 
 ### 9.2 后端包结构建议
 

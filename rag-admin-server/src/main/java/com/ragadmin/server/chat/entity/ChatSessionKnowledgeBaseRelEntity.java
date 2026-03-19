@@ -8,19 +8,13 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("chat_session")
-public class ChatSessionEntity {
+@TableName("chat_session_kb_rel")
+public class ChatSessionKnowledgeBaseRelEntity {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long sessionId;
     private Long kbId;
-    private Long userId;
-    private String sceneType;
-    private String terminalType;
-    private String sessionName;
-    private Long modelId;
-    private Boolean webSearchEnabled;
-    private String status;
+    private Integer sortNo;
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }

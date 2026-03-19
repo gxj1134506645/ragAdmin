@@ -2,6 +2,9 @@
 .ai/
 .codex-temp/
 .idea/
+node_modules/
+dist/
+*.tsbuildinfo
 rag-admin-server/.env.local
 rag-admin-server/src/main/resources/application-local-secret.yml
 rag-admin-server/.ocr-data/

@@ -1,0 +1,119 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+
+:root {
+  color-scheme: light;
+  font-family: "Noto Sans SC", sans-serif;
+  --app-bg:
+    radial-gradient(circle at top left, rgba(206, 152, 89, 0.16), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(108, 94, 76, 0.12), transparent 28%),
+    linear-gradient(180deg, #f7f1e7 0%, #efe5d6 100%);
+  --panel-bg: rgba(255, 251, 246, 0.82);
+  --panel-border: rgba(110, 84, 54, 0.14);
+  --panel-shadow: 0 22px 60px rgba(70, 48, 20, 0.12);
+  --text-primary: #2f241d;
+  --text-secondary: #675543;
+  --text-muted: #8e765e;
+  --accent: #9d5b2f;
+  --accent-strong: #7f431b;
+  --accent-soft: rgba(157, 91, 47, 0.12);
+  --danger-soft: rgba(179, 59, 43, 0.1);
+  --radius-xl: 28px;
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --layout-gap: 20px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text-primary);
+  background: var(--app-bg);
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.2), transparent 42%),
+    linear-gradient(transparent 0%, rgba(126, 94, 55, 0.04) 100%);
+  pointer-events: none;
+  content: '';
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.app-shell-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
+  backdrop-filter: blur(18px);
+}
+
+.serif-title {
+  font-family: "Noto Serif SC", serif;
+}
+
+.page-scrollbar::-webkit-scrollbar,
+.thin-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.page-scrollbar::-webkit-scrollbar-thumb,
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(123, 84, 46, 0.24);
+}
+
+.page-scrollbar::-webkit-scrollbar-track,
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--accent);
+  --el-button-border-color: var(--accent);
+  --el-button-hover-bg-color: #a86a41;
+  --el-button-hover-border-color: #a86a41;
+  --el-button-active-bg-color: var(--accent-strong);
+  --el-button-active-border-color: var(--accent-strong);
+}
+
+.el-switch.is-checked .el-switch__core {
+  --el-switch-on-color: var(--accent);
+}
+
+.el-select__wrapper,
+.el-textarea__inner,
+.el-input__wrapper {
+  border-radius: 16px;
+}
+
+.el-empty__description p,
+.el-empty__description span {
+  color: var(--text-muted);
+}

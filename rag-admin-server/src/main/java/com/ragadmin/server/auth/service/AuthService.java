@@ -12,6 +12,8 @@ import com.ragadmin.server.auth.mapper.SysRoleMapper;
 import com.ragadmin.server.auth.mapper.SysUserMapper;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.common.exception.BusinessException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -20,6 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -27,9 +31,12 @@ import java.util.UUID;
 @Service
 public class AuthService {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
     public static final String REQUEST_ATTRIBUTE = "AUTHENTICATED_USER";
     public static final String ADMIN_LOGIN_TYPE = "admin";
     public static final String APP_LOGIN_TYPE = "app";
+    private static final String LAST_LOGIN_METADATA_PREFIX = "rag:auth:meta:last-login:";
+    private static final String LAST_ACTIVE_METADATA_PREFIX = "rag:auth:meta:last-active:";
     private static final List<String> ADMIN_PORTAL_ROLE_CODES = List.of("ADMIN", "KB_ADMIN", "AUDITOR");
     private static final List<String> APP_PORTAL_ROLE_CODES = List.of("APP_USER", "ADMIN", "KB_ADMIN", "AUDITOR");
 
@@ -103,6 +110,7 @@ public class AuthService {
         String accessToken = saTokenLoginService.login(user.getId(), loginType);
         String refreshToken = UUID.randomUUID().toString();
         persistRefreshSession(user.getId(), loginType, accessToken, refreshToken);
+        recordLoginMetadata(user.getId(), loginType);
 
         return new LoginResponse()
                 .setAccessToken(accessToken)
@@ -137,6 +145,7 @@ public class AuthService {
         String newRefreshToken = UUID.randomUUID().toString();
         deleteRefreshSession(refreshToken, oldAccessToken);
         persistRefreshSession(user.getId(), loginType, newAccessToken, newRefreshToken);
+        recordLoginMetadata(user.getId(), loginType);
         return new RefreshTokenResponse()
                 .setAccessToken(newAccessToken)
                 .setRefreshToken(newRefreshToken)
@@ -147,6 +156,10 @@ public class AuthService {
     public void logout(AuthenticatedUser authenticatedUser) {
         saTokenLoginService.logoutByTokenValue(authenticatedUser.getTokenValue(), authenticatedUser.getLoginType());
         deleteRefreshSessionByAccessToken(authenticatedUser.getTokenValue());
+    }
+
+    public void revokeRefreshSessionByAccessToken(String accessToken) {
+        deleteRefreshSessionByAccessToken(accessToken);
     }
 
     public CurrentUserResponse getCurrentUserForAdminPortal(Long userId) {
@@ -163,12 +176,21 @@ public class AuthService {
             throw unauthorized("Token 无效或已过期");
         }
         SysUserEntity user = loadEnabledUser(userId);
+        recordActivityMetadata(user.getId(), loginType);
         return new AuthenticatedUser()
                 .setUserId(user.getId())
                 .setUsername(user.getUsername())
                 .setSessionId(accessToken)
                 .setLoginType(loginType)
                 .setTokenValue(accessToken);
+    }
+
+    public LocalDateTime loadLastLoginAt(Long userId, String loginType) {
+        return readDateTimeMetadata(buildLastLoginMetadataKey(userId, loginType));
+    }
+
+    public LocalDateTime loadLastActiveAt(Long userId, String loginType) {
+        return readDateTimeMetadata(buildLastActiveMetadataKey(userId, loginType));
     }
 
     private SysUserEntity findByLoginId(String loginId) {
@@ -236,6 +258,40 @@ public class AuthService {
         ));
     }
 
+    /**
+     * 最近登录和最近活跃时间属于认证层热数据，保存在 Redis 即可，不进入 PostgreSQL 事实表。
+     */
+    private void recordLoginMetadata(Long userId, String loginType) {
+        LocalDateTime now = LocalDateTime.now();
+        writeDateTimeMetadata(buildLastLoginMetadataKey(userId, loginType), now);
+        writeDateTimeMetadata(buildLastActiveMetadataKey(userId, loginType), now);
+    }
+
+    private void recordActivityMetadata(Long userId, String loginType) {
+        writeDateTimeMetadata(buildLastActiveMetadataKey(userId, loginType), LocalDateTime.now());
+    }
+
+    private void writeDateTimeMetadata(String key, LocalDateTime time) {
+        stringRedisTemplate.opsForValue().set(
+                key,
+                time.toString(),
+                Duration.ofSeconds(authProperties.getRefreshTokenTtlSeconds())
+        );
+    }
+
+    private LocalDateTime readDateTimeMetadata(String key) {
+        String value = stringRedisTemplate.opsForValue().get(key);
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(value);
+        } catch (DateTimeParseException ex) {
+            log.warn("认证元数据时间格式非法，key={}, value={}", key, value);
+            return null;
+        }
+    }
+
     private String buildRefreshUserIdKey(String refreshToken) {
         return "rag:auth:refresh:user:" + refreshToken;
     }
@@ -250,6 +306,14 @@ public class AuthService {
 
     private String buildAccessRefreshTokenKey(String accessToken) {
         return "rag:auth:access:refresh:" + accessToken;
+    }
+
+    private String buildLastLoginMetadataKey(Long userId, String loginType) {
+        return LAST_LOGIN_METADATA_PREFIX + loginType + ":" + userId;
+    }
+
+    private String buildLastActiveMetadataKey(Long userId, String loginType) {
+        return LAST_ACTIVE_METADATA_PREFIX + loginType + ":" + userId;
     }
 
     private BusinessException unauthorized(String message) {

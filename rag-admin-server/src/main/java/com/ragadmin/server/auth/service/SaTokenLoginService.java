@@ -4,6 +4,11 @@ import cn.dev33.satoken.stp.StpLogic;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @Service
 public class SaTokenLoginService {
 
@@ -32,6 +37,26 @@ public class SaTokenLoginService {
             return;
         }
         resolve(loginType).logoutByTokenValue(tokenValue);
+    }
+
+    public boolean isLogin(Long userId, String loginType) {
+        return resolve(loginType).isLogin(userId);
+    }
+
+    public List<String> getTokenValueListByLoginId(Long userId, String loginType) {
+        return resolve(loginType).getTokenValueListByLoginId(userId);
+    }
+
+    public void kickout(Long userId, String loginType) {
+        resolve(loginType).kickout(userId);
+    }
+
+    public Set<Long> listOnlineUserIds(String loginType) {
+        return resolve(loginType).searchTokenValue("", 0, -1, true)
+                .stream()
+                .map(tokenValue -> getLoginId(tokenValue, loginType))
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private StpLogic resolve(String loginType) {

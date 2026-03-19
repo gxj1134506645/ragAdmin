@@ -3,14 +3,17 @@ package com.ragadmin.server.web;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ragadmin.server.auth.controller.AuthController;
 import com.ragadmin.server.auth.controller.UserController;
+import com.ragadmin.server.auth.controller.UserSessionController;
 import com.ragadmin.server.auth.dto.CurrentUserResponse;
 import com.ragadmin.server.auth.dto.LoginResponse;
 import com.ragadmin.server.auth.dto.RefreshTokenResponse;
+import com.ragadmin.server.auth.dto.UserSessionListItemResponse;
 import com.ragadmin.server.auth.dto.UserListItemResponse;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.auth.service.AuthInterceptor;
 import com.ragadmin.server.auth.service.AuthService;
 import com.ragadmin.server.auth.service.UserAdminService;
+import com.ragadmin.server.auth.service.UserSessionAdminService;
 import com.ragadmin.server.chat.controller.ChatController;
 import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatUsageResponse;
@@ -109,6 +112,9 @@ class AdminApiWebMvcTest {
     @Mock
     private UserAdminService userAdminService;
 
+    @Mock
+    private UserSessionAdminService userSessionAdminService;
+
     private MockMvc publicMockMvc;
     private MockMvc protectedMockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -149,6 +155,9 @@ class AdminApiWebMvcTest {
         UserController userController = new UserController();
         ReflectionTestUtils.setField(userController, "userAdminService", userAdminService);
 
+        UserSessionController userSessionController = new UserSessionController();
+        ReflectionTestUtils.setField(userSessionController, "userSessionAdminService", userSessionAdminService);
+
         GlobalExceptionHandler exceptionHandler = new GlobalExceptionHandler();
 
         AuthInterceptor authInterceptor = new AuthInterceptor();
@@ -168,7 +177,8 @@ class AdminApiWebMvcTest {
                         modelController,
                         modelProviderController,
                         statisticsController,
-                        userController
+                        userController,
+                        userSessionController
                 )
                 .addInterceptors(authInterceptor)
                 .setControllerAdvice(exceptionHandler)
@@ -647,6 +657,54 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.list[0].username").value("app-user"))
                 .andExpect(jsonPath("$.data.list[0].roles[0]").value("APP_USER"));
+    }
+
+    @Test
+    void shouldReturnUserSessionsWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
+        when(userSessionAdminService.list(null, "APP_USER", "all", 1L, 20L)).thenReturn(new PageResponse<>(
+                List.of(new UserSessionListItemResponse()
+                        .setUserId(2L)
+                        .setUsername("app-user")
+                        .setDisplayName("前台用户")
+                        .setRoles(List.of("APP_USER"))
+                        .setAdminOnline(false)
+                        .setAppOnline(true)),
+                1,
+                20,
+                1
+        ));
+
+        protectedMockMvc.perform(get("/api/admin/user-sessions")
+                        .queryParam("roleCode", "APP_USER")
+                        .queryParam("onlineScope", "all")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.list[0].userId").value(2))
+                .andExpect(jsonPath("$.data.list[0].username").value("app-user"))
+                .andExpect(jsonPath("$.data.list[0].appOnline").value(true));
+    }
+
+    @Test
+    void shouldKickoutUserSessionWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
+        doNothing().when(userSessionAdminService).kickout(any(), eq(2L), any());
+
+        protectedMockMvc.perform(post("/api/admin/user-sessions/2/kickout")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "scope": "all",
+                                  "reason": "管理员手动下线"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        verify(userSessionAdminService).kickout(any(), eq(2L), any());
     }
 
     private AuthenticatedUser authenticatedUser() {

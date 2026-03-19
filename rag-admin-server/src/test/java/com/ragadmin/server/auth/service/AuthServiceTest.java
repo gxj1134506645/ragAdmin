@@ -123,11 +123,13 @@ class AuthServiceTest {
         ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> valueCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Duration> ttlCaptor = ArgumentCaptor.forClass(Duration.class);
-        verify(valueOperations, times(4)).set(keyCaptor.capture(), valueCaptor.capture(), ttlCaptor.capture());
+        verify(valueOperations, times(6)).set(keyCaptor.capture(), valueCaptor.capture(), ttlCaptor.capture());
         assertTrue(keyCaptor.getAllValues().stream().anyMatch(key -> key.startsWith("rag:auth:refresh:user:")));
         assertTrue(keyCaptor.getAllValues().stream().anyMatch(key -> key.startsWith("rag:auth:refresh:type:")));
         assertTrue(keyCaptor.getAllValues().stream().anyMatch(key -> key.startsWith("rag:auth:refresh:access:")));
         assertTrue(keyCaptor.getAllValues().stream().anyMatch(key -> key.startsWith("rag:auth:access:refresh:access-token")));
+        assertTrue(keyCaptor.getAllValues().stream().anyMatch(key -> key.startsWith("rag:auth:meta:last-login:admin:1")));
+        assertTrue(keyCaptor.getAllValues().stream().anyMatch(key -> key.startsWith("rag:auth:meta:last-active:admin:1")));
         assertTrue(valueCaptor.getAllValues().contains("1"));
         assertTrue(valueCaptor.getAllValues().contains(AuthService.ADMIN_LOGIN_TYPE));
         assertTrue(valueCaptor.getAllValues().contains("access-token"));

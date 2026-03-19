@@ -10,11 +10,9 @@ import com.ragadmin.server.auth.entity.SysUserEntity;
 import com.ragadmin.server.auth.mapper.AuthUserStructMapper;
 import com.ragadmin.server.auth.mapper.SysRoleMapper;
 import com.ragadmin.server.auth.mapper.SysUserMapper;
-import com.ragadmin.server.auth.model.AuthClaims;
-import com.ragadmin.server.auth.model.AuthTokenType;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.common.exception.BusinessException;
-import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,36 +28,51 @@ import java.util.UUID;
 public class AuthService {
 
     public static final String REQUEST_ATTRIBUTE = "AUTHENTICATED_USER";
+    public static final String ADMIN_LOGIN_TYPE = "admin";
+    public static final String APP_LOGIN_TYPE = "app";
     private static final List<String> ADMIN_PORTAL_ROLE_CODES = List.of("ADMIN", "KB_ADMIN", "AUDITOR");
     private static final List<String> APP_PORTAL_ROLE_CODES = List.of("APP_USER", "ADMIN", "KB_ADMIN", "AUDITOR");
 
-    @Resource
+    @Autowired
     private SysUserMapper sysUserMapper;
 
-    @Resource
+    @Autowired
     private SysRoleMapper sysRoleMapper;
 
-    @Resource
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @Resource
-    private TokenService tokenService;
+    @Autowired
+    private SaTokenLoginService saTokenLoginService;
 
-    @Resource
+    @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
-    @Resource
+    @Autowired
     private AuthProperties authProperties;
 
-    @Resource
+    @Autowired
     private AuthUserStructMapper authUserStructMapper;
 
+    @Autowired
+    private AdminPermissionService adminPermissionService;
+
     public LoginResponse loginForAdminPortal(LoginRequest request) {
-        return loginWithRoleBoundary(request, ADMIN_PORTAL_ROLE_CODES, "当前账号未开通后台管理权限");
+        return loginWithRoleBoundary(
+                request,
+                ADMIN_PORTAL_ROLE_CODES,
+                "当前账号未开通后台管理权限",
+                ADMIN_LOGIN_TYPE
+        );
     }
 
     public LoginResponse loginForAppPortal(LoginRequest request) {
-        return loginWithRoleBoundary(request, APP_PORTAL_ROLE_CODES, "当前账号未开通问答前台权限");
+        return loginWithRoleBoundary(
+                request,
+                APP_PORTAL_ROLE_CODES,
+                "当前账号未开通问答前台权限",
+                APP_LOGIN_TYPE
+        );
     }
 
     public void assertAnyRole(Long userId, List<String> allowedRoleCodes, String message) {
@@ -69,7 +82,12 @@ public class AuthService {
         }
     }
 
-    private LoginResponse loginWithRoleBoundary(LoginRequest request, List<String> allowedRoleCodes, String forbiddenMessage) {
+    private LoginResponse loginWithRoleBoundary(
+            LoginRequest request,
+            List<String> allowedRoleCodes,
+            String forbiddenMessage,
+            String loginType
+    ) {
         SysUserEntity user = findByLoginId(request.getLoginId());
         if (user == null || Boolean.TRUE.equals(user.getDeleted()) || !"ENABLED".equals(user.getStatus())) {
             throw unauthorized("用户名或密码错误");
@@ -82,31 +100,43 @@ public class AuthService {
             throw forbidden(forbiddenMessage);
         }
 
-        String sessionId = UUID.randomUUID().toString();
-        String accessToken = tokenService.generateAccessToken(user.getId(), user.getUsername(), sessionId);
-        String refreshToken = tokenService.generateRefreshToken(user.getId(), user.getUsername(), sessionId);
-        persistSession(user.getId(), sessionId, refreshToken);
+        String accessToken = saTokenLoginService.login(user.getId(), loginType);
+        String refreshToken = UUID.randomUUID().toString();
+        persistRefreshSession(user.getId(), loginType, accessToken, refreshToken);
 
         return new LoginResponse()
                 .setAccessToken(accessToken)
                 .setRefreshToken(refreshToken)
                 .setExpiresIn(authProperties.getAccessTokenTtlSeconds())
                 .setRefreshExpiresIn(authProperties.getRefreshTokenTtlSeconds())
-                .setUser(buildCurrentUser(user, roleCodes));
+                .setUser(buildCurrentUser(user, roleCodes, loginType));
     }
 
-    public RefreshTokenResponse refresh(String refreshToken) {
-        AuthClaims claims = parseToken(refreshToken, AuthTokenType.REFRESH);
-        assertSessionAlive(claims.getSessionId());
-        String storedRefreshToken = stringRedisTemplate.opsForValue().get(buildRefreshKey(claims.getSessionId()));
-        if (!StringUtils.hasText(storedRefreshToken) || !storedRefreshToken.equals(refreshToken)) {
+    public RefreshTokenResponse refreshForAdminPortal(String refreshToken) {
+        return refresh(refreshToken, ADMIN_LOGIN_TYPE);
+    }
+
+    public RefreshTokenResponse refreshForAppPortal(String refreshToken) {
+        return refresh(refreshToken, APP_LOGIN_TYPE);
+    }
+
+    private RefreshTokenResponse refresh(String refreshToken, String expectedLoginType) {
+        String loginType = stringRedisTemplate.opsForValue().get(buildRefreshLoginTypeKey(refreshToken));
+        String userIdValue = stringRedisTemplate.opsForValue().get(buildRefreshUserIdKey(refreshToken));
+        String oldAccessToken = stringRedisTemplate.opsForValue().get(buildRefreshAccessTokenKey(refreshToken));
+        if (!StringUtils.hasText(loginType) || !StringUtils.hasText(userIdValue) || !StringUtils.hasText(oldAccessToken)) {
             throw unauthorized("Refresh Token 无效或已失效");
         }
-
-        SysUserEntity user = loadEnabledUser(claims.getUserId());
-        String newAccessToken = tokenService.generateAccessToken(user.getId(), user.getUsername(), claims.getSessionId());
-        String newRefreshToken = tokenService.generateRefreshToken(user.getId(), user.getUsername(), claims.getSessionId());
-        persistSession(user.getId(), claims.getSessionId(), newRefreshToken);
+        if (!expectedLoginType.equals(loginType)) {
+            throw unauthorized("Refresh Token 与当前登录入口不匹配");
+        }
+        Long userId = Long.valueOf(userIdValue);
+        SysUserEntity user = loadEnabledUser(userId);
+        saTokenLoginService.logoutByTokenValue(oldAccessToken, loginType);
+        String newAccessToken = saTokenLoginService.login(user.getId(), loginType);
+        String newRefreshToken = UUID.randomUUID().toString();
+        deleteRefreshSession(refreshToken, oldAccessToken);
+        persistRefreshSession(user.getId(), loginType, newAccessToken, newRefreshToken);
         return new RefreshTokenResponse()
                 .setAccessToken(newAccessToken)
                 .setRefreshToken(newRefreshToken)
@@ -115,23 +145,30 @@ public class AuthService {
     }
 
     public void logout(AuthenticatedUser authenticatedUser) {
-        stringRedisTemplate.delete(List.of(
-                buildSessionKey(authenticatedUser.getSessionId()),
-                buildRefreshKey(authenticatedUser.getSessionId())
-        ));
+        saTokenLoginService.logoutByTokenValue(authenticatedUser.getTokenValue(), authenticatedUser.getLoginType());
+        deleteRefreshSessionByAccessToken(authenticatedUser.getTokenValue());
     }
 
-    public CurrentUserResponse getCurrentUser(Long userId) {
-        return buildCurrentUser(loadEnabledUser(userId));
+    public CurrentUserResponse getCurrentUserForAdminPortal(Long userId) {
+        return buildCurrentUser(loadEnabledUser(userId), ADMIN_LOGIN_TYPE);
     }
 
-    public AuthenticatedUser authenticateAccessToken(String accessToken) {
-        AuthClaims claims = parseToken(accessToken, AuthTokenType.ACCESS);
-        assertSessionAlive(claims.getSessionId());
+    public CurrentUserResponse getCurrentUserForAppPortal(Long userId) {
+        return buildCurrentUser(loadEnabledUser(userId), APP_LOGIN_TYPE);
+    }
+
+    public AuthenticatedUser authenticateAccessToken(String accessToken, String loginType) {
+        Long userId = saTokenLoginService.getLoginId(accessToken, loginType);
+        if (userId == null) {
+            throw unauthorized("Token 无效或已过期");
+        }
+        SysUserEntity user = loadEnabledUser(userId);
         return new AuthenticatedUser()
-                .setUserId(claims.getUserId())
-                .setUsername(claims.getUsername())
-                .setSessionId(claims.getSessionId());
+                .setUserId(user.getId())
+                .setUsername(user.getUsername())
+                .setSessionId(accessToken)
+                .setLoginType(loginType)
+                .setTokenValue(accessToken);
     }
 
     private SysUserEntity findByLoginId(String loginId) {
@@ -150,12 +187,15 @@ public class AuthService {
         return user;
     }
 
-    private CurrentUserResponse buildCurrentUser(SysUserEntity user) {
-        return buildCurrentUser(user, loadRoleCodes(user.getId()));
+    private CurrentUserResponse buildCurrentUser(SysUserEntity user, String loginType) {
+        return buildCurrentUser(user, loadRoleCodes(user.getId()), loginType);
     }
 
-    private CurrentUserResponse buildCurrentUser(SysUserEntity user, List<String> roleCodes) {
-        return authUserStructMapper.toCurrentUserResponse(user, roleCodes);
+    private CurrentUserResponse buildCurrentUser(SysUserEntity user, List<String> roleCodes, String loginType) {
+        List<String> permissions = ADMIN_LOGIN_TYPE.equals(loginType)
+                ? adminPermissionService.listPermissionsByRoleCodes(roleCodes)
+                : Collections.emptyList();
+        return authUserStructMapper.toCurrentUserResponse(user, roleCodes, permissions);
     }
 
     private List<String> loadRoleCodes(Long userId) {
@@ -167,39 +207,49 @@ public class AuthService {
         return userRoleCodes.stream().anyMatch(allowedRoleCodes::contains);
     }
 
-    private AuthClaims parseToken(String token, AuthTokenType expectedType) {
-        try {
-            AuthClaims claims = tokenService.parse(token);
-            if (claims.getTokenType() != expectedType) {
-                throw unauthorized("Token 类型非法");
-            }
-            return claims;
-        } catch (BusinessException ex) {
-            throw ex;
-        } catch (Exception ex) {
-            throw unauthorized("Token 无效或已过期");
-        }
-    }
-
-    private void assertSessionAlive(String sessionId) {
-        Boolean exists = stringRedisTemplate.hasKey(buildSessionKey(sessionId));
-        if (!Boolean.TRUE.equals(exists)) {
-            throw unauthorized("登录态已失效，请重新登录");
-        }
-    }
-
-    private void persistSession(Long userId, String sessionId, String refreshToken) {
+    /**
+     * 刷新 Token 仍然保留独立串值，目的是兼容当前前端存量协议，而不是继续保留旧 JWT 链路。
+     */
+    private void persistRefreshSession(Long userId, String loginType, String accessToken, String refreshToken) {
         Duration ttl = Duration.ofSeconds(authProperties.getRefreshTokenTtlSeconds());
-        stringRedisTemplate.opsForValue().set(buildSessionKey(sessionId), String.valueOf(userId), ttl);
-        stringRedisTemplate.opsForValue().set(buildRefreshKey(sessionId), refreshToken, ttl);
+        stringRedisTemplate.opsForValue().set(buildRefreshUserIdKey(refreshToken), String.valueOf(userId), ttl);
+        stringRedisTemplate.opsForValue().set(buildRefreshLoginTypeKey(refreshToken), loginType, ttl);
+        stringRedisTemplate.opsForValue().set(buildRefreshAccessTokenKey(refreshToken), accessToken, ttl);
+        stringRedisTemplate.opsForValue().set(buildAccessRefreshTokenKey(accessToken), refreshToken, ttl);
     }
 
-    private String buildSessionKey(String sessionId) {
-        return "rag:auth:session:" + sessionId;
+    private void deleteRefreshSessionByAccessToken(String accessToken) {
+        String refreshToken = stringRedisTemplate.opsForValue().get(buildAccessRefreshTokenKey(accessToken));
+        if (StringUtils.hasText(refreshToken)) {
+            deleteRefreshSession(refreshToken, accessToken);
+        } else {
+            stringRedisTemplate.delete(buildAccessRefreshTokenKey(accessToken));
+        }
     }
 
-    private String buildRefreshKey(String sessionId) {
-        return "rag:auth:refresh:" + sessionId;
+    private void deleteRefreshSession(String refreshToken, String accessToken) {
+        stringRedisTemplate.delete(List.of(
+                buildRefreshUserIdKey(refreshToken),
+                buildRefreshLoginTypeKey(refreshToken),
+                buildRefreshAccessTokenKey(refreshToken),
+                buildAccessRefreshTokenKey(accessToken)
+        ));
+    }
+
+    private String buildRefreshUserIdKey(String refreshToken) {
+        return "rag:auth:refresh:user:" + refreshToken;
+    }
+
+    private String buildRefreshLoginTypeKey(String refreshToken) {
+        return "rag:auth:refresh:type:" + refreshToken;
+    }
+
+    private String buildRefreshAccessTokenKey(String refreshToken) {
+        return "rag:auth:refresh:access:" + refreshToken;
+    }
+
+    private String buildAccessRefreshTokenKey(String accessToken) {
+        return "rag:auth:access:refresh:" + accessToken;
     }
 
     private BusinessException unauthorized(String message) {

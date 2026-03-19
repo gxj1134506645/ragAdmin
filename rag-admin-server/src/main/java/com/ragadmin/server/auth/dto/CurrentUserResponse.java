@@ -14,4 +14,5 @@ public class CurrentUserResponse {
     private String displayName;
     private String mobile;
     private List<String> roles;
+    private List<String> permissions;
 }

@@ -208,7 +208,7 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.data.accessToken").value("access-token"))
                 .andExpect(jsonPath("$.data.user.username").value("admin"));
 
-        verify(authService, never()).authenticateAccessToken(any());
+        verify(authService, never()).authenticateAccessToken(any(), any());
     }
 
     @Test
@@ -219,7 +219,7 @@ class AdminApiWebMvcTest {
                 .setExpiresIn(7200)
                 .setRefreshExpiresIn(604800);
 
-        when(authService.refresh("old-refresh-token")).thenReturn(response);
+        when(authService.refreshForAdminPortal("old-refresh-token")).thenReturn(response);
 
         publicMockMvc.perform(post("/api/admin/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -244,7 +244,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldReturnTaskDetailWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(taskService.detail(1L)).thenReturn(new TaskDetailResponse(
                 1L,
                 "DOCUMENT_PARSE",
@@ -278,7 +278,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldReturnChatResponseWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(chatService.chat(eq(11L), any(), any())).thenReturn(new ChatResponse(
                 101L,
                 "这是知识库回答",
@@ -299,7 +299,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldCreateKnowledgeBaseWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(knowledgeBaseService.create(any(), eq(1L))).thenReturn(new KnowledgeBaseResponse(
                 21L,
                 "demo-kb",
@@ -337,7 +337,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldCreateUploadUrlWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(fileUploadService.createUploadUrl(any())).thenReturn(new UploadUrlResponse(
                 "ragadmin",
                 "kb_document/20260310/demo/sample.md",
@@ -362,7 +362,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldReturnUploadCapabilityWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(fileUploadService.getUploadCapability()).thenReturn(new DocumentUploadCapabilityResponse(
                 true,
                 true,
@@ -385,7 +385,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldCreateDocumentWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(documentService.createDocument(eq(21L), any(), eq(1L))).thenReturn(new DocumentResponse(
                 31L,
                 21L,
@@ -424,7 +424,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldReturnKnowledgeBaseDocumentsWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(documentService.listKnowledgeBaseDocuments(21L, null, null, null, 1L, 20L))
                 .thenReturn(new PageResponse<>(
                         List.of(new DocumentResponse(
@@ -458,7 +458,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldReturnSystemHealthWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(systemHealthService.check()).thenReturn(new HealthCheckResponse(
                 "UP",
                 new DependencyHealthResponse("UP", "PostgreSQL 正常"),
@@ -482,7 +482,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldUpdateModelWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(modelService.update(eq(5L), any())).thenReturn(new ModelResponse(
                 5L,
                 1L,
@@ -518,7 +518,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldRunModelHealthCheckWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(modelService.healthCheck(5L)).thenReturn(new ModelHealthCheckResponse(
                 5L,
                 "deepseek-v3.2",
@@ -538,7 +538,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldRunModelProviderHealthCheckWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(modelProviderService.healthCheck(1L)).thenReturn(new ModelProviderHealthCheckResponse(
                 1L,
                 "BAILIAN",
@@ -558,7 +558,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldReturnVectorIndexOverviewWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         VectorIndexOverviewResponse response = new VectorIndexOverviewResponse();
         response.setKbId(21L);
         response.setKbCode("demo-kb");
@@ -588,7 +588,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldDeleteModelWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         doNothing().when(modelService).delete(5L);
 
         protectedMockMvc.perform(delete("/api/admin/models/5")
@@ -602,7 +602,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldDeleteKnowledgeBaseWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         doNothing().when(knowledgeBaseService).delete(21L);
 
         protectedMockMvc.perform(delete("/api/admin/knowledge-bases/21")
@@ -616,7 +616,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldDeleteDocumentWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         doNothing().when(documentService).delete(31L);
 
         protectedMockMvc.perform(delete("/api/admin/documents/31")
@@ -630,7 +630,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldReturnUsersWhenAdminHasPermission() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(userAdminService.list(null, null, 1L, 20L)).thenReturn(new PageResponse<>(
                 List.of(new UserListItemResponse()
                         .setId(2L)
@@ -656,7 +656,7 @@ class AdminApiWebMvcTest {
 
     @Test
     void shouldRejectUsersWhenCurrentRoleHasNoPermission() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
         doThrow(new com.ragadmin.server.common.exception.BusinessException(
                 "FORBIDDEN",
                 "当前账号未开通用户管理权限",
@@ -674,9 +674,12 @@ class AdminApiWebMvcTest {
         return new AuthenticatedUser()
                 .setUserId(1L)
                 .setUsername("admin")
-                .setSessionId("session-1");
+                .setSessionId("session-1")
+                .setLoginType(AuthService.ADMIN_LOGIN_TYPE)
+                .setTokenValue("access-token");
     }
 
     private record ChatRequestPayload(String question, Long kbId, Boolean stream) {
     }
 }
+

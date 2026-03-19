@@ -10,4 +10,6 @@ public class AuthenticatedUser {
     private Long userId;
     private String username;
     private String sessionId;
+    private String loginType;
+    private String tokenValue;
 }

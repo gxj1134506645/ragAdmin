@@ -31,11 +31,11 @@ public class AppPortalService {
     }
 
     public RefreshTokenResponse refresh(String refreshToken) {
-        return authService.refresh(refreshToken);
+        return authService.refreshForAppPortal(refreshToken);
     }
 
     public CurrentUserResponse getCurrentUser(Long userId) {
-        return authService.getCurrentUser(userId);
+        return authService.getCurrentUserForAppPortal(userId);
     }
 
     public void logout(AuthenticatedUser authenticatedUser) {

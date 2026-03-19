@@ -12,7 +12,8 @@ import java.util.List;
 public interface AuthUserStructMapper {
 
     @Mapping(target = "roles", source = "roles")
-    CurrentUserResponse toCurrentUserResponse(SysUserEntity user, List<String> roles);
+    @Mapping(target = "permissions", source = "permissions")
+    CurrentUserResponse toCurrentUserResponse(SysUserEntity user, List<String> roles, List<String> permissions);
 
     @Mapping(target = "roles", source = "roles")
     UserListItemResponse toUserListItemResponse(SysUserEntity user, List<String> roles);

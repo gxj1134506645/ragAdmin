@@ -127,7 +127,7 @@ class AppApiWebMvcTest {
                 .andExpect(jsonPath("$.data.accessToken").value("app-access-token"))
                 .andExpect(jsonPath("$.data.user.roles[0]").value("APP_USER"));
 
-        verify(authService, never()).authenticateAccessToken(any());
+        verify(authService, never()).authenticateAccessToken(any(), any());
     }
 
     @Test
@@ -162,7 +162,7 @@ class AppApiWebMvcTest {
 
     @Test
     void shouldReturnCurrentAppUserWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.APP_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(appPortalService.getCurrentUser(2L)).thenReturn(new CurrentUserResponse()
                 .setId(2L)
                 .setUsername("app-user")
@@ -178,7 +178,7 @@ class AppApiWebMvcTest {
 
     @Test
     void shouldReturnVisibleKnowledgeBasesWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.APP_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(appPortalService.listVisibleKnowledgeBases(eq("制度"), eq(1L), eq(20L))).thenReturn(new PageResponse<>(
                 List.of(new KnowledgeBaseResponse(
                         11L,
@@ -208,7 +208,7 @@ class AppApiWebMvcTest {
 
     @Test
     void shouldReturnAvailableChatModelsWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.APP_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(appPortalService.listAvailableChatModels(eq("BAILIAN"), eq(1L), eq(20L))).thenReturn(new PageResponse<>(
                 List.of(new ModelResponse(
                         1L,
@@ -239,7 +239,7 @@ class AppApiWebMvcTest {
 
     @Test
     void shouldCreateAppChatSessionWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.APP_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(appChatService.createSession(any(), any())).thenReturn(new AppChatSessionResponse(
                 21L,
                 null,
@@ -271,7 +271,7 @@ class AppApiWebMvcTest {
 
     @Test
     void shouldListAppChatSessionsWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.APP_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(appChatService.listSessions(eq(null), eq("GENERAL"), any(), eq(1L), eq(20L))).thenReturn(new PageResponse<>(
                 List.of(new AppChatSessionResponse(
                         22L,
@@ -298,7 +298,7 @@ class AppApiWebMvcTest {
 
     @Test
     void shouldListAppChatMessagesWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.APP_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(appChatService.listMessages(eq(22L), any())).thenReturn(List.of(
                 new ChatMessageResponse(
                         101L,
@@ -320,7 +320,7 @@ class AppApiWebMvcTest {
 
     @Test
     void shouldRenameAppChatSessionWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.APP_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(appChatService.renameSession(eq(22L), eq("新的会话名"), any())).thenReturn(new AppChatSessionResponse(
                 22L,
                 null,
@@ -348,7 +348,7 @@ class AppApiWebMvcTest {
 
     @Test
     void shouldDeleteAppChatSessionWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.APP_LOGIN_TYPE)).thenReturn(authenticatedUser());
 
         protectedMockMvc.perform(delete("/api/app/chat/sessions/22")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
@@ -360,7 +360,7 @@ class AppApiWebMvcTest {
 
     @Test
     void shouldUpdateAppSessionKnowledgeBasesWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.APP_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(appChatService.updateSessionKnowledgeBases(eq(22L), eq(List.of(11L, 13L)), any())).thenReturn(new AppChatSessionResponse(
                 22L,
                 null,
@@ -388,7 +388,7 @@ class AppApiWebMvcTest {
 
     @Test
     void shouldChatThroughAppEndpointWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(authService.authenticateAccessToken("access-token", AuthService.APP_LOGIN_TYPE)).thenReturn(authenticatedUser());
         when(appChatService.chat(eq(22L), any(), any())).thenReturn(new ChatResponse(
                 102L,
                 "根据已选知识库，发布前需要完成回归测试。",
@@ -415,7 +415,9 @@ class AppApiWebMvcTest {
         return new AuthenticatedUser()
                 .setUserId(2L)
                 .setUsername("app-user")
-                .setSessionId("session-app");
+                .setSessionId("session-app")
+                .setLoginType(AuthService.APP_LOGIN_TYPE)
+                .setTokenValue("access-token");
     }
 
     private record AppChatPayload(
@@ -426,3 +428,4 @@ class AppApiWebMvcTest {
     ) {
     }
 }
+

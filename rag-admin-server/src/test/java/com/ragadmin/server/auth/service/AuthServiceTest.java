@@ -9,8 +9,6 @@ import com.ragadmin.server.auth.entity.SysUserEntity;
 import com.ragadmin.server.auth.mapper.AuthUserStructMapper;
 import com.ragadmin.server.auth.mapper.SysRoleMapper;
 import com.ragadmin.server.auth.mapper.SysUserMapper;
-import com.ragadmin.server.auth.model.AuthClaims;
-import com.ragadmin.server.auth.model.AuthTokenType;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -50,7 +47,7 @@ class AuthServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private TokenService tokenService;
+    private SaTokenLoginService saTokenLoginService;
 
     @Mock
     private StringRedisTemplate stringRedisTemplate;
@@ -61,6 +58,9 @@ class AuthServiceTest {
     @Mock
     private AuthUserStructMapper authUserStructMapper;
 
+    @Mock
+    private AdminPermissionService adminPermissionService;
+
     private AuthService authService;
 
     @BeforeEach
@@ -69,9 +69,10 @@ class AuthServiceTest {
         ReflectionTestUtils.setField(authService, "sysUserMapper", sysUserMapper);
         ReflectionTestUtils.setField(authService, "sysRoleMapper", sysRoleMapper);
         ReflectionTestUtils.setField(authService, "passwordEncoder", passwordEncoder);
-        ReflectionTestUtils.setField(authService, "tokenService", tokenService);
+        ReflectionTestUtils.setField(authService, "saTokenLoginService", saTokenLoginService);
         ReflectionTestUtils.setField(authService, "stringRedisTemplate", stringRedisTemplate);
         ReflectionTestUtils.setField(authService, "authUserStructMapper", authUserStructMapper);
+        ReflectionTestUtils.setField(authService, "adminPermissionService", adminPermissionService);
         ReflectionTestUtils.setField(authService, "authProperties", new AuthProperties()
                 .setAccessTokenTtlSeconds(7200)
                 .setRefreshTokenTtlSeconds(604800));
@@ -94,52 +95,54 @@ class AuthServiceTest {
                 .setId(1L)
                 .setUsername("admin")
                 .setDisplayName("系统管理员")
-                .setRoles(List.of("ADMIN"));
+                .setRoles(List.of("ADMIN"))
+                .setPermissions(List.of("DASHBOARD_VIEW", "USER_MANAGE"));
 
         when(sysUserMapper.selectOne(any())).thenReturn(user);
         when(passwordEncoder.matches("Admin@123456", "hashed-password")).thenReturn(true);
-        when(tokenService.generateAccessToken(eq(1L), eq("admin"), any())).thenReturn("access-token");
-        when(tokenService.generateRefreshToken(eq(1L), eq("admin"), any())).thenReturn("refresh-token");
+        when(saTokenLoginService.login(1L, AuthService.ADMIN_LOGIN_TYPE)).thenReturn("access-token");
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(sysRoleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of("ADMIN"));
-        when(authUserStructMapper.toCurrentUserResponse(user, List.of("ADMIN"))).thenReturn(currentUser);
+        when(adminPermissionService.listPermissionsByRoleCodes(List.of("ADMIN")))
+                .thenReturn(List.of("DASHBOARD_VIEW", "USER_MANAGE"));
+        when(authUserStructMapper.toCurrentUserResponse(
+                user,
+                List.of("ADMIN"),
+                List.of("DASHBOARD_VIEW", "USER_MANAGE")
+        )).thenReturn(currentUser);
 
         LoginResponse response = authService.loginForAdminPortal(request);
 
         assertEquals("access-token", response.getAccessToken());
-        assertEquals("refresh-token", response.getRefreshToken());
+        assertTrue(response.getRefreshToken() != null && !response.getRefreshToken().isBlank());
         assertEquals(7200, response.getExpiresIn());
         assertEquals(604800, response.getRefreshExpiresIn());
         assertEquals("admin", response.getUser().getUsername());
+        assertTrue(response.getUser().getPermissions().contains("USER_MANAGE"));
 
         ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> valueCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Duration> ttlCaptor = ArgumentCaptor.forClass(Duration.class);
-        verify(valueOperations, times(2)).set(keyCaptor.capture(), valueCaptor.capture(), ttlCaptor.capture());
-        assertTrue(keyCaptor.getAllValues().get(0).startsWith("rag:auth:session:"));
-        assertEquals("1", valueCaptor.getAllValues().get(0));
+        verify(valueOperations, times(4)).set(keyCaptor.capture(), valueCaptor.capture(), ttlCaptor.capture());
+        assertTrue(keyCaptor.getAllValues().stream().anyMatch(key -> key.startsWith("rag:auth:refresh:user:")));
+        assertTrue(keyCaptor.getAllValues().stream().anyMatch(key -> key.startsWith("rag:auth:refresh:type:")));
+        assertTrue(keyCaptor.getAllValues().stream().anyMatch(key -> key.startsWith("rag:auth:refresh:access:")));
+        assertTrue(keyCaptor.getAllValues().stream().anyMatch(key -> key.startsWith("rag:auth:access:refresh:access-token")));
+        assertTrue(valueCaptor.getAllValues().contains("1"));
+        assertTrue(valueCaptor.getAllValues().contains(AuthService.ADMIN_LOGIN_TYPE));
+        assertTrue(valueCaptor.getAllValues().contains("access-token"));
+        assertTrue(valueCaptor.getAllValues().contains(response.getRefreshToken()));
         assertEquals(Duration.ofSeconds(604800), ttlCaptor.getAllValues().get(0));
-        assertTrue(keyCaptor.getAllValues().get(1).startsWith("rag:auth:refresh:"));
-        assertEquals("refresh-token", valueCaptor.getAllValues().get(1));
-        assertEquals(Duration.ofSeconds(604800), ttlCaptor.getAllValues().get(1));
     }
 
     @Test
     void shouldRejectRefreshWhenStoredTokenMismatch() {
-        AuthClaims claims = new AuthClaims()
-                .setUserId(1L)
-                .setUsername("admin")
-                .setSessionId("session-1")
-                .setTokenType(AuthTokenType.REFRESH);
-
-        when(tokenService.parse("bad-refresh-token")).thenReturn(claims);
-        when(stringRedisTemplate.hasKey("rag:auth:session:session-1")).thenReturn(true);
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get("rag:auth:refresh:session-1")).thenReturn("another-token");
+        when(valueOperations.get("rag:auth:refresh:type:bad-refresh-token")).thenReturn(null);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> authService.refresh("bad-refresh-token")
+                () -> authService.refreshForAdminPortal("bad-refresh-token")
         );
 
         assertEquals("UNAUTHORIZED", exception.getCode());
@@ -149,34 +152,32 @@ class AuthServiceTest {
 
     @Test
     void shouldRefreshTokenWhenSessionAlive() {
-        AuthClaims claims = new AuthClaims()
-                .setUserId(1L)
-                .setUsername("admin")
-                .setSessionId("session-2")
-                .setTokenType(AuthTokenType.REFRESH);
-
         SysUserEntity user = new SysUserEntity();
         user.setId(1L);
         user.setUsername("admin");
         user.setStatus("ENABLED");
         user.setDeleted(Boolean.FALSE);
 
-        when(tokenService.parse("refresh-token-old")).thenReturn(claims);
-        when(stringRedisTemplate.hasKey("rag:auth:session:session-2")).thenReturn(true);
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get("rag:auth:refresh:session-2")).thenReturn("refresh-token-old");
+        when(valueOperations.get("rag:auth:refresh:type:refresh-token-old")).thenReturn(AuthService.ADMIN_LOGIN_TYPE);
+        when(valueOperations.get("rag:auth:refresh:user:refresh-token-old")).thenReturn("1");
+        when(valueOperations.get("rag:auth:refresh:access:refresh-token-old")).thenReturn("access-token-old");
         when(sysUserMapper.selectById(1L)).thenReturn(user);
-        when(tokenService.generateAccessToken(1L, "admin", "session-2")).thenReturn("access-token-new");
-        when(tokenService.generateRefreshToken(1L, "admin", "session-2")).thenReturn("refresh-token-new");
+        when(saTokenLoginService.login(1L, AuthService.ADMIN_LOGIN_TYPE)).thenReturn("access-token-new");
 
-        RefreshTokenResponse response = authService.refresh("refresh-token-old");
+        RefreshTokenResponse response = authService.refreshForAdminPortal("refresh-token-old");
 
         assertEquals("access-token-new", response.getAccessToken());
-        assertEquals("refresh-token-new", response.getRefreshToken());
+        assertTrue(response.getRefreshToken() != null && !response.getRefreshToken().isBlank());
         assertEquals(7200, response.getExpiresIn());
         assertEquals(604800, response.getRefreshExpiresIn());
-        verify(valueOperations).set("rag:auth:session:session-2", "1", Duration.ofSeconds(604800));
-        verify(valueOperations).set("rag:auth:refresh:session-2", "refresh-token-new", Duration.ofSeconds(604800));
+        verify(saTokenLoginService).logoutByTokenValue("access-token-old", AuthService.ADMIN_LOGIN_TYPE);
+        verify(stringRedisTemplate).delete(List.of(
+                "rag:auth:refresh:user:refresh-token-old",
+                "rag:auth:refresh:type:refresh-token-old",
+                "rag:auth:refresh:access:refresh-token-old",
+                "rag:auth:access:refresh:access-token-old"
+        ));
     }
 
     @Test
@@ -184,13 +185,20 @@ class AuthServiceTest {
         AuthenticatedUser user = new AuthenticatedUser()
                 .setUserId(1L)
                 .setUsername("admin")
-                .setSessionId("session-3");
+                .setLoginType(AuthService.ADMIN_LOGIN_TYPE)
+                .setTokenValue("access-token");
+
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("rag:auth:access:refresh:access-token")).thenReturn("refresh-token");
 
         authService.logout(user);
 
+        verify(saTokenLoginService).logoutByTokenValue("access-token", AuthService.ADMIN_LOGIN_TYPE);
         verify(stringRedisTemplate).delete(List.of(
-                "rag:auth:session:session-3",
-                "rag:auth:refresh:session-3"
+                "rag:auth:refresh:user:refresh-token",
+                "rag:auth:refresh:type:refresh-token",
+                "rag:auth:refresh:access:refresh-token",
+                "rag:auth:access:refresh:access-token"
         ));
     }
 
@@ -211,20 +219,21 @@ class AuthServiceTest {
                 .setId(1L)
                 .setUsername("admin")
                 .setDisplayName("系统管理员")
-                .setRoles(List.of("ADMIN"));
+                .setRoles(List.of("ADMIN"))
+                .setPermissions(List.of());
 
         when(sysUserMapper.selectOne(any())).thenReturn(user);
         when(passwordEncoder.matches("Admin@123456", "hashed-password")).thenReturn(true);
-        when(tokenService.generateAccessToken(eq(1L), eq("admin"), any())).thenReturn("access-token");
-        when(tokenService.generateRefreshToken(eq(1L), eq("admin"), any())).thenReturn("refresh-token");
+        when(saTokenLoginService.login(1L, AuthService.APP_LOGIN_TYPE)).thenReturn("access-token");
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(sysRoleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of("ADMIN"));
-        when(authUserStructMapper.toCurrentUserResponse(user, List.of("ADMIN"))).thenReturn(currentUser);
+        when(authUserStructMapper.toCurrentUserResponse(user, List.of("ADMIN"), List.of())).thenReturn(currentUser);
 
         LoginResponse response = authService.loginForAppPortal(request);
 
         assertEquals("admin", response.getUser().getUsername());
         assertTrue(response.getUser().getRoles().contains("ADMIN"));
+        assertTrue(response.getUser().getPermissions().isEmpty());
     }
 
     @Test
@@ -251,7 +260,7 @@ class AuthServiceTest {
 
         assertEquals("FORBIDDEN", exception.getCode());
         assertTrue(exception.getMessage().contains("后台管理权限"));
-        verify(tokenService, never()).generateAccessToken(any(), any(), any());
+        verify(saTokenLoginService, never()).login(any(), any());
     }
 
     @Test
@@ -278,7 +287,7 @@ class AuthServiceTest {
 
         assertEquals("FORBIDDEN", exception.getCode());
         assertTrue(exception.getMessage().contains("问答前台权限"));
-        verify(tokenService, never()).generateAccessToken(any(), any(), any());
+        verify(saTokenLoginService, never()).login(any(), any());
     }
 
     @Test

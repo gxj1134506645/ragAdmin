@@ -31,7 +31,7 @@ public class AuthController {
 
     @PostMapping("/refresh")
     public ApiResponse<RefreshTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
-        return ApiResponse.success(authService.refresh(request.getRefreshToken()));
+        return ApiResponse.success(authService.refreshForAdminPortal(request.getRefreshToken()));
     }
 
     @PostMapping("/logout")
@@ -43,7 +43,7 @@ public class AuthController {
     @GetMapping("/me")
     public ApiResponse<CurrentUserResponse> me(HttpServletRequest request) {
         AuthenticatedUser authenticatedUser = currentUser(request);
-        return ApiResponse.success(authService.getCurrentUser(authenticatedUser.getUserId()));
+        return ApiResponse.success(authService.getCurrentUserForAdminPortal(authenticatedUser.getUserId()));
     }
 
     private AuthenticatedUser currentUser(HttpServletRequest request) {

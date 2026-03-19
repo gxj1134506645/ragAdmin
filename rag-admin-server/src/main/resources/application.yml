@@ -35,6 +35,16 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
 
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+  timeout: 7200
+  active-timeout: -1
+  is-concurrent: true
+  is-share: false
+  is-read-header: true
+  is-read-cookie: false
+
 logging:
   config: classpath:logback-spring.xml
 

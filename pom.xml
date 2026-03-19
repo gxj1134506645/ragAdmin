@@ -29,6 +29,7 @@
         <mapstruct.version>1.6.3</mapstruct.version>
         <mybatis-plus.version>3.5.7</mybatis-plus.version>
         <minio.version>8.5.17</minio.version>
+        <sa-token.version>1.44.0</sa-token.version>
         <spring-boot.version>3.5.10</spring-boot.version>
         <spring-ai.version>1.1.2</spring-ai.version>
         <spring-ai-alibaba.version>1.1.2.2</spring-ai-alibaba.version>

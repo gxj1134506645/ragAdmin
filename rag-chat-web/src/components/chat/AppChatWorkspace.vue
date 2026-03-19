@@ -58,6 +58,8 @@ const streaming = ref(false)
 const sessionActionLoadingId = ref<number | null>(null)
 const feedbackSubmittingMessageIds = ref<number[]>([])
 const expandedReferenceMessageIds = ref<number[]>([])
+const knowledgeBasePickerVisible = ref(false)
+const knowledgeBasePickerKeyword = ref('')
 
 let streamHandle: ChatStreamHandle | null = null
 
@@ -77,6 +79,31 @@ const selectedKnowledgeBaseNames = computed<string[]>(() => {
     const match = availableKnowledgeBases.value.find((item) => item.id === id)
     return match ? [match.kbName] : []
   })
+})
+
+const selectedKnowledgeBases = computed<KnowledgeBaseSummary[]>(() => {
+  return selectedKbIds.value.flatMap((id) => {
+    const match = availableKnowledgeBases.value.find((item) => item.id === id)
+    return match ? [match] : []
+  })
+})
+
+const filteredKnowledgeBases = computed<KnowledgeBaseSummary[]>(() => {
+  const keyword = knowledgeBasePickerKeyword.value.trim().toLowerCase()
+  const selectedIdSet = new Set(selectedKbIds.value)
+
+  return availableKnowledgeBases.value
+    .filter((item) => {
+      if (!keyword) {
+        return true
+      }
+      return item.kbName.toLowerCase().includes(keyword) || item.kbCode.toLowerCase().includes(keyword)
+    })
+    .sort((left, right) => {
+      const leftSelected = selectedIdSet.has(left.id) ? 1 : 0
+      const rightSelected = selectedIdSet.has(right.id) ? 1 : 0
+      return rightSelected - leftSelected
+    })
 })
 
 const currentModelName = computed(() => {
@@ -117,6 +144,11 @@ function resetPreferenceInputs(): void {
 
 function resetConversationViewState(): void {
   expandedReferenceMessageIds.value = []
+}
+
+function resetKnowledgeBasePickerState(): void {
+  knowledgeBasePickerVisible.value = false
+  knowledgeBasePickerKeyword.value = ''
 }
 
 function applySessionPreferences(session: ChatSession | null): void {
@@ -393,6 +425,31 @@ function handleClearView(): void {
   resetConversationViewState()
 }
 
+function toggleKnowledgeBaseSelection(kbId: number): void {
+  if (isKnowledgeBaseScene.value) {
+    return
+  }
+  if (selectedKbIds.value.includes(kbId)) {
+    selectedKbIds.value = normalizeSelectedKbIds(selectedKbIds.value.filter((id) => id !== kbId))
+    return
+  }
+  selectedKbIds.value = normalizeSelectedKbIds([...selectedKbIds.value, kbId])
+}
+
+function removeSelectedKnowledgeBase(kbId: number): void {
+  if (isKnowledgeBaseScene.value) {
+    return
+  }
+  selectedKbIds.value = normalizeSelectedKbIds(selectedKbIds.value.filter((id) => id !== kbId))
+}
+
+function clearSelectedKnowledgeBases(): void {
+  if (isKnowledgeBaseScene.value) {
+    return
+  }
+  selectedKbIds.value = []
+}
+
 function isFeedbackSubmitting(messageId: number): boolean {
   return feedbackSubmittingMessageIds.value.includes(messageId)
 }
@@ -529,9 +586,17 @@ function handleComposerKeydown(event: KeyboardEvent): void {
 watch(
   () => [props.sceneType, props.anchorKbId],
   async () => {
+    resetKnowledgeBasePickerState()
     await initialize()
   },
 )
+
+watch(knowledgeBasePickerVisible, (visible) => {
+  if (visible) {
+    return
+  }
+  knowledgeBasePickerKeyword.value = ''
+})
 
 onMounted(async () => {
   await initialize()
@@ -566,17 +631,39 @@ onUnmounted(() => {
       </div>
     </header>
 
-    <section class="control-strip app-shell-panel">
+    <section class="control-strip app-shell-panel" :class="{ 'is-general-scene': !isKnowledgeBaseScene }">
       <div class="control-block">
         <ModelSelector v-model="selectedModelId" :options="availableModels" :loading="optionLoading" />
       </div>
-      <div class="control-block is-wide">
+      <div v-if="isKnowledgeBaseScene" class="control-block is-wide">
         <KnowledgeBaseSelector
           v-model="selectedKbIds"
           :options="availableKnowledgeBases"
           :loading="optionLoading"
           :locked-kb-id="props.anchorKbId ?? null"
         />
+      </div>
+      <div v-else class="control-block control-summary">
+        <div class="control-summary-head">
+          <span>@知识库选择</span>
+          <small>{{ selectedKbIds.length }} 个已接入</small>
+        </div>
+        <p class="control-summary-copy">
+          首页场景不固定绑定知识库。你可以在输入区点击 `@知识库`，把本轮问题切换成临时多库检索模式。
+        </p>
+        <div v-if="selectedKnowledgeBases.length > 0" class="control-summary-tags">
+          <el-tag
+            v-for="knowledgeBase in selectedKnowledgeBases.slice(0, 4)"
+            :key="knowledgeBase.id"
+            effect="plain"
+            type="info"
+          >
+            @{{ knowledgeBase.kbName }}
+          </el-tag>
+          <span v-if="selectedKnowledgeBases.length > 4" class="control-summary-more">
+            +{{ selectedKnowledgeBases.length - 4 }}
+          </span>
+        </div>
       </div>
       <div class="control-block control-toggle">
         <div class="toggle-head">
@@ -785,7 +872,77 @@ onUnmounted(() => {
               <el-icon><Connection /></el-icon>
               <span>{{ composerPlaceholder }}</span>
             </div>
-            <span class="composer-tip">Enter 发送，Shift + Enter 换行</span>
+            <div class="composer-tools">
+              <el-popover
+                v-if="!isKnowledgeBaseScene"
+                v-model:visible="knowledgeBasePickerVisible"
+                placement="top-end"
+                :width="380"
+                trigger="click"
+                popper-class="composer-kb-popper"
+              >
+                <template #reference>
+                  <el-button plain size="small">@知识库</el-button>
+                </template>
+                <div class="composer-kb-picker">
+                  <div class="composer-kb-picker-head">
+                    <div>
+                      <strong>选择本轮检索知识库</strong>
+                      <span>支持多选，不选则走纯模型回答</span>
+                    </div>
+                    <el-button
+                      text
+                      size="small"
+                      :disabled="selectedKbIds.length === 0"
+                      @click="clearSelectedKnowledgeBases"
+                    >
+                      清空
+                    </el-button>
+                  </div>
+                  <el-input
+                    v-model="knowledgeBasePickerKeyword"
+                    clearable
+                    placeholder="搜索知识库编码或名称"
+                  />
+                  <div class="composer-kb-picker-list thin-scrollbar">
+                    <button
+                      v-for="knowledgeBase in filteredKnowledgeBases"
+                      :key="knowledgeBase.id"
+                      type="button"
+                      class="composer-kb-picker-item"
+                      :class="{ 'is-selected': selectedKbIds.includes(knowledgeBase.id) }"
+                      @click="toggleKnowledgeBaseSelection(knowledgeBase.id)"
+                    >
+                      <div class="composer-kb-picker-copy">
+                        <strong>{{ knowledgeBase.kbName }}</strong>
+                        <span>{{ knowledgeBase.kbCode }}</span>
+                      </div>
+                      <small>{{ selectedKbIds.includes(knowledgeBase.id) ? '已选择' : '点击接入' }}</small>
+                    </button>
+                    <div v-if="filteredKnowledgeBases.length === 0" class="composer-kb-picker-empty">
+                      未找到匹配知识库
+                    </div>
+                  </div>
+                </div>
+              </el-popover>
+              <span class="composer-tip">Enter 发送，Shift + Enter 换行</span>
+            </div>
+          </div>
+          <div v-if="!isKnowledgeBaseScene" class="composer-kb-strip">
+            <span class="composer-kb-strip-label">@ 当前知识库</span>
+            <div v-if="selectedKnowledgeBases.length > 0" class="composer-kb-strip-tags">
+              <el-tag
+                v-for="knowledgeBase in selectedKnowledgeBases"
+                :key="knowledgeBase.id"
+                closable
+                effect="plain"
+                type="info"
+                @close="removeSelectedKnowledgeBase(knowledgeBase.id)"
+              >
+                @{{ knowledgeBase.kbName }}
+              </el-tag>
+            </div>
+            <span v-else class="composer-kb-strip-empty">未选择，当前将走纯模型问答</span>
           </div>
           <el-input
             v-model="draftQuestion"
@@ -912,6 +1069,41 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+.control-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.control-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.control-summary-head span {
+  font-weight: 600;
+}
+
+.control-summary-copy,
+.control-summary-head small,
+.control-summary-more {
+  color: var(--text-muted);
+}
+
+.control-summary-copy {
+  margin: 0;
+  line-height: 1.7;
+}
+
+.control-summary-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .toggle-head span {
@@ -1267,9 +1459,15 @@ onUnmounted(() => {
 .composer-head {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   justify-content: space-between;
   gap: 12px;
+}
+
+.composer-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .composer-hint {
@@ -1277,6 +1475,124 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   color: var(--text-secondary);
+}
+
+.composer-kb-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 250, 244, 0.88);
+  border: 1px dashed rgba(157, 91, 47, 0.22);
+}
+
+.composer-kb-strip-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.composer-kb-strip-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.composer-kb-strip-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.composer-kb-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.composer-kb-picker-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.composer-kb-picker-head strong {
+  display: block;
+}
+
+.composer-kb-picker-head span {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.composer-kb-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.composer-kb-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(122, 89, 53, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.composer-kb-picker-item:hover,
+.composer-kb-picker-item.is-selected {
+  transform: translateY(-1px);
+  border-color: rgba(157, 91, 47, 0.24);
+  box-shadow: 0 10px 24px rgba(91, 58, 24, 0.08);
+}
+
+.composer-kb-picker-item small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.composer-kb-picker-copy {
+  min-width: 0;
+}
+
+.composer-kb-picker-copy strong,
+.composer-kb-picker-copy span {
+  display: block;
+}
+
+.composer-kb-picker-copy span {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.composer-kb-picker-empty {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .composer-actions {

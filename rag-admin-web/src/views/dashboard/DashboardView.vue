@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChatDotRound, Collection, Connection, List, Plus } from '@element-plus/icons-vue'
+import { ChatDotRound, Collection, Connection, List, Plus, Tickets } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -53,6 +53,16 @@ const quickEntries = [
     actionText: '查看任务',
     path: '/tasks',
     icon: List,
+    accent: 'is-light',
+  },
+  {
+    key: 'audit-logs',
+    eyebrow: '治理',
+    title: '进入审计日志',
+    description: '查看管理员操作轨迹，并快速筛选问答反馈类审计记录。',
+    actionText: '查看审计',
+    path: '/audit-logs',
+    icon: Tickets,
     accent: 'is-light',
   },
 ]

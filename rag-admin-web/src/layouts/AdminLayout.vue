@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ChatDotRound, Collection, Connection, DataAnalysis, Histogram, List, SwitchButton } from '@element-plus/icons-vue'
+import { ChatDotRound, Collection, Connection, DataAnalysis, Histogram, List, SwitchButton, Tickets } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { resolveErrorMessage } from '@/api/http'
 
@@ -19,6 +19,7 @@ const menuItems = [
   { index: '/models', label: '模型管理', icon: Connection },
   { index: '/vector-indexes', label: '向量索引', icon: DataAnalysis },
   { index: '/tasks', label: '任务监控', icon: List },
+  { index: '/audit-logs', label: '审计日志', icon: Tickets },
 ]
 
 async function handleLogout(): Promise<void> {

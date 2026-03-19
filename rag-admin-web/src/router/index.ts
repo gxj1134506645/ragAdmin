@@ -98,6 +98,14 @@ const router = createRouter({
           },
         },
         {
+          path: 'audit-logs',
+          name: 'audit-logs',
+          component: () => import('@/views/audit/AuditLogView.vue'),
+          meta: {
+            title: '审计日志',
+          },
+        },
+        {
           path: 'vector-indexes',
           name: 'vector-indexes',
           component: () => import('@/views/statistics/VectorIndexOverviewView.vue'),

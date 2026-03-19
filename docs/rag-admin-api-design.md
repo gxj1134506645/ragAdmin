@@ -643,6 +643,11 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 - `pageNo`
 - `pageSize`
 
+说明：
+
+- `bizType` 典型值包括：`AUTH`、`KNOWLEDGE_BASE`、`DOCUMENT`、`TASK`、`CHAT`、`CHAT_FEEDBACK`、`MODEL`、`AUDIT`、`SYSTEM`
+- 问答反馈提交会单独归类为 `CHAT_FEEDBACK`，便于后台治理侧筛选
+
 ### 8.2 模型调用统计
 
 - `GET /api/admin/statistics/model-calls`

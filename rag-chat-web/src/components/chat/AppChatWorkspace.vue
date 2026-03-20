@@ -156,7 +156,7 @@ const mentionKnowledgeBases = computed<KnowledgeBaseSummary[]>(() => {
 })
 
 const mentionPanelVisible = computed(() => {
-  return !isKnowledgeBaseScene.value && knowledgeBaseMentionState.value !== null
+  return !streaming.value && !isKnowledgeBaseScene.value && knowledgeBaseMentionState.value !== null
 })
 
 const currentModelName = computed(() => {
@@ -579,7 +579,7 @@ function handleClearView(): void {
 }
 
 function toggleKnowledgeBaseSelection(kbId: number): void {
-  if (isKnowledgeBaseScene.value) {
+  if (streaming.value || isKnowledgeBaseScene.value) {
     return
   }
   if (selectedKbIds.value.includes(kbId)) {
@@ -590,14 +590,14 @@ function toggleKnowledgeBaseSelection(kbId: number): void {
 }
 
 function removeSelectedKnowledgeBase(kbId: number): void {
-  if (isKnowledgeBaseScene.value) {
+  if (streaming.value || isKnowledgeBaseScene.value) {
     return
   }
   selectedKbIds.value = normalizeSelectedKbIds(selectedKbIds.value.filter((id) => id !== kbId))
 }
 
 function clearSelectedKnowledgeBases(): void {
-  if (isKnowledgeBaseScene.value) {
+  if (streaming.value || isKnowledgeBaseScene.value) {
     return
   }
   selectedKbIds.value = []
@@ -729,6 +729,9 @@ function moveMentionActiveIndex(offset: number): void {
 }
 
 function selectKnowledgeBaseFromMention(knowledgeBase: KnowledgeBaseSummary): void {
+  if (streaming.value) {
+    return
+  }
   const mentionState = knowledgeBaseMentionState.value
   selectedKbIds.value = normalizeSelectedKbIds([...selectedKbIds.value, knowledgeBase.id])
 
@@ -1035,13 +1038,19 @@ onUnmounted(() => {
 
     <section class="control-strip app-shell-panel" :class="{ 'is-general-scene': !isKnowledgeBaseScene }">
       <div class="control-block">
-        <ModelSelector v-model="selectedModelId" :options="availableModels" :loading="optionLoading" />
+        <ModelSelector
+          v-model="selectedModelId"
+          :options="availableModels"
+          :loading="optionLoading"
+          :disabled="streaming"
+        />
       </div>
       <div v-if="isKnowledgeBaseScene" class="control-block is-wide">
         <KnowledgeBaseSelector
           v-model="selectedKbIds"
           :options="availableKnowledgeBases"
           :loading="optionLoading"
+          :disabled="streaming"
           :locked-kb-id="props.anchorKbId ?? null"
         />
       </div>
@@ -1072,7 +1081,7 @@ onUnmounted(() => {
           <span>联网搜索</span>
           <small>Provider 不可用时服务端会优雅降级</small>
         </div>
-        <el-switch v-model="webSearchEnabled" />
+        <el-switch v-model="webSearchEnabled" :disabled="streaming" />
       </div>
     </section>
 
@@ -1281,10 +1290,11 @@ onUnmounted(() => {
                 placement="top-end"
                 :width="380"
                 trigger="click"
+                :disabled="streaming"
                 popper-class="composer-kb-popper"
               >
                 <template #reference>
-                  <el-button plain size="small">@知识库</el-button>
+                  <el-button plain size="small" :disabled="streaming">@知识库</el-button>
                 </template>
                 <div class="composer-kb-picker">
                   <div class="composer-kb-picker-head">
@@ -1295,7 +1305,7 @@ onUnmounted(() => {
                     <el-button
                       text
                       size="small"
-                      :disabled="selectedKbIds.length === 0"
+                      :disabled="streaming || selectedKbIds.length === 0"
                       @click="clearSelectedKnowledgeBases"
                     >
                       清空
@@ -1304,6 +1314,7 @@ onUnmounted(() => {
                   <el-input
                     v-model="knowledgeBasePickerKeyword"
                     clearable
+                    :disabled="streaming"
                     placeholder="搜索知识库编码或名称"
                   />
                   <div class="composer-kb-picker-list thin-scrollbar">
@@ -1313,6 +1324,7 @@ onUnmounted(() => {
                       type="button"
                       class="composer-kb-picker-item"
                       :class="{ 'is-selected': selectedKbIds.includes(knowledgeBase.id) }"
+                      :disabled="streaming"
                       @click="toggleKnowledgeBaseSelection(knowledgeBase.id)"
                     >
                       <div class="composer-kb-picker-copy">
@@ -1336,7 +1348,7 @@ onUnmounted(() => {
               <el-tag
                 v-for="knowledgeBase in selectedKnowledgeBases"
                 :key="knowledgeBase.id"
-                closable
+                :closable="!streaming"
                 effect="plain"
                 type="info"
                 @close="removeSelectedKnowledgeBase(knowledgeBase.id)"
@@ -1364,6 +1376,7 @@ onUnmounted(() => {
                     'is-active': index === knowledgeBaseMentionActiveIndex,
                     'is-selected': selectedKbIds.includes(knowledgeBase.id),
                   }"
+                  :disabled="streaming"
                   @mousedown.prevent="selectKnowledgeBaseFromMention(knowledgeBase)"
                   @mouseenter="knowledgeBaseMentionActiveIndex = index"
                 >

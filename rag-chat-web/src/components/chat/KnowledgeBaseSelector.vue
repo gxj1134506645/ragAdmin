@@ -6,6 +6,7 @@ const props = defineProps<{
   modelValue: number[]
   options: KnowledgeBaseSummary[]
   loading?: boolean
+  disabled?: boolean
   lockedKbId?: number | null
 }>()
 
@@ -50,6 +51,7 @@ function handleChange(values: number[]): void {
       collapse-tags-tooltip
       :max-collapse-tags="2"
       :loading="loading"
+      :disabled="disabled"
       placeholder="可为空，表示纯模型问答"
       @change="handleChange"
     >

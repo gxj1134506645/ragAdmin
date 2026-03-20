@@ -5,6 +5,7 @@ defineProps<{
   modelValue?: number | null
   options: ModelSummary[]
   loading?: boolean
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -31,6 +32,7 @@ function handleChange(value: number | string | boolean | undefined): void {
       filterable
       clearable
       :loading="loading"
+      :disabled="disabled"
       placeholder="选择当前会话使用的模型"
       @change="handleChange"
     >

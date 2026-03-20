@@ -53,6 +53,8 @@ export interface UpdateSessionKnowledgeBasesRequest {
 
 export interface UpdateChatSessionRequest {
   sessionName: string
+  chatModelId: number | null
+  webSearchEnabled: boolean
 }
 
 export interface ChatRequest {

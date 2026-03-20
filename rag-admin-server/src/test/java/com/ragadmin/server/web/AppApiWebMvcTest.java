@@ -330,7 +330,7 @@ class AppApiWebMvcTest {
     @Test
     void shouldRenameAppChatSessionWhenBearerTokenIsValid() throws Exception {
         when(authService.authenticateAccessToken("access-token", AuthService.APP_LOGIN_TYPE)).thenReturn(authenticatedUser());
-        when(appChatService.renameSession(eq(22L), eq("新的会话名"), any())).thenReturn(new AppChatSessionResponse(
+        when(appChatService.updateSession(eq(22L), any(), any())).thenReturn(new AppChatSessionResponse(
                 22L,
                 null,
                 "GENERAL",
@@ -346,7 +346,9 @@ class AppApiWebMvcTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "sessionName": "新的会话名"
+                                  "sessionName": "新的会话名",
+                                  "chatModelId": 1,
+                                  "webSearchEnabled": false
                                 }
                                 """))
                 .andExpect(status().isOk())

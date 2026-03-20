@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ragadmin.server.app.dto.AppChatRequest;
 import com.ragadmin.server.app.dto.AppChatSessionResponse;
 import com.ragadmin.server.app.dto.AppCreateChatSessionRequest;
+import com.ragadmin.server.app.dto.AppUpdateChatSessionRequest;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.chat.ChatSceneTypes;
 import com.ragadmin.server.chat.ChatTerminalTypes;
@@ -211,13 +212,35 @@ public class AppChatService {
     }
 
     @Transactional
-    public AppChatSessionResponse renameSession(Long sessionId, String sessionName, AuthenticatedUser user) {
+    public AppChatSessionResponse updateSession(Long sessionId, AppUpdateChatSessionRequest request, AuthenticatedUser user) {
         ChatSessionEntity session = requireAppSession(sessionId, user.getUserId());
-        String normalizedSessionName = sessionName.trim();
+        boolean changed = false;
+
+        String normalizedSessionName = request.getSessionName().trim();
         if (!Objects.equals(normalizedSessionName, session.getSessionName())) {
             session.setSessionName(normalizedSessionName);
+            changed = true;
+        }
+
+        if (request.getChatModelId() != null) {
+            // 前台会话层面显式切换模型时，先校验模型是否存在且具备聊天能力。
+            modelService.resolveChatModelDescriptor(request.getChatModelId());
+        }
+        if (!Objects.equals(request.getChatModelId(), session.getModelId())) {
+            session.setModelId(request.getChatModelId());
+            changed = true;
+        }
+
+        boolean normalizedWebSearchEnabled = Boolean.TRUE.equals(request.getWebSearchEnabled());
+        if (!Objects.equals(normalizedWebSearchEnabled, Boolean.TRUE.equals(session.getWebSearchEnabled()))) {
+            session.setWebSearchEnabled(normalizedWebSearchEnabled);
+            changed = true;
+        }
+
+        if (changed) {
             chatSessionMapper.updateById(session);
         }
+
         return toSessionResponse(
                 session,
                 loadSelectedKnowledgeBaseIds(session.getId()).getOrDefault(session.getId(), defaultSelectedKnowledgeBaseIds(session))

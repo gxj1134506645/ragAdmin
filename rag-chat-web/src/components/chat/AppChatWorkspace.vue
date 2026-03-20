@@ -13,6 +13,7 @@ import {
   streamChatMessage,
   type ChatStreamHandle,
   updateChatSession,
+  updateSessionKnowledgeBases,
 } from '@/api/chat'
 import { listKnowledgeBases } from '@/api/knowledge-base'
 import { listModels } from '@/api/model'
@@ -40,6 +41,18 @@ interface KnowledgeBaseMentionState {
   keyword: string
   start: number
   end: number
+}
+
+interface SessionMetadataPayload {
+  sessionId: number
+  sessionName: string
+  chatModelId: number | null
+  webSearchEnabled: boolean
+}
+
+interface SessionKnowledgeBasePayload {
+  sessionId: number
+  selectedKbIds: number[]
 }
 
 const props = defineProps<Props>()
@@ -70,9 +83,12 @@ const knowledgeBasePickerVisible = ref(false)
 const knowledgeBasePickerKeyword = ref('')
 const knowledgeBaseMentionState = ref<KnowledgeBaseMentionState | null>(null)
 const knowledgeBaseMentionActiveIndex = ref(0)
+const preferencePersistencePauseDepth = ref(0)
 
 let streamHandle: ChatStreamHandle | null = null
 let composerBlurTimer: number | null = null
+let sessionMetadataSyncTask: Promise<void> = Promise.resolve()
+let sessionKnowledgeBaseSyncTask: Promise<void> = Promise.resolve()
 
 const isKnowledgeBaseScene = computed(() => props.sceneType === 'KNOWLEDGE_BASE')
 const sessionPanelTitle = computed(() => {
@@ -154,6 +170,13 @@ const hasConversation = computed(() => {
   return messages.value.length > 0 || pendingExchange.value !== null
 })
 
+const activeSession = computed<ChatSession | null>(() => {
+  if (activeSessionId.value === null) {
+    return null
+  }
+  return sessions.value.find((item) => item.id === activeSessionId.value) ?? null
+})
+
 const composerPlaceholder = computed(() => {
   return isKnowledgeBaseScene.value
     ? '输入问题后，将在当前知识库基础上执行检索增强问答'
@@ -190,14 +213,24 @@ function resetKnowledgeBasePickerState(): void {
   knowledgeBaseMentionActiveIndex.value = 0
 }
 
+function suspendPreferencePersistence(mutator: () => void): void {
+  preferencePersistencePauseDepth.value += 1
+  mutator()
+  void nextTick(() => {
+    preferencePersistencePauseDepth.value = Math.max(0, preferencePersistencePauseDepth.value - 1)
+  })
+}
+
 function applySessionPreferences(session: ChatSession | null): void {
-  if (!session) {
-    resetPreferenceInputs()
-    return
-  }
-  selectedKbIds.value = normalizeSelectedKbIds(session.selectedKbIds)
-  selectedModelId.value = session.chatModelId ?? undefined
-  webSearchEnabled.value = Boolean(session.webSearchEnabled)
+  suspendPreferencePersistence(() => {
+    if (!session) {
+      resetPreferenceInputs()
+      return
+    }
+    selectedKbIds.value = normalizeSelectedKbIds(session.selectedKbIds)
+    selectedModelId.value = session.chatModelId ?? undefined
+    webSearchEnabled.value = Boolean(session.webSearchEnabled)
+  })
 }
 
 function replaceSessionLocal(sessionId: number, patch: Partial<ChatSession>): void {
@@ -216,6 +249,87 @@ function closeStream(): void {
   streamHandle?.close()
   streamHandle = null
   streaming.value = false
+}
+
+function isSameNumberArray(left: number[], right: number[]): boolean {
+  if (left.length !== right.length) {
+    return false
+  }
+  return left.every((value, index) => value === right[index])
+}
+
+function buildSessionMetadataPayload(): SessionMetadataPayload | null {
+  const session = activeSession.value
+  if (!session) {
+    return null
+  }
+  return {
+    sessionId: session.id,
+    sessionName: session.sessionName,
+    chatModelId: selectedModelId.value ?? null,
+    webSearchEnabled: webSearchEnabled.value,
+  }
+}
+
+function buildSessionKnowledgeBasePayload(): SessionKnowledgeBasePayload | null {
+  const session = activeSession.value
+  if (!session) {
+    return null
+  }
+  return {
+    sessionId: session.id,
+    selectedKbIds: [...selectedKbIds.value],
+  }
+}
+
+async function persistSessionMetadata(payload: SessionMetadataPayload): Promise<void> {
+  try {
+    const updated = await updateChatSession(payload.sessionId, {
+      sessionName: payload.sessionName,
+      chatModelId: payload.chatModelId,
+      webSearchEnabled: payload.webSearchEnabled,
+    })
+    replaceSessionLocal(payload.sessionId, {
+      sessionName: updated.sessionName,
+      chatModelId: updated.chatModelId,
+      webSearchEnabled: updated.webSearchEnabled,
+    })
+  } catch (error) {
+    ElMessage.error(resolveChatStreamError(error))
+  }
+}
+
+async function persistSessionKnowledgeBases(payload: SessionKnowledgeBasePayload): Promise<void> {
+  try {
+    const updated = await updateSessionKnowledgeBases(payload.sessionId, {
+      selectedKbIds: payload.selectedKbIds,
+    })
+    replaceSessionLocal(payload.sessionId, {
+      selectedKbIds: [...updated.selectedKbIds],
+    })
+  } catch (error) {
+    ElMessage.error(resolveChatStreamError(error))
+  }
+}
+
+function queueSessionMetadataPersistence(): void {
+  const payload = buildSessionMetadataPayload()
+  if (!payload) {
+    return
+  }
+  sessionMetadataSyncTask = sessionMetadataSyncTask
+    .catch(() => undefined)
+    .then(() => persistSessionMetadata(payload))
+}
+
+function queueSessionKnowledgeBasePersistence(): void {
+  const payload = buildSessionKnowledgeBasePayload()
+  if (!payload) {
+    return
+  }
+  sessionKnowledgeBaseSyncTask = sessionKnowledgeBaseSyncTask
+    .catch(() => undefined)
+    .then(() => persistSessionKnowledgeBases(payload))
 }
 
 async function scrollToBottom(): Promise<void> {
@@ -722,11 +836,16 @@ async function handleRenameSession(session: ChatSession): Promise<void> {
       return
     }
     sessionActionLoadingId.value = session.id
-    const updated = await updateChatSession(session.id, { sessionName: normalizedName })
-    replaceSessionLocal(session.id, updated)
-    if (session.id === activeSessionId.value) {
-      applySessionPreferences(updated)
-    }
+    const updated = await updateChatSession(session.id, {
+      sessionName: normalizedName,
+      chatModelId: session.id === activeSessionId.value ? (selectedModelId.value ?? null) : session.chatModelId,
+      webSearchEnabled: session.id === activeSessionId.value ? webSearchEnabled.value : session.webSearchEnabled,
+    })
+    replaceSessionLocal(session.id, {
+      sessionName: updated.sessionName,
+      chatModelId: updated.chatModelId,
+      webSearchEnabled: updated.webSearchEnabled,
+    })
     ElMessage.success('会话已重命名')
   } catch (error) {
     if (error === 'cancel' || error === 'close') {
@@ -818,6 +937,39 @@ watch(
   async () => {
     resetKnowledgeBasePickerState()
     await initialize()
+  },
+)
+
+watch(
+  () => [selectedModelId.value ?? null, webSearchEnabled.value] as const,
+  ([nextModelId, nextWebSearchEnabled], [prevModelId, prevWebSearchEnabled]) => {
+    if (preferencePersistencePauseDepth.value > 0 || activeSessionId.value === null) {
+      return
+    }
+    if (nextModelId === prevModelId && nextWebSearchEnabled === prevWebSearchEnabled) {
+      return
+    }
+    replaceSessionLocal(activeSessionId.value, {
+      chatModelId: nextModelId,
+      webSearchEnabled: nextWebSearchEnabled,
+    })
+    queueSessionMetadataPersistence()
+  },
+)
+
+watch(
+  selectedKbIds,
+  (nextValue, prevValue) => {
+    if (preferencePersistencePauseDepth.value > 0 || activeSessionId.value === null) {
+      return
+    }
+    if (isSameNumberArray(nextValue, prevValue ?? [])) {
+      return
+    }
+    replaceSessionLocal(activeSessionId.value, {
+      selectedKbIds: [...nextValue],
+    })
+    queueSessionKnowledgeBasePersistence()
   },
 )
 

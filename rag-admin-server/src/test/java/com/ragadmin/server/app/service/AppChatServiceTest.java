@@ -3,6 +3,7 @@ package com.ragadmin.server.app.service;
 import com.ragadmin.server.app.dto.AppChatRequest;
 import com.ragadmin.server.app.dto.AppChatSessionResponse;
 import com.ragadmin.server.app.dto.AppCreateChatSessionRequest;
+import com.ragadmin.server.app.dto.AppUpdateChatSessionRequest;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.chat.ChatSceneTypes;
 import com.ragadmin.server.chat.ChatTerminalTypes;
@@ -183,13 +184,15 @@ class AppChatServiceTest {
     }
 
     @Test
-    void shouldRenameOwnedAppSessionAndKeepSelection() {
+    void shouldUpdateOwnedAppSessionMetadataAndKeepSelection() {
         ChatSessionEntity session = new ChatSessionEntity();
         session.setId(301L);
         session.setUserId(4001L);
         session.setSceneType(ChatSceneTypes.GENERAL);
         session.setTerminalType(ChatTerminalTypes.APP);
         session.setSessionName("旧名称");
+        session.setModelId(7L);
+        session.setWebSearchEnabled(Boolean.FALSE);
         session.setStatus("ENABLED");
 
         ChatSessionKnowledgeBaseRelEntity rel = new ChatSessionKnowledgeBaseRelEntity();
@@ -197,16 +200,61 @@ class AppChatServiceTest {
         rel.setKbId(66L);
         rel.setSortNo(1);
 
+        AppUpdateChatSessionRequest request = new AppUpdateChatSessionRequest();
+        request.setSessionName("  新名称  ");
+        request.setChatModelId(88L);
+        request.setWebSearchEnabled(Boolean.TRUE);
+
         when(chatSessionMapper.selectById(301L)).thenReturn(session);
         when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of(rel));
+        when(modelService.resolveChatModelDescriptor(88L)).thenReturn(new ModelService.ChatModelDescriptor(
+                88L,
+                "qwen-plus",
+                "BAILIAN",
+                "百炼"
+        ));
 
-        AppChatSessionResponse response = appChatService.renameSession(301L, "  新名称  ", user(4001L));
+        AppChatSessionResponse response = appChatService.updateSession(301L, request, user(4001L));
 
         ArgumentCaptor<ChatSessionEntity> sessionCaptor = ArgumentCaptor.forClass(ChatSessionEntity.class);
         verify(chatSessionMapper).updateById(sessionCaptor.capture());
         assertEquals("新名称", sessionCaptor.getValue().getSessionName());
+        assertEquals(88L, sessionCaptor.getValue().getModelId());
+        assertTrue(Boolean.TRUE.equals(sessionCaptor.getValue().getWebSearchEnabled()));
         assertEquals("新名称", response.sessionName());
+        assertEquals(88L, response.chatModelId());
+        assertTrue(response.webSearchEnabled());
         assertIterableEquals(List.of(66L), response.selectedKbIds());
+    }
+
+    @Test
+    void shouldClearExplicitChatModelWhenSessionFallsBackToDefault() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(302L);
+        session.setUserId(4002L);
+        session.setSceneType(ChatSceneTypes.GENERAL);
+        session.setTerminalType(ChatTerminalTypes.APP);
+        session.setSessionName("首页会话");
+        session.setModelId(99L);
+        session.setWebSearchEnabled(Boolean.TRUE);
+        session.setStatus("ENABLED");
+
+        AppUpdateChatSessionRequest request = new AppUpdateChatSessionRequest();
+        request.setSessionName("首页会话");
+        request.setChatModelId(null);
+        request.setWebSearchEnabled(Boolean.FALSE);
+
+        when(chatSessionMapper.selectById(302L)).thenReturn(session);
+        when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of());
+
+        AppChatSessionResponse response = appChatService.updateSession(302L, request, user(4002L));
+
+        ArgumentCaptor<ChatSessionEntity> sessionCaptor = ArgumentCaptor.forClass(ChatSessionEntity.class);
+        verify(chatSessionMapper).updateById(sessionCaptor.capture());
+        assertEquals(null, sessionCaptor.getValue().getModelId());
+        assertTrue(Boolean.FALSE.equals(sessionCaptor.getValue().getWebSearchEnabled()));
+        assertEquals(null, response.chatModelId());
+        assertTrue(!response.webSearchEnabled());
     }
 
     @Test

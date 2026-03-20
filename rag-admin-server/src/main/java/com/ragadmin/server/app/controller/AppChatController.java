@@ -72,9 +72,9 @@ public class AppChatController {
             @Valid @RequestBody AppUpdateChatSessionRequest request,
             HttpServletRequest httpServletRequest
     ) {
-        return ApiResponse.success(appChatService.renameSession(
+        return ApiResponse.success(appChatService.updateSession(
                 sessionId,
-                request.getSessionName(),
+                request,
                 currentUser(httpServletRequest)
         ));
     }

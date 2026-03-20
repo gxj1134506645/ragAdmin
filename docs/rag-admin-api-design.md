@@ -755,7 +755,27 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 
 - `GET /api/app/chat/sessions/{sessionId}/messages`
 
-### 7.10 前台更新会话知识库集合
+### 7.10 前台更新会话元数据
+
+- `PUT /api/app/chat/sessions/{sessionId}`
+
+请求体：
+
+```json
+{
+  "sessionName": "新的会话名称",
+  "chatModelId": 1,
+  "webSearchEnabled": false
+}
+```
+
+说明：
+
+- 前台会话名称、显式聊天模型和联网开关统一在该接口内更新
+- `chatModelId=null` 表示清空显式模型，回退到系统默认模型或知识库默认聊天模型
+- 前台工作台切换模型或联网开关后，会使用该接口即时持久化当前会话偏好
+
+### 7.11 前台更新会话知识库集合
 
 - `PUT /api/app/chat/sessions/{sessionId}/knowledge-bases`
 
@@ -767,7 +787,7 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 }
 ```
 
-### 7.11 前台发起流式问答
+### 7.12 前台发起流式问答
 
 - `POST /api/app/chat/sessions/{sessionId}/messages/stream`
 - `Content-Type: application/json`
@@ -790,7 +810,7 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 - `chatModelId` 为运行时模型选择，优先级高于知识库默认聊天模型
 - `webSearchEnabled=true` 时，由后端按 `WebSearchProvider` 配置决定是否补充联网搜索上下文
 
-### 7.12 前台提交反馈
+### 7.13 前台提交反馈
 
 - `POST /api/app/chat/messages/{messageId}/feedback`
 
@@ -861,6 +881,7 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 
 - `GET /api/admin/documents/{documentId}/chunks`
 - `POST /api/admin/tasks/{taskId}/retry`
+- `PUT /api/app/chat/sessions/{sessionId}`
 - `POST /api/admin/chat/messages/{messageId}/feedback`
 - `PUT /api/app/chat/sessions/{sessionId}/knowledge-bases`
 - `POST /api/app/chat/messages/{messageId}/feedback`

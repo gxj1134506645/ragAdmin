@@ -3,9 +3,14 @@ package com.ragadmin.server.infra.ai.chat;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ragadmin.server.chat.entity.ChatMessageEntity;
+import com.ragadmin.server.chat.entity.ChatSessionEntity;
 import com.ragadmin.server.chat.entity.ChatSessionMemorySummaryEntity;
 import com.ragadmin.server.chat.mapper.ChatMessageMapper;
+import com.ragadmin.server.chat.mapper.ChatSessionMapper;
 import com.ragadmin.server.chat.mapper.ChatSessionMemorySummaryMapper;
+import com.ragadmin.server.model.service.ModelService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -17,15 +22,21 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class SpringAiConversationMemoryManager implements ConversationMemoryManager {
+
+    private static final Logger log = LoggerFactory.getLogger(SpringAiConversationMemoryManager.class);
 
     @Autowired
     private ChatMemory chatMemory;
 
     @Autowired
     private ChatMessageMapper chatMessageMapper;
+
+    @Autowired
+    private ChatSessionMapper chatSessionMapper;
 
     @Autowired
     private ChatSessionMemorySummaryMapper chatSessionMemorySummaryMapper;
@@ -39,6 +50,15 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
     @Autowired
     private ChatMemoryProperties chatMemoryProperties;
 
+    @Autowired
+    private ConversationSummaryGenerator conversationSummaryGenerator;
+
+    @Autowired
+    private ConversationSummaryLockManager conversationSummaryLockManager;
+
+    @Autowired
+    private ModelService modelService;
+
     @Override
     public void clear(String conversationId) {
         chatMemory.clear(conversationId);
@@ -51,6 +71,27 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
             return;
         }
 
+        Optional<ConversationSummaryLockManager.LockToken> lockToken = Optional.empty();
+        try {
+            lockToken = conversationSummaryLockManager.tryLock(conversationId);
+            if (lockToken.isEmpty()) {
+                log.debug("会话摘要刷新跳过，未获取到锁，conversationId={}", conversationId);
+                return;
+            }
+            doRefresh(conversationId, sessionId);
+        } catch (Exception ex) {
+            // 记忆刷新属于附属链路，失败不能回滚主问答结果。
+            log.warn("会话记忆刷新失败，conversationId={}, sessionId={}", conversationId, sessionId, ex);
+        } finally {
+            lockToken.ifPresent(token -> {
+                if (!conversationSummaryLockManager.unlock(token)) {
+                    log.debug("会话摘要刷新锁释放失败，conversationId={}", conversationId);
+                }
+            });
+        }
+    }
+
+    private void doRefresh(String conversationId, Long sessionId) {
         List<ChatMessageEntity> exchanges = chatMessageMapper.selectList(new LambdaQueryWrapper<ChatMessageEntity>()
                 .eq(ChatMessageEntity::getSessionId, sessionId)
                 .orderByAsc(ChatMessageEntity::getId));
@@ -61,8 +102,9 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
             return;
         }
 
-        String summaryText = buildSummaryText(exchanges);
-        upsertSummary(sessionId, conversationId, summaryText, exchanges);
+        List<ChatMessageEntity> olderExchanges = buildOlderExchanges(exchanges);
+        String summaryText = buildSummaryText(conversationId, sessionId, olderExchanges);
+        upsertSummary(sessionId, conversationId, summaryText, olderExchanges);
         redisShortTermChatMemoryStore.save(
                 conversationId,
                 redisShortTermChatMemoryStore.build(summaryText, buildRecentMessages(exchanges))
@@ -73,7 +115,7 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
             Long sessionId,
             String conversationId,
             String summaryText,
-            List<ChatMessageEntity> exchanges
+            List<ChatMessageEntity> olderExchanges
     ) {
         ChatSessionMemorySummaryEntity existing = chatSessionMemorySummaryMapper.selectOne(
                 new LambdaQueryWrapper<ChatSessionMemorySummaryEntity>()
@@ -91,9 +133,9 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
         entity.setSessionId(sessionId);
         entity.setConversationId(conversationId);
         entity.setSummaryText(summaryText);
-        entity.setCompressedMessageCount(Math.max(0, exchanges.size() - Math.max(1, chatMemoryProperties.getShortTermRounds())));
-        entity.setCompressedUntilMessageId(resolveCompressedUntilMessageId(exchanges));
-        entity.setLastSourceMessageId(exchanges.get(exchanges.size() - 1).getId());
+        entity.setCompressedMessageCount(olderExchanges.size());
+        entity.setCompressedUntilMessageId(resolveCompressedUntilMessageId(olderExchanges));
+        entity.setLastSourceMessageId(resolveLastSourceMessageId(olderExchanges));
         entity.setUpdatedAt(LocalDateTime.now());
         if (existing == null) {
             entity.setSummaryVersion(1);
@@ -104,12 +146,18 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
         chatSessionMemorySummaryMapper.updateById(entity);
     }
 
-    private Long resolveCompressedUntilMessageId(List<ChatMessageEntity> exchanges) {
-        int keepRounds = Math.max(1, chatMemoryProperties.getShortTermRounds());
-        if (exchanges.size() <= keepRounds) {
+    private Long resolveCompressedUntilMessageId(List<ChatMessageEntity> olderExchanges) {
+        if (olderExchanges.isEmpty()) {
             return null;
         }
-        return exchanges.get(exchanges.size() - keepRounds - 1).getId();
+        return olderExchanges.get(olderExchanges.size() - 1).getId();
+    }
+
+    private Long resolveLastSourceMessageId(List<ChatMessageEntity> olderExchanges) {
+        if (olderExchanges.isEmpty()) {
+            return null;
+        }
+        return olderExchanges.get(olderExchanges.size() - 1).getId();
     }
 
     private List<Message> buildRecentMessages(List<ChatMessageEntity> exchanges) {
@@ -129,45 +177,50 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
         return messages;
     }
 
-    private String buildSummaryText(List<ChatMessageEntity> exchanges) {
+    private List<ChatMessageEntity> buildOlderExchanges(List<ChatMessageEntity> exchanges) {
         int keepRounds = Math.max(1, chatMemoryProperties.getShortTermRounds());
         if (exchanges.size() <= keepRounds) {
-            return null;
+            return List.of();
         }
-        List<ChatMessageEntity> olderExchanges = exchanges.subList(0, exchanges.size() - keepRounds);
-        StringBuilder builder = new StringBuilder("历史对话摘要：\n");
-        int maxLength = Math.max(200, chatMemoryProperties.getSummaryMaxLength());
-        for (ChatMessageEntity exchange : olderExchanges) {
-            appendLine(builder, "用户：", exchange.getQuestionText(), maxLength);
-            appendLine(builder, "助手：", exchange.getAnswerText(), maxLength);
-            if (builder.length() >= maxLength) {
-                break;
-            }
-        }
-        String summary = builder.toString().trim();
-        if (summary.length() <= maxLength) {
-            return summary;
-        }
-        return summary.substring(0, maxLength - 3) + "...";
+        return new ArrayList<>(exchanges.subList(0, exchanges.size() - keepRounds));
     }
 
-    private void appendLine(StringBuilder builder, String prefix, String text, int maxLength) {
-        if (!StringUtils.hasText(text) || builder.length() >= maxLength) {
-            return;
+    private String buildSummaryText(String conversationId, Long sessionId, List<ChatMessageEntity> olderExchanges) {
+        if (olderExchanges.isEmpty()) {
+            return null;
         }
-        String normalized = text.replaceAll("\\s+", " ").trim();
-        if (!StringUtils.hasText(normalized)) {
-            return;
+        ModelService.ChatModelDescriptor chatModelDescriptor = resolveSummaryModel(sessionId, conversationId);
+        ConversationSummaryResult result = conversationSummaryGenerator.generate(new ConversationSummaryRequest(
+                conversationId,
+                chatModelDescriptor == null ? null : chatModelDescriptor.providerCode(),
+                chatModelDescriptor == null ? null : chatModelDescriptor.modelCode(),
+                buildSummaryMessages(olderExchanges),
+                chatMemoryProperties.getSummaryMaxLength()
+        ));
+        return result == null ? null : result.summaryText();
+    }
+
+    private ModelService.ChatModelDescriptor resolveSummaryModel(Long sessionId, String conversationId) {
+        try {
+            ChatSessionEntity session = chatSessionMapper.selectById(sessionId);
+            Long modelId = session == null ? null : session.getModelId();
+            return modelService.resolveChatModelDescriptor(modelId);
+        } catch (Exception ex) {
+            log.warn("解析会话摘要模型失败，conversationId={}, sessionId={}", conversationId, sessionId, ex);
+            return null;
         }
-        int remaining = maxLength - builder.length();
-        if (remaining <= prefix.length() + 1) {
-            return;
+    }
+
+    private List<ChatModelClient.ChatMessage> buildSummaryMessages(List<ChatMessageEntity> exchanges) {
+        List<ChatModelClient.ChatMessage> messages = new ArrayList<>(exchanges.size() * 2);
+        for (ChatMessageEntity exchange : exchanges) {
+            if (StringUtils.hasText(exchange.getQuestionText())) {
+                messages.add(new ChatModelClient.ChatMessage("user", exchange.getQuestionText()));
+            }
+            if (StringUtils.hasText(exchange.getAnswerText())) {
+                messages.add(new ChatModelClient.ChatMessage("assistant", exchange.getAnswerText()));
+            }
         }
-        int textLimit = Math.min(normalized.length(), Math.max(16, remaining - prefix.length() - 1));
-        builder.append(prefix).append(normalized, 0, textLimit);
-        if (textLimit < normalized.length()) {
-            builder.append("...");
-        }
-        builder.append('\n');
+        return messages;
     }
 }

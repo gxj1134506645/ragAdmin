@@ -29,7 +29,7 @@ import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
-import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
+import com.ragadmin.server.infra.ai.chat.ConversationMemoryRefreshDispatcher;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.service.ModelService;
@@ -89,7 +89,7 @@ public class ChatService {
     private ChatExchangePersistenceService chatExchangePersistenceService;
 
     @Autowired
-    private ConversationMemoryManager conversationMemoryManager;
+    private ConversationMemoryRefreshDispatcher conversationMemoryRefreshDispatcher;
 
     @Autowired
     private ConversationIdCodec conversationIdCodec;
@@ -206,7 +206,7 @@ public class ChatService {
                 latencyMs,
                 execution.retrievalResult()
         );
-        conversationMemoryManager.refresh(execution.conversationId());
+        conversationMemoryRefreshDispatcher.dispatchRefresh(execution.conversationId());
         return response;
     }
 
@@ -246,7 +246,7 @@ public class ChatService {
                             (int) Duration.between(start, Instant.now()).toMillis(),
                             execution.retrievalResult()
                     );
-                    conversationMemoryManager.refresh(execution.conversationId());
+                    conversationMemoryRefreshDispatcher.dispatchRefresh(execution.conversationId());
                     return ChatStreamEventResponse.complete(response);
                 }))
                 .onErrorResume(ex -> Flux.just(ChatStreamEventResponse.error(resolveStreamErrorMessage(ex))));

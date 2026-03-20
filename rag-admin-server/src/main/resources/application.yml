@@ -95,6 +95,7 @@ rag:
       summary-trigger-token-threshold: 4000
       summary-max-length: 2000
       summary-lock-seconds: 30
+      refresh-max-concurrency: 8
       redis-key-prefix: rag:chat:memory
   document:
     parse:

@@ -43,6 +43,11 @@ public class ChatMemoryProperties {
     private int summaryLockSeconds = 30;
 
     /**
+     * 会话记忆后台刷新最大并发数。
+     */
+    private int refreshMaxConcurrency = 8;
+
+    /**
      * Redis key 前缀。
      */
     private String redisKeyPrefix = "rag:chat:memory";

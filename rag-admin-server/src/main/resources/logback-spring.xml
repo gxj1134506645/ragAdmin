@@ -4,9 +4,9 @@
 
     <property name="LOG_HOME" value="${LOG_HOME:-logs}"/>
     <property name="CONSOLE_PATTERN"
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId:-},%X{requestId:-},%X{taskId:-}] - %msg%n%wEx"/>
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId:-},%X{requestId:-},%X{taskId:-}] - %msg%n%ex"/>
     <property name="FILE_PATTERN"
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{48} [%X{traceId:-},%X{requestId:-},%X{taskId:-}] - %msg%n%wEx"/>
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{48} [%X{traceId:-},%X{requestId:-},%X{taskId:-}] - %msg%n%ex"/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>

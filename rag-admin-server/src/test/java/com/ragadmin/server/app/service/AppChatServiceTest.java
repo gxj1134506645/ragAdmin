@@ -1,5 +1,6 @@
 package com.ragadmin.server.app.service;
 
+import com.ragadmin.server.app.dto.AppChatRequest;
 import com.ragadmin.server.app.dto.AppChatSessionResponse;
 import com.ragadmin.server.app.dto.AppCreateChatSessionRequest;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
@@ -18,10 +19,13 @@ import com.ragadmin.server.chat.mapper.ChatSessionMapper;
 import com.ragadmin.server.chat.service.ChatExchangePersistenceService;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
+import com.ragadmin.server.infra.ai.chat.ChatModelClient;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryRefreshDispatcher;
+import com.ragadmin.server.infra.search.WebSearchProvider;
+import com.ragadmin.server.infra.search.WebSearchSnippet;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.service.ModelService;
@@ -35,11 +39,15 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -89,6 +97,9 @@ class AppChatServiceTest {
 
     @Mock
     private ChatExchangePersistenceService chatExchangePersistenceService;
+
+    @Mock
+    private WebSearchProvider webSearchProvider;
 
     @Spy
     private ConversationIdCodec conversationIdCodec = new ConversationIdCodec();
@@ -223,6 +234,128 @@ class AppChatServiceTest {
         verify(chatSessionKnowledgeBaseRelMapper).delete(any());
         verify(conversationMemoryManager).clear("chat-terminal-app-scene-general-user-5001-session-401");
         verify(chatSessionMapper).deleteById(401L);
+    }
+
+    @Test
+    void shouldIgnoreWebSearchFailureAndUseRequestedModelWhenChatting() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(501L);
+        session.setUserId(6001L);
+        session.setSceneType(ChatSceneTypes.GENERAL);
+        session.setTerminalType(ChatTerminalTypes.APP);
+        session.setSessionName("首页会话");
+        session.setStatus("ENABLED");
+
+        AppChatRequest request = new AppChatRequest();
+        request.setQuestion("今天适合安排哪些工作？");
+        request.setChatModelId(901L);
+        request.setWebSearchEnabled(Boolean.TRUE);
+
+        ModelService.ChatModelDescriptor modelDescriptor = new ModelService.ChatModelDescriptor(
+                901L,
+                "qwen-plus",
+                "BAILIAN",
+                "百炼"
+        );
+        RetrievalService.RetrievalResult retrievalResult = new RetrievalService.RetrievalResult(List.of(), "");
+
+        when(chatSessionMapper.selectById(501L)).thenReturn(session);
+        when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of());
+        when(webSearchProvider.search("今天适合安排哪些工作？", 5)).thenThrow(new RuntimeException("search down"));
+        when(modelService.resolveChatModelDescriptor(901L)).thenReturn(modelDescriptor);
+        when(conversationChatClient.chat(eq("BAILIAN"), eq("qwen-plus"), any(), any(), any()))
+                .thenReturn(new ChatModelClient.ChatCompletionResult("建议先处理高优先级事项。", 80, 20));
+        when(chatExchangePersistenceService.persistExchange(
+                eq(session),
+                eq(6001L),
+                eq("今天适合安排哪些工作？"),
+                eq("建议先处理高优先级事项。"),
+                eq(901L),
+                eq(80),
+                eq(20),
+                anyInt(),
+                eq(retrievalResult)
+        )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
+                1001L,
+                "建议先处理高优先级事项。",
+                List.of(),
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(80, 20)
+        ));
+
+        com.ragadmin.server.chat.dto.ChatResponse response = appChatService.chat(501L, request, user(6001L));
+
+        ArgumentCaptor<List<ChatModelClient.ChatMessage>> promptCaptor = ArgumentCaptor.forClass(List.class);
+        verify(conversationChatClient).chat(eq("BAILIAN"), eq("qwen-plus"), any(), promptCaptor.capture(), any());
+        List<ChatModelClient.ChatMessage> promptMessages = promptCaptor.getValue();
+        assertEquals(2, promptMessages.size());
+        assertEquals("今天适合安排哪些工作？", promptMessages.get(1).content());
+        verify(modelService).resolveChatModelDescriptor(901L);
+        verify(conversationMemoryRefreshDispatcher).dispatchRefresh("chat-terminal-app-scene-general-user-6001-session-501");
+        assertEquals("建议先处理高优先级事项。", response.answer());
+    }
+
+    @Test
+    void shouldAppendWebSearchContextToPromptWhenEnabled() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(502L);
+        session.setUserId(6002L);
+        session.setSceneType(ChatSceneTypes.GENERAL);
+        session.setTerminalType(ChatTerminalTypes.APP);
+        session.setSessionName("首页会话");
+        session.setStatus("ENABLED");
+
+        AppChatRequest request = new AppChatRequest();
+        request.setQuestion("今天有什么行业动态？");
+        request.setChatModelId(902L);
+        request.setWebSearchEnabled(Boolean.TRUE);
+
+        ModelService.ChatModelDescriptor modelDescriptor = new ModelService.ChatModelDescriptor(
+                902L,
+                "qwen-max",
+                "BAILIAN",
+                "百炼"
+        );
+        RetrievalService.RetrievalResult retrievalResult = new RetrievalService.RetrievalResult(List.of(), "");
+
+        when(chatSessionMapper.selectById(502L)).thenReturn(session);
+        when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of());
+        when(webSearchProvider.search("今天有什么行业动态？", 5)).thenReturn(List.of(
+                new WebSearchSnippet(
+                        "行业快讯",
+                        "多家企业正在推进智能体应用落地。",
+                        "https://example.com/news",
+                        Instant.parse("2026-03-20T10:00:00Z")
+                )
+        ));
+        when(modelService.resolveChatModelDescriptor(902L)).thenReturn(modelDescriptor);
+        when(conversationChatClient.chat(eq("BAILIAN"), eq("qwen-max"), any(), any(), any()))
+                .thenReturn(new ChatModelClient.ChatCompletionResult("可以重点关注智能体应用落地。", 96, 26));
+        when(chatExchangePersistenceService.persistExchange(
+                eq(session),
+                eq(6002L),
+                eq("今天有什么行业动态？"),
+                eq("可以重点关注智能体应用落地。"),
+                eq(902L),
+                eq(96),
+                eq(26),
+                anyInt(),
+                eq(retrievalResult)
+        )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
+                1002L,
+                "可以重点关注智能体应用落地。",
+                List.of(),
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(96, 26)
+        ));
+
+        appChatService.chat(502L, request, user(6002L));
+
+        ArgumentCaptor<List<ChatModelClient.ChatMessage>> promptCaptor = ArgumentCaptor.forClass(List.class);
+        verify(conversationChatClient).chat(eq("BAILIAN"), eq("qwen-max"), any(), promptCaptor.capture(), any());
+        List<ChatModelClient.ChatMessage> promptMessages = promptCaptor.getValue();
+        assertEquals(2, promptMessages.size());
+        assertTrue(promptMessages.get(1).content().contains("联网搜索摘要"));
+        assertTrue(promptMessages.get(1).content().contains("行业快讯"));
+        assertTrue(promptMessages.get(1).content().contains("https://example.com/news"));
     }
 
     private AuthenticatedUser user(Long userId) {

@@ -35,10 +35,14 @@ import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryRefreshDispatcher;
+import com.ragadmin.server.infra.search.WebSearchProvider;
+import com.ragadmin.server.infra.search.WebSearchSnippet;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.service.ModelService;
 import com.ragadmin.server.retrieval.service.RetrievalService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -59,6 +63,10 @@ import java.util.stream.Collectors;
 
 @Service
 public class AppChatService {
+
+    private static final Logger log = LoggerFactory.getLogger(AppChatService.class);
+
+    private static final int WEB_SEARCH_TOP_K = 5;
 
     @Autowired
     private ChatSessionMapper chatSessionMapper;
@@ -104,6 +112,9 @@ public class AppChatService {
 
     @Autowired
     private ConversationIdCodec conversationIdCodec;
+
+    @Autowired
+    private WebSearchProvider webSearchProvider;
 
     @Transactional
     public AppChatSessionResponse createSession(AppCreateChatSessionRequest request, AuthenticatedUser user) {
@@ -376,11 +387,73 @@ public class AppChatService {
         return "你是企业智能助手。优先给出直接、准确、可执行的回答；如果信息不充分，要明确说明你的判断边界。";
     }
 
-    private String buildKnowledgeBaseUserPrompt(String question, String context) {
-        if (context == null || context.isBlank()) {
-            return "问题：\n" + question + "\n\n当前没有命中知识片段，请明确说明无法从知识库确认答案。";
+    private String buildKnowledgeBaseUserPrompt(String question, String context, String webSearchContext) {
+        StringBuilder prompt = new StringBuilder();
+        if (StringUtils.hasText(context)) {
+            prompt.append("知识片段：\n").append(context).append("\n\n");
+        } else {
+            prompt.append("当前没有命中知识片段。\n\n");
         }
-        return "知识片段：\n" + context + "\n\n问题：\n" + question + "\n\n请基于知识片段回答，并尽量简洁。";
+        if (StringUtils.hasText(webSearchContext)) {
+            prompt.append("联网搜索摘要：\n").append(webSearchContext).append("\n\n");
+        }
+        prompt.append("问题：\n").append(question).append("\n\n");
+
+        if (StringUtils.hasText(context)) {
+            if (StringUtils.hasText(webSearchContext)) {
+                prompt.append("请优先基于知识片段回答，联网摘要仅作补充；若两者冲突，以知识片段为准。");
+            } else {
+                prompt.append("请基于知识片段回答，并尽量简洁。");
+            }
+            return prompt.toString();
+        }
+
+        if (StringUtils.hasText(webSearchContext)) {
+            prompt.append("当前没有命中知识片段，你可以参考联网摘要回答，并明确说明这部分信息来自联网搜索结果。");
+            return prompt.toString();
+        }
+
+        prompt.append("请明确说明无法从知识库确认答案。");
+        return prompt.toString();
+    }
+
+    private String buildGeneralUserPrompt(String question, String webSearchContext) {
+        if (!StringUtils.hasText(webSearchContext)) {
+            return question;
+        }
+        return "联网搜索摘要：\n"
+                + webSearchContext
+                + "\n\n问题：\n"
+                + question
+                + "\n\n请优先结合联网摘要回答；如果摘要不足以支撑结论，要明确说明。";
+    }
+
+    private String buildWebSearchContext(List<WebSearchSnippet> snippets) {
+        if (snippets == null || snippets.isEmpty()) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (int index = 0; index < snippets.size(); index++) {
+            WebSearchSnippet snippet = snippets.get(index);
+            if (snippet == null) {
+                continue;
+            }
+            builder.append("结果").append(index + 1).append("：\n");
+            if (StringUtils.hasText(snippet.title())) {
+                builder.append("标题：").append(snippet.title()).append("\n");
+            }
+            if (StringUtils.hasText(snippet.snippet())) {
+                builder.append("摘要：").append(snippet.snippet()).append("\n");
+            }
+            if (StringUtils.hasText(snippet.url())) {
+                builder.append("链接：").append(snippet.url()).append("\n");
+            }
+            if (snippet.publishedAt() != null) {
+                builder.append("时间：").append(snippet.publishedAt()).append("\n");
+            }
+            builder.append("\n");
+        }
+        return builder.toString().trim();
     }
 
     private List<ChatModelClient.ChatMessage> buildHistoryMessages(Long sessionId) {
@@ -414,6 +487,7 @@ public class AppChatService {
         }
 
         refreshSessionPreferences(session, request.getChatModelId(), request.getWebSearchEnabled());
+        List<WebSearchSnippet> webSearchSnippets = loadWebSearchSnippets(request.getQuestion(), request.getWebSearchEnabled());
 
         RetrievalService.RetrievalResult retrievalResult = effectiveSelectedKbIds.isEmpty()
                 ? new RetrievalService.RetrievalResult(List.of(), "")
@@ -427,7 +501,8 @@ public class AppChatService {
                 sceneType,
                 request.getQuestion(),
                 retrievalResult,
-                effectiveSelectedKbIds
+                effectiveSelectedKbIds,
+                webSearchSnippets
         );
 
         return new PreparedChatExecution(
@@ -602,18 +677,33 @@ public class AppChatService {
             String sceneType,
             String question,
             RetrievalService.RetrievalResult retrievalResult,
-            List<Long> selectedKbIds
+            List<Long> selectedKbIds,
+            List<WebSearchSnippet> webSearchSnippets
     ) {
+        String webSearchContext = buildWebSearchContext(webSearchSnippets);
         if (!selectedKbIds.isEmpty() || ChatSceneTypes.KNOWLEDGE_BASE.equals(sceneType)) {
             return List.of(
                     new ChatModelClient.ChatMessage("system", buildKnowledgeBaseSystemPrompt()),
-                    new ChatModelClient.ChatMessage("user", buildKnowledgeBaseUserPrompt(question, retrievalResult.context()))
+                    new ChatModelClient.ChatMessage("user", buildKnowledgeBaseUserPrompt(question, retrievalResult.context(), webSearchContext))
             );
         }
         return List.of(
                 new ChatModelClient.ChatMessage("system", buildGeneralSystemPrompt()),
-                new ChatModelClient.ChatMessage("user", question)
+                new ChatModelClient.ChatMessage("user", buildGeneralUserPrompt(question, webSearchContext))
         );
+    }
+
+    private List<WebSearchSnippet> loadWebSearchSnippets(String question, Boolean webSearchEnabled) {
+        if (!Boolean.TRUE.equals(webSearchEnabled) || !StringUtils.hasText(question)) {
+            return List.of();
+        }
+        try {
+            List<WebSearchSnippet> snippets = webSearchProvider.search(question, WEB_SEARCH_TOP_K);
+            return snippets == null ? List.of() : snippets.stream().filter(Objects::nonNull).toList();
+        } catch (Exception ex) {
+            log.warn("联网搜索已降级为空结果，question={}", question, ex);
+            return List.of();
+        }
     }
 
     private record PreparedChatExecution(

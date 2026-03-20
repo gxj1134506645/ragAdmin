@@ -344,7 +344,7 @@ git commit -m "feat(chat): 支持前台会话隔离与多知识库绑定"
 - Modify: `rag-admin-server/src/main/java/com/ragadmin/server/chat/service/ChatService.java`
 - Modify: `rag-admin-server/src/main/java/com/ragadmin/server/retrieval/service/RetrievalService.java`
 
-- [ ] **Step 1: 为模型切换和联网开关写测试**
+- [x] **Step 1: 为模型切换和联网开关写测试**
 
 至少覆盖：
 
@@ -352,7 +352,7 @@ git commit -m "feat(chat): 支持前台会话隔离与多知识库绑定"
 - 未传模型时回退默认模型
 - `webSearchEnabled=true` 且 Provider 不可用时不抛错
 
-- [ ] **Step 2: 实现 `WebSearchProvider` 抽象**
+- [x] **Step 2: 实现 `WebSearchProvider` 抽象**
 
 首版最小接口：
 
@@ -362,7 +362,7 @@ List<WebSearchSnippet> search(String query, int topK);
 
 并提供 `NoopWebSearchProvider`
 
-- [ ] **Step 3: 在聊天编排中接入运行时参数**
+- [x] **Step 3: 在聊天编排中接入运行时参数**
 
 要求：
 
@@ -370,7 +370,7 @@ List<WebSearchSnippet> search(String query, int topK);
 - `chatModelId` 控制生成模型
 - `webSearchEnabled` 决定是否拼接联网上下文
 
-- [ ] **Step 4: 跑测试与编译**
+- [x] **Step 4: 跑测试与编译**
 
 Run:
 
@@ -382,6 +382,13 @@ mvn -q -pl rag-admin-server -DskipTests compile
 Expected:
 
 - 后端测试与编译通过
+
+执行说明：
+
+- 当前已在 `AppChatService` 中接入 `chatModelId` 与 `webSearchEnabled` 的运行时编排
+- 已新增 `WebSearchProvider`、`WebSearchSnippet` 与 `NoopWebSearchProvider`
+- 当联网 Provider 不可用或未配置时，前台问答链路会记录日志并自动降级为空结果
+- 后台管理端 `ChatService` 暂未复用联网搜索抽象，后续如需要后台问答统一能力，再单独补齐
 
 - [ ] **Step 5: 提交**
 

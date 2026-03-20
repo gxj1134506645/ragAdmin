@@ -66,6 +66,7 @@ rag:
     chat:
       client:
         simple-logger-advisor-enabled: false
+        simple-logger-max-text-length: 800
     bailian:
       enabled: true
       api-key:

@@ -4,11 +4,15 @@ import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.infra.ai.SpringAiModelFactory;
 import com.ragadmin.server.infra.ai.SpringAiModelSupport;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -16,6 +20,8 @@ import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 public class SpringAiConversationChatClient implements ConversationChatClient {
@@ -98,11 +104,103 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
         if (chatClientAdvisorProperties.isSimpleLoggerAdvisorEnabled()) {
             // 放在 memory advisor 之后，确保日志里看到的是已经注入会话记忆后的最终请求。
             advisors.add(SimpleLoggerAdvisor.builder()
+                    .requestToString(this::formatChatClientRequest)
+                    .responseToString(this::formatChatResponse)
                     .order(Advisor.DEFAULT_CHAT_MEMORY_PRECEDENCE_ORDER + 10)
                     .build());
         }
 
         return List.copyOf(advisors);
+    }
+
+    String formatChatClientRequest(ChatClientRequest request) {
+        List<Message> messages = request.prompt().getInstructions();
+        return "ChatClientRequest{"
+                + "messageCount=" + messages.size()
+                + ", contextKeys=" + request.context().keySet()
+                + ", messages=" + summarizeMessages(messages)
+                + "}";
+    }
+
+    String formatChatResponse(ChatResponse response) {
+        if (response == null) {
+            return "ChatResponse{empty=true}";
+        }
+
+        List<String> resultSummaries = response.getResults().stream()
+                .map(result -> summarizeAssistantMessage(result.getOutput()))
+                .toList();
+
+        String usageSummary = "";
+        if (response.getMetadata() != null && response.getMetadata().getUsage() != null) {
+            usageSummary = ", usage={promptTokens=" + safeInteger(response.getMetadata().getUsage().getPromptTokens())
+                    + ", completionTokens=" + safeInteger(response.getMetadata().getUsage().getCompletionTokens())
+                    + ", totalTokens=" + safeInteger(response.getMetadata().getUsage().getTotalTokens())
+                    + "}";
+        }
+
+        String modelSummary = "";
+        if (response.getMetadata() != null && StringUtils.hasText(response.getMetadata().getModel())) {
+            modelSummary = ", model=" + response.getMetadata().getModel();
+        }
+
+        return "ChatResponse{"
+                + "resultCount=" + response.getResults().size()
+                + modelSummary
+                + usageSummary
+                + ", results=" + resultSummaries
+                + "}";
+    }
+
+    private List<String> summarizeMessages(List<Message> messages) {
+        return messages.stream()
+                .map(this::summarizeMessage)
+                .collect(Collectors.toList());
+    }
+
+    private String summarizeMessage(Message message) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("{role=").append(message.getMessageType());
+        builder.append(", text=").append(abbreviateText(message.getText()));
+        builder.append(", metadataKeys=").append(safeMetadataKeys(message.getMetadata()));
+
+        if (message instanceof AssistantMessage assistantMessage) {
+            builder.append(", toolCallCount=").append(assistantMessage.getToolCalls().size());
+        }
+
+        builder.append("}");
+        return builder.toString();
+    }
+
+    private String summarizeAssistantMessage(AssistantMessage message) {
+        return "{text=" + abbreviateText(message.getText())
+                + ", toolCallCount=" + message.getToolCalls().size()
+                + ", metadataKeys=" + safeMetadataKeys(message.getMetadata())
+                + "}";
+    }
+
+    private List<String> safeMetadataKeys(Map<String, Object> metadata) {
+        if (metadata == null || metadata.isEmpty()) {
+            return List.of();
+        }
+        return metadata.keySet().stream().sorted().toList();
+    }
+
+    private String abbreviateText(String text) {
+        if (!StringUtils.hasText(text)) {
+            return "\"\"";
+        }
+
+        String normalized = text.replaceAll("\\s+", " ").trim();
+        int maxLength = Math.max(1, chatClientAdvisorProperties.getSimpleLoggerMaxTextLength());
+        if (normalized.length() <= maxLength) {
+            return "\"" + normalized + "\"";
+        }
+        return "\"" + normalized.substring(0, maxLength) + "...(truncated,total=" + normalized.length() + ")\"";
+    }
+
+    private int safeInteger(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private void seedConversationMemoryIfNecessary(

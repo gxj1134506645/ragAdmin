@@ -36,6 +36,7 @@ import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryRefreshDispatcher;
+import com.ragadmin.server.infra.search.NoopWebSearchProvider;
 import com.ragadmin.server.infra.search.WebSearchProvider;
 import com.ragadmin.server.infra.search.WebSearchSnippet;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
@@ -114,8 +115,11 @@ public class AppChatService {
     @Autowired
     private ConversationIdCodec conversationIdCodec;
 
-    @Autowired
-    private WebSearchProvider webSearchProvider;
+    /**
+     * 联网搜索当前仍属于可选能力，没有真实 provider 时自动回退为空实现，避免应用启动失败。
+     */
+    @Autowired(required = false)
+    private WebSearchProvider webSearchProvider = new NoopWebSearchProvider();
 
     @Transactional
     public AppChatSessionResponse createSession(AppCreateChatSessionRequest request, AuthenticatedUser user) {

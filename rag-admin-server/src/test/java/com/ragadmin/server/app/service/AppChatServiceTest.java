@@ -25,6 +25,7 @@ import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryRefreshDispatcher;
+import com.ragadmin.server.infra.search.NoopWebSearchProvider;
 import com.ragadmin.server.infra.search.WebSearchProvider;
 import com.ragadmin.server.infra.search.WebSearchSnippet;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
@@ -38,6 +39,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.time.Instant;
@@ -107,6 +109,15 @@ class AppChatServiceTest {
 
     @InjectMocks
     private AppChatService appChatService;
+
+    @Test
+    void shouldFallbackToNoopWebSearchProviderByDefault() {
+        AppChatService service = new AppChatService();
+
+        Object provider = ReflectionTestUtils.getField(service, "webSearchProvider");
+
+        assertTrue(provider instanceof NoopWebSearchProvider);
+    }
 
     @Test
     void shouldCreateIndependentGeneralSessionsForSameUserInAppPortal() {

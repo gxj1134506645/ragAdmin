@@ -93,6 +93,7 @@ const modelTypeOptions = [
 ]
 
 const hasModelData = computed(() => models.value.length > 0)
+const showGenerationOptionFields = computed(() => !isEmbeddingModel(modelForm.modelType))
 const modelDialogTitle = computed(() => (modelDialogMode.value === 'create' ? '新增模型定义' : '编辑模型定义'))
 const modelDialogConfirmText = computed(() => (modelDialogMode.value === 'create' ? '确认创建' : '确认保存'))
 const modelPurposeHint = computed(() => {
@@ -140,8 +141,12 @@ function providerNameById(providerId: number | null): string {
   return providers.value.find((item) => item.id === providerId)?.providerName ?? `#${providerId}`
 }
 
+function isEmbeddingModel(modelType: string): boolean {
+  return modelType === 'EMBEDDING'
+}
+
 function allowedCapabilityTypes(modelType: string): string[] {
-  return modelType === 'EMBEDDING' ? ['EMBEDDING'] : ['TEXT_GENERATION']
+  return isEmbeddingModel(modelType) ? ['EMBEDDING'] : ['TEXT_GENERATION']
 }
 
 // 前端只暴露“模型用途”，实际提交给后端的 capabilityTypes 仍按用途自动派生。
@@ -149,6 +154,30 @@ function normalizeCapabilityTypes(modelType: string, capabilityTypes: string[]):
   const allowed = allowedCapabilityTypes(modelType)
   const normalized = capabilityTypes.filter((item) => allowed.includes(item))
   return normalized.length > 0 ? normalized : allowed
+}
+
+function normalizeRuntimeOptions(
+  modelType: string,
+  maxTokens: number | null | undefined,
+  temperatureDefault: number | null | undefined,
+): { maxTokens: number | null; temperatureDefault: number | null } {
+  if (isEmbeddingModel(modelType)) {
+    return {
+      maxTokens: null,
+      temperatureDefault: null,
+    }
+  }
+  return {
+    maxTokens: maxTokens || null,
+    temperatureDefault: temperatureDefault ?? null,
+  }
+}
+
+function runtimeOptionDisplay(modelType: string, value: number | string | null | undefined): number | string {
+  if (isEmbeddingModel(modelType)) {
+    return '不适用'
+  }
+  return value ?? '未配置'
 }
 
 function resetProviderForm(): void {
@@ -178,6 +207,7 @@ function openCreateModelDialog(): void {
 }
 
 function openEditModelDialog(model: ModelDefinition): void {
+  const runtimeOptions = normalizeRuntimeOptions(model.modelType, model.maxTokens, model.temperatureDefault)
   modelDialogMode.value = 'edit'
   editingModelId.value = model.id
   modelForm.providerId = model.providerId
@@ -185,8 +215,8 @@ function openEditModelDialog(model: ModelDefinition): void {
   modelForm.modelName = model.modelName
   modelForm.modelType = model.modelType
   modelForm.capabilityTypes = normalizeCapabilityTypes(model.modelType, model.capabilityTypes)
-  modelForm.maxTokens = model.maxTokens ?? null
-  modelForm.temperatureDefault = model.temperatureDefault ?? 0.7
+  modelForm.maxTokens = runtimeOptions.maxTokens
+  modelForm.temperatureDefault = runtimeOptions.temperatureDefault
   modelForm.status = model.status
   modelDialogVisible.value = true
 }
@@ -195,6 +225,10 @@ watch(
   () => modelForm.modelType,
   (modelType) => {
     modelForm.capabilityTypes = normalizeCapabilityTypes(modelType, modelForm.capabilityTypes)
+    if (isEmbeddingModel(modelType)) {
+      modelForm.maxTokens = null
+      modelForm.temperatureDefault = null
+    }
   },
   { immediate: true },
 )
@@ -287,13 +321,18 @@ async function handleCreateProvider(): Promise<void> {
 }
 
 function buildModelPayload(): ModelCreateRequest | UpdateModelRequest {
+  const runtimeOptions = normalizeRuntimeOptions(
+    modelForm.modelType,
+    modelForm.maxTokens,
+    modelForm.temperatureDefault,
+  )
   return {
     ...modelForm,
     modelCode: modelForm.modelCode.trim(),
     modelName: modelForm.modelName.trim(),
     capabilityTypes: normalizeCapabilityTypes(modelForm.modelType, modelForm.capabilityTypes),
-    maxTokens: modelForm.maxTokens || null,
-    temperatureDefault: modelForm.temperatureDefault ?? null,
+    maxTokens: runtimeOptions.maxTokens,
+    temperatureDefault: runtimeOptions.temperatureDefault,
   }
 }
 
@@ -467,12 +506,12 @@ onMounted(async () => {
         </el-table-column>
         <el-table-column label="最大令牌数" width="120">
           <template #default="{ row }">
-            {{ row.maxTokens ?? '未配置' }}
+            {{ runtimeOptionDisplay(row.modelType, row.maxTokens) }}
           </template>
         </el-table-column>
         <el-table-column label="默认温度" width="120">
           <template #default="{ row }">
-            {{ row.temperatureDefault ?? '未配置' }}
+            {{ runtimeOptionDisplay(row.modelType, row.temperatureDefault) }}
           </template>
         </el-table-column>
         <el-table-column label="状态" width="110">
@@ -692,7 +731,7 @@ onMounted(async () => {
             </el-select>
           </el-form-item>
         </div>
-        <div class="form-grid">
+        <div v-if="showGenerationOptionFields" class="form-grid">
           <el-form-item label="最大令牌数">
             <el-input-number v-model="modelForm.maxTokens" :min="1" :step="256" controls-position="right" />
           </el-form-item>

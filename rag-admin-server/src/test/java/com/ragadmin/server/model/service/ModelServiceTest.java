@@ -9,13 +9,19 @@ import com.ragadmin.server.infra.ai.chat.ChatModelClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
 import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
+import com.ragadmin.server.knowledge.mapper.KnowledgeBaseMapper;
+import com.ragadmin.server.model.dto.CreateModelRequest;
 import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
+import com.ragadmin.server.model.dto.ModelResponse;
+import com.ragadmin.server.model.dto.UpdateModelRequest;
 import com.ragadmin.server.model.entity.AiModelCapabilityEntity;
 import com.ragadmin.server.model.entity.AiModelEntity;
 import com.ragadmin.server.model.entity.AiProviderEntity;
 import com.ragadmin.server.model.mapper.AiModelCapabilityMapper;
 import com.ragadmin.server.model.mapper.AiModelMapper;
 import com.ragadmin.server.model.mapper.AiProviderMapper;
+import com.ragadmin.server.document.mapper.ChunkVectorRefMapper;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -23,11 +29,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -42,6 +52,12 @@ class ModelServiceTest {
 
     @Mock
     private AiModelCapabilityMapper aiModelCapabilityMapper;
+
+    @Mock
+    private KnowledgeBaseMapper knowledgeBaseMapper;
+
+    @Mock
+    private ChunkVectorRefMapper chunkVectorRefMapper;
 
     @Mock
     private ModelProviderService modelProviderService;
@@ -64,12 +80,89 @@ class ModelServiceTest {
         ReflectionTestUtils.setField(modelService, "aiModelMapper", aiModelMapper);
         ReflectionTestUtils.setField(modelService, "aiProviderMapper", aiProviderMapper);
         ReflectionTestUtils.setField(modelService, "aiModelCapabilityMapper", aiModelCapabilityMapper);
+        ReflectionTestUtils.setField(modelService, "knowledgeBaseMapper", knowledgeBaseMapper);
+        ReflectionTestUtils.setField(modelService, "chunkVectorRefMapper", chunkVectorRefMapper);
         ReflectionTestUtils.setField(modelService, "modelProviderService", modelProviderService);
         ReflectionTestUtils.setField(modelService, "chatClientRegistry", chatClientRegistry);
         ReflectionTestUtils.setField(modelService, "embeddingClientRegistry", embeddingClientRegistry);
         ReflectionTestUtils.setField(modelService, "aiProperties", aiProperties);
         ReflectionTestUtils.setField(modelService, "bailianProperties", bailianProperties);
         ReflectionTestUtils.setField(modelService, "ollamaProperties", ollamaProperties);
+    }
+
+    @Test
+    void shouldClearGenerationOptionsWhenCreatingEmbeddingModel() {
+        AiProviderEntity provider = new AiProviderEntity();
+        provider.setId(10L);
+        provider.setProviderCode("BAILIAN");
+        provider.setProviderName("百炼");
+
+        CreateModelRequest request = new CreateModelRequest();
+        request.setProviderId(10L);
+        request.setModelCode("text-embedding-v3");
+        request.setModelName("通义文本向量");
+        request.setCapabilityTypes(List.of("EMBEDDING"));
+        request.setModelType("EMBEDDING");
+        request.setMaxTokens(8192);
+        request.setTemperatureDefault(new BigDecimal("0.5"));
+        request.setStatus("ENABLED");
+
+        when(modelProviderService.requireProvider(10L)).thenReturn(provider);
+        doAnswer(invocation -> {
+            AiModelEntity entity = invocation.getArgument(0);
+            entity.setId(100L);
+            return 1;
+        }).when(aiModelMapper).insert(any(AiModelEntity.class));
+
+        ModelResponse response = modelService.create(request);
+
+        ArgumentCaptor<AiModelEntity> captor = ArgumentCaptor.forClass(AiModelEntity.class);
+        verify(aiModelMapper).insert(captor.capture());
+        assertNull(captor.getValue().getMaxTokens());
+        assertNull(captor.getValue().getTemperatureDefault());
+        assertNull(response.maxTokens());
+        assertNull(response.temperatureDefault());
+    }
+
+    @Test
+    void shouldClearGenerationOptionsWhenUpdatingEmbeddingModel() {
+        AiProviderEntity provider = new AiProviderEntity();
+        provider.setId(11L);
+        provider.setProviderCode("OLLAMA");
+        provider.setProviderName("Ollama");
+
+        AiModelEntity entity = new AiModelEntity();
+        entity.setId(11L);
+        entity.setProviderId(11L);
+        entity.setModelCode("legacy-chat-model");
+        entity.setModelName("旧模型");
+        entity.setModelType("CHAT");
+        entity.setMaxTokens(4096);
+        entity.setTemperatureDefault(new BigDecimal("0.8"));
+        entity.setStatus("ENABLED");
+
+        UpdateModelRequest request = new UpdateModelRequest();
+        request.setProviderId(11L);
+        request.setModelCode("nomic-embed-text");
+        request.setModelName("Nomic Embed");
+        request.setCapabilityTypes(List.of("EMBEDDING"));
+        request.setModelType("EMBEDDING");
+        request.setMaxTokens(2048);
+        request.setTemperatureDefault(new BigDecimal("0.2"));
+        request.setStatus("ENABLED");
+
+        when(aiModelMapper.selectById(11L)).thenReturn(entity);
+        when(modelProviderService.requireProvider(11L)).thenReturn(provider);
+        when(knowledgeBaseMapper.selectCount(any())).thenReturn(0L);
+
+        ModelResponse response = modelService.update(11L, request);
+
+        ArgumentCaptor<AiModelEntity> captor = ArgumentCaptor.forClass(AiModelEntity.class);
+        verify(aiModelMapper).updateById(captor.capture());
+        assertNull(captor.getValue().getMaxTokens());
+        assertNull(captor.getValue().getTemperatureDefault());
+        assertNull(response.maxTokens());
+        assertNull(response.temperatureDefault());
     }
 
     @Test

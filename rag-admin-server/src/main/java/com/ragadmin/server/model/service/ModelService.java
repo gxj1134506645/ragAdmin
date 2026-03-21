@@ -37,6 +37,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -141,14 +142,16 @@ public class ModelService {
         AiProviderEntity provider = modelProviderService.requireProvider(request.getProviderId());
         List<String> capabilityTypes = validateCapabilityTypes(request.getModelType(), request.getCapabilityTypes());
         ensureModelCodeUnique(null, request.getProviderId(), request.getModelCode());
+        Integer normalizedMaxTokens = normalizeMaxTokens(request.getModelType(), request.getMaxTokens());
+        BigDecimal normalizedTemperatureDefault = normalizeTemperatureDefault(request.getModelType(), request.getTemperatureDefault());
 
         AiModelEntity entity = new AiModelEntity();
         entity.setProviderId(request.getProviderId());
         entity.setModelCode(request.getModelCode());
         entity.setModelName(request.getModelName());
         entity.setModelType(request.getModelType());
-        entity.setMaxTokens(request.getMaxTokens());
-        entity.setTemperatureDefault(request.getTemperatureDefault());
+        entity.setMaxTokens(normalizedMaxTokens);
+        entity.setTemperatureDefault(normalizedTemperatureDefault);
         entity.setStatus(request.getStatus());
         aiModelMapper.insert(entity);
         replaceCapabilities(entity.getId(), capabilityTypes);
@@ -163,13 +166,15 @@ public class ModelService {
         List<String> capabilityTypes = validateCapabilityTypes(request.getModelType(), request.getCapabilityTypes());
         ensureModelCodeUnique(modelId, request.getProviderId(), request.getModelCode());
         validateCapabilityReferenceChange(modelId, capabilityTypes);
+        Integer normalizedMaxTokens = normalizeMaxTokens(request.getModelType(), request.getMaxTokens());
+        BigDecimal normalizedTemperatureDefault = normalizeTemperatureDefault(request.getModelType(), request.getTemperatureDefault());
 
         entity.setProviderId(request.getProviderId());
         entity.setModelCode(request.getModelCode());
         entity.setModelName(request.getModelName());
         entity.setModelType(request.getModelType());
-        entity.setMaxTokens(request.getMaxTokens());
-        entity.setTemperatureDefault(request.getTemperatureDefault());
+        entity.setMaxTokens(normalizedMaxTokens);
+        entity.setTemperatureDefault(normalizedTemperatureDefault);
         entity.setStatus(request.getStatus());
         aiModelMapper.updateById(entity);
         replaceCapabilities(modelId, capabilityTypes);
@@ -360,6 +365,20 @@ public class ModelService {
             return distinctCapabilityTypes;
         }
         throw new BusinessException("MODEL_TYPE_INVALID", "当前仅支持 CHAT 或 EMBEDDING 模型类型", HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * 向量模型不参与文本生成，这里的生成参数需要在保存时统一收口为 null。
+     */
+    private Integer normalizeMaxTokens(String modelType, Integer maxTokens) {
+        return "EMBEDDING".equalsIgnoreCase(modelType) ? null : maxTokens;
+    }
+
+    /**
+     * 温度仅对聊天生成模型有意义，向量模型配置后也不会生效。
+     */
+    private BigDecimal normalizeTemperatureDefault(String modelType, BigDecimal temperatureDefault) {
+        return "EMBEDDING".equalsIgnoreCase(modelType) ? null : temperatureDefault;
     }
 
     private void validateCapabilityReferenceChange(Long modelId, List<String> capabilityTypes) {

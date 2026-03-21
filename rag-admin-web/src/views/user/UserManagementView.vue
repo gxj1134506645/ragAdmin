@@ -118,6 +118,14 @@ const currentPageSummary = computed(() => {
     },
   )
 })
+const tableResultSummary = computed(() => {
+  if (pagination.total === 0 || rows.value.length === 0) {
+    return '当前暂无匹配用户，支持按账号、状态快速筛选。'
+  }
+  const start = (pagination.pageNo - 1) * pagination.pageSize + 1
+  const end = start + rows.value.length - 1
+  return `当前展示第 ${start}-${end} 条，共 ${pagination.total} 条用户记录。`
+})
 const sessionDrawerTitle = computed(() => {
   if (!sessionDetail.value) {
     return '在线会话详情'
@@ -512,39 +520,50 @@ onMounted(async () => {
     </header>
 
     <section class="summary-grid">
-      <article class="summary-card soft-panel">
-        <span>当前页用户</span>
-        <strong>{{ currentPageSummary.total }}</strong>
-        <p>当前分页结果中的用户数量</p>
+      <article class="summary-card summary-card-overview soft-panel">
+        <span>分页概览</span>
+        <div class="summary-overview-grid">
+          <div class="summary-overview-item">
+            <strong>{{ pagination.total }}</strong>
+            <small>检索结果</small>
+          </div>
+          <div class="summary-overview-item">
+            <strong>{{ currentPageSummary.total }}</strong>
+            <small>当前页用户</small>
+          </div>
+          <div class="summary-overview-item">
+            <strong>{{ currentPageSummary.enabled }}</strong>
+            <small>当前页启用</small>
+          </div>
+        </div>
       </article>
-      <article class="summary-card soft-panel">
-        <span>启用账号</span>
-        <strong>{{ currentPageSummary.enabled }}</strong>
-        <p>可以参与登录鉴权的已启用账号</p>
-      </article>
-      <article class="summary-card soft-panel is-primary" v-loading="sessionSummaryLoading">
+      <article class="summary-card soft-panel" v-loading="sessionSummaryLoading">
         <span>前台在线</span>
         <strong>{{ sessionSummary.appOnline }}</strong>
-        <p>按 userId 去重的聊天前台在线用户数</p>
+        <p>问答前台按 userId 去重后的在线人数</p>
       </article>
       <article class="summary-card soft-panel is-warm" v-loading="sessionSummaryLoading">
         <span>后台在线</span>
         <strong>{{ sessionSummary.adminOnline }}</strong>
-        <p>按 userId 去重的后台治理在线用户数</p>
+        <p>后台治理域按 userId 去重后的在线人数</p>
       </article>
     </section>
 
-    <section class="role-guide soft-panel">
-      <article v-for="role in ROLE_OPTIONS" :key="role.value" class="role-guide-item">
-        <div class="role-guide-head">
-          <el-tag :type="roleTagType(role.value)" effect="plain">{{ role.value }}</el-tag>
-          <strong>{{ role.label }}</strong>
+    <section class="table-panel soft-panel">
+      <header class="table-panel-head">
+        <div class="table-panel-copy">
+          <p class="user-eyebrow">列表重点</p>
+          <h2 class="table-title">用户分页列表</h2>
+          <p class="table-subtitle">{{ tableResultSummary }}</p>
         </div>
-        <p>{{ role.description }}</p>
-      </article>
-    </section>
+        <div class="table-role-hints">
+          <div v-for="role in ROLE_OPTIONS" :key="role.value" class="role-hint-chip">
+            <el-tag :type="roleTagType(role.value)" effect="plain">{{ role.value }}</el-tag>
+            <small>{{ role.label }}</small>
+          </div>
+        </div>
+      </header>
 
-    <section class="filter-panel soft-panel">
       <div class="filter-grid">
         <el-input
           v-model="query.keyword"
@@ -566,9 +585,7 @@ onMounted(async () => {
         <el-button @click="handleRefresh">刷新</el-button>
         <el-button type="primary" @click="handleSearch">查询用户</el-button>
       </div>
-    </section>
 
-    <section class="table-panel soft-panel">
       <section v-if="loadError" class="table-error">
         <p class="error-text">{{ loadError }}</p>
       </section>
@@ -931,65 +948,116 @@ onMounted(async () => {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(0, 1fr));
   gap: 18px;
 }
 
 .summary-card {
-  padding: 22px;
+  padding: 18px 20px;
 }
 
 .summary-card strong {
   display: block;
-  margin-top: 12px;
+  margin-top: 10px;
   color: #2f241d;
   font-family: "Noto Serif SC", serif;
-  font-size: 30px;
+  font-size: 28px;
 }
 
 .summary-card p {
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   color: #6d5948;
-  line-height: 1.7;
+  line-height: 1.65;
 }
 
-.summary-card.is-primary {
-  background: linear-gradient(180deg, rgba(244, 248, 255, 0.96), rgba(250, 252, 255, 0.92));
+.summary-card-overview {
+  background:
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98), rgba(255, 247, 239, 0.94)),
+    linear-gradient(120deg, rgba(198, 107, 34, 0.06), transparent 60%);
+}
+
+.summary-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.summary-overview-item {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 252, 247, 0.78);
+  border: 1px solid rgba(110, 84, 54, 0.08);
+}
+
+.summary-overview-item strong {
+  margin-top: 0;
+  font-size: 24px;
+}
+
+.summary-overview-item small {
+  display: block;
+  margin-top: 6px;
+  color: #8f7159;
 }
 
 .summary-card.is-warm {
   background: linear-gradient(180deg, rgba(255, 248, 238, 0.96), rgba(255, 252, 247, 0.9));
 }
 
-.role-guide,
-.filter-panel,
 .table-panel {
   padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.role-guide {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+.table-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
 }
 
-.role-guide-item {
-  padding: 16px 18px;
-  border-radius: 18px;
-  background: rgba(255, 251, 245, 0.74);
+.table-panel-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.table-title {
+  margin: 0;
+  color: #2f241d;
+  font-family: "Noto Serif SC", serif;
+  font-size: 30px;
+}
+
+.table-subtitle {
+  margin: 0;
+  color: #6d5948;
+  line-height: 1.7;
+}
+
+.table-role-hints {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  max-width: 560px;
+}
+
+.role-hint-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 250, 243, 0.82);
   border: 1px solid rgba(110, 84, 54, 0.08);
 }
 
-.role-guide-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.role-guide-item p {
-  margin: 12px 0 0;
+.role-hint-chip small {
   color: #6d5948;
-  line-height: 1.7;
 }
 
 .filter-grid,
@@ -1175,14 +1243,23 @@ onMounted(async () => {
 }
 
 @media (max-width: 1180px) {
-  .summary-grid,
-  .role-guide {
+  .summary-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .table-panel-head {
+    flex-direction: column;
+  }
+
+  .table-role-hints {
+    justify-content: flex-start;
+    max-width: none;
   }
 }
 
 @media (max-width: 900px) {
   .user-head,
+  .table-panel-head,
   .filter-actions {
     flex-direction: column;
     align-items: flex-start;
@@ -1191,7 +1268,7 @@ onMounted(async () => {
   .filter-grid,
   .form-grid,
   .summary-grid,
-  .role-guide,
+  .summary-overview-grid,
   .session-domain-grid {
     grid-template-columns: 1fr;
   }

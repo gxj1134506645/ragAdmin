@@ -45,6 +45,9 @@ public class UserAdminService {
     @Resource
     private AuthUserStructMapper authUserStructMapper;
 
+    @Resource
+    private SaTokenLoginService saTokenLoginService;
+
     public PageResponse<UserListItemResponse> list(String keyword, String status, long pageNo, long pageSize) {
         Page<SysUserEntity> page = sysUserMapper.selectPage(
                 Page.of(pageNo, pageSize),
@@ -182,6 +185,9 @@ public class UserAdminService {
     }
 
     private UserListItemResponse toResponse(SysUserEntity user, List<String> roles) {
-        return authUserStructMapper.toUserListItemResponse(user, roles);
+        return authUserStructMapper.toUserListItemResponse(user, roles)
+                // 用户列表直接补齐前后台在线状态，避免分页表格为每一行额外发起会话详情查询。
+                .setAdminOnline(saTokenLoginService.isLogin(user.getId(), AuthService.ADMIN_LOGIN_TYPE))
+                .setAppOnline(saTokenLoginService.isLogin(user.getId(), AuthService.APP_LOGIN_TYPE));
     }
 }

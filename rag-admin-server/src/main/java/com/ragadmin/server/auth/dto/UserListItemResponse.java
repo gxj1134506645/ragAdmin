@@ -16,4 +16,6 @@ public class UserListItemResponse {
     private String mobile;
     private String status;
     private List<String> roles;
+    private Boolean adminOnline;
+    private Boolean appOnline;
 }

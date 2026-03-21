@@ -86,7 +86,6 @@ const roleForm = reactive({
 const hasData = computed(() => rows.value.length > 0)
 const dialogTitle = computed(() => (userDialogMode.value === 'create' ? '新增用户' : '编辑用户'))
 const dialogConfirmText = computed(() => (userDialogMode.value === 'create' ? '确认创建' : '确认保存'))
-const sessionSummaryLoading = ref(false)
 const sessionDetailLoading = ref(false)
 const sessionDetailError = ref('')
 const sessionDrawerVisible = ref(false)
@@ -100,23 +99,6 @@ const kickoutForm = reactive<KickoutUserSessionRequest>({
 })
 const sessionSummary = reactive({
   allOnline: 0,
-  adminOnline: 0,
-  appOnline: 0,
-})
-const currentPageSummary = computed(() => {
-  return rows.value.reduce(
-    (result, item) => {
-      result.total += 1
-      if (item.status === 'ENABLED') {
-        result.enabled += 1
-      }
-      return result
-    },
-    {
-      total: 0,
-      enabled: 0,
-    },
-  )
 })
 const tableResultSummary = computed(() => {
   if (pagination.total === 0 || rows.value.length === 0) {
@@ -149,6 +131,32 @@ function statusTagType(status: string): 'success' | 'info' {
 
 function sessionTagType(online: boolean): 'success' | 'info' {
   return online ? 'success' : 'info'
+}
+
+function onlineStatusTagType(user: UserListItem): 'success' | 'warning' | 'primary' | 'info' {
+  if (user.adminOnline && user.appOnline) {
+    return 'success'
+  }
+  if (user.adminOnline) {
+    return 'warning'
+  }
+  if (user.appOnline) {
+    return 'primary'
+  }
+  return 'info'
+}
+
+function onlineStatusLabel(user: UserListItem): string {
+  if (user.adminOnline && user.appOnline) {
+    return '双端在线'
+  }
+  if (user.adminOnline) {
+    return '后台在线'
+  }
+  if (user.appOnline) {
+    return '前台在线'
+  }
+  return '全部离线'
 }
 
 function roleTagType(roleCode: string): 'primary' | 'success' | 'warning' | 'info' {
@@ -293,22 +301,11 @@ async function loadData(): Promise<void> {
 }
 
 async function loadSessionSummary(): Promise<void> {
-  sessionSummaryLoading.value = true
   try {
-    const [all, admin, app] = await Promise.all([
-      listUserSessions({ pageNo: 1, pageSize: 1, onlineScope: 'all' }),
-      listUserSessions({ pageNo: 1, pageSize: 1, onlineScope: 'admin' }),
-      listUserSessions({ pageNo: 1, pageSize: 1, onlineScope: 'app' }),
-    ])
+    const all = await listUserSessions({ pageNo: 1, pageSize: 1, onlineScope: 'all' })
     sessionSummary.allOnline = all.total
-    sessionSummary.adminOnline = admin.total
-    sessionSummary.appOnline = app.total
   } catch {
     sessionSummary.allOnline = 0
-    sessionSummary.adminOnline = 0
-    sessionSummary.appOnline = 0
-  } finally {
-    sessionSummaryLoading.value = false
   }
 }
 
@@ -513,57 +510,9 @@ onMounted(async () => {
           后台统一维护组织用户。`APP_USER` 用于聊天前台白名单，`ADMIN`、`KB_ADMIN`、`AUDITOR` 用于后台治理入口。
         </p>
       </div>
-      <div class="head-actions">
-        <el-button @click="handleRefresh">刷新列表</el-button>
-        <el-button type="primary" @click="openCreateDialog">新增用户</el-button>
-      </div>
     </header>
 
-    <section class="summary-grid">
-      <article class="summary-card summary-card-overview soft-panel">
-        <span>分页概览</span>
-        <div class="summary-overview-grid">
-          <div class="summary-overview-item">
-            <strong>{{ pagination.total }}</strong>
-            <small>检索结果</small>
-          </div>
-          <div class="summary-overview-item">
-            <strong>{{ currentPageSummary.total }}</strong>
-            <small>当前页用户</small>
-          </div>
-          <div class="summary-overview-item">
-            <strong>{{ currentPageSummary.enabled }}</strong>
-            <small>当前页启用</small>
-          </div>
-        </div>
-      </article>
-      <article class="summary-card soft-panel" v-loading="sessionSummaryLoading">
-        <span>前台在线</span>
-        <strong>{{ sessionSummary.appOnline }}</strong>
-        <p>问答前台按 userId 去重后的在线人数</p>
-      </article>
-      <article class="summary-card soft-panel is-warm" v-loading="sessionSummaryLoading">
-        <span>后台在线</span>
-        <strong>{{ sessionSummary.adminOnline }}</strong>
-        <p>后台治理域按 userId 去重后的在线人数</p>
-      </article>
-    </section>
-
     <section class="table-panel soft-panel">
-      <header class="table-panel-head">
-        <div class="table-panel-copy">
-          <p class="user-eyebrow">列表重点</p>
-          <h2 class="table-title">用户分页列表</h2>
-          <p class="table-subtitle">{{ tableResultSummary }}</p>
-        </div>
-        <div class="table-role-hints">
-          <div v-for="role in ROLE_OPTIONS" :key="role.value" class="role-hint-chip">
-            <el-tag :type="roleTagType(role.value)" effect="plain">{{ role.value }}</el-tag>
-            <small>{{ role.label }}</small>
-          </div>
-        </div>
-      </header>
-
       <div class="filter-grid">
         <el-input
           v-model="query.keyword"
@@ -580,10 +529,14 @@ onMounted(async () => {
           />
         </el-select>
       </div>
-      <div class="filter-actions">
-        <el-button @click="handleReset">重置</el-button>
-        <el-button @click="handleRefresh">刷新</el-button>
-        <el-button type="primary" @click="handleSearch">查询用户</el-button>
+      <div class="filter-toolbar">
+        <p class="table-result-summary">{{ tableResultSummary }}</p>
+        <div class="filter-actions">
+          <el-button @click="handleReset">重置</el-button>
+          <el-button @click="handleRefresh">刷新列表</el-button>
+          <el-button type="primary" plain @click="openCreateDialog">新增用户</el-button>
+          <el-button type="primary" @click="handleSearch">查询用户</el-button>
+        </div>
       </div>
 
       <section v-if="loadError" class="table-error">
@@ -604,6 +557,13 @@ onMounted(async () => {
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
             <el-tag :type="statusTagType(row.status)">{{ row.status }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="在线状态" width="120">
+          <template #default="{ row }">
+            <el-tag :type="onlineStatusTagType(row)" effect="plain">
+              {{ onlineStatusLabel(row) }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="角色" min-width="260">
@@ -923,7 +883,7 @@ onMounted(async () => {
 .user-head {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 16px;
   padding: 28px 32px;
   background:
@@ -931,8 +891,7 @@ onMounted(async () => {
     linear-gradient(180deg, rgba(255, 251, 246, 0.96), rgba(255, 248, 241, 0.9));
 }
 
-.user-eyebrow,
-.summary-card span {
+.user-eyebrow {
   margin: 0 0 10px;
   color: #9d7a58;
   font-size: 12px;
@@ -940,124 +899,25 @@ onMounted(async () => {
   text-transform: uppercase;
 }
 
-.head-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.summary-card {
-  padding: 18px 20px;
-}
-
-.summary-card strong {
-  display: block;
-  margin-top: 10px;
-  color: #2f241d;
-  font-family: "Noto Serif SC", serif;
-  font-size: 28px;
-}
-
-.summary-card p {
-  margin: 10px 0 0;
-  color: #6d5948;
-  line-height: 1.65;
-}
-
-.summary-card-overview {
-  background:
-    linear-gradient(180deg, rgba(255, 251, 246, 0.98), rgba(255, 247, 239, 0.94)),
-    linear-gradient(120deg, rgba(198, 107, 34, 0.06), transparent 60%);
-}
-
-.summary-overview-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 10px;
-}
-
-.summary-overview-item {
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(255, 252, 247, 0.78);
-  border: 1px solid rgba(110, 84, 54, 0.08);
-}
-
-.summary-overview-item strong {
-  margin-top: 0;
-  font-size: 24px;
-}
-
-.summary-overview-item small {
-  display: block;
-  margin-top: 6px;
-  color: #8f7159;
-}
-
-.summary-card.is-warm {
-  background: linear-gradient(180deg, rgba(255, 248, 238, 0.96), rgba(255, 252, 247, 0.9));
-}
-
 .table-panel {
   padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-
-.table-panel-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
   gap: 18px;
 }
 
-.table-panel-copy {
+.filter-toolbar {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
 }
 
-.table-title {
-  margin: 0;
-  color: #2f241d;
-  font-family: "Noto Serif SC", serif;
-  font-size: 30px;
-}
-
-.table-subtitle {
+.table-result-summary {
   margin: 0;
   color: #6d5948;
   line-height: 1.7;
-}
-
-.table-role-hints {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px;
-  max-width: 560px;
-}
-
-.role-hint-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(255, 250, 243, 0.82);
-  border: 1px solid rgba(110, 84, 54, 0.08);
-}
-
-.role-hint-chip small {
-  color: #6d5948;
 }
 
 .filter-grid,
@@ -1075,7 +935,6 @@ onMounted(async () => {
   gap: 12px;
 }
 
-.filter-actions,
 .table-footer {
   margin-top: 18px;
 }
@@ -1243,23 +1102,14 @@ onMounted(async () => {
 }
 
 @media (max-width: 1180px) {
-  .summary-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .table-panel-head {
+  .filter-toolbar {
     flex-direction: column;
-  }
-
-  .table-role-hints {
-    justify-content: flex-start;
-    max-width: none;
+    align-items: flex-start;
   }
 }
 
 @media (max-width: 900px) {
   .user-head,
-  .table-panel-head,
   .filter-actions {
     flex-direction: column;
     align-items: flex-start;
@@ -1267,15 +1117,12 @@ onMounted(async () => {
 
   .filter-grid,
   .form-grid,
-  .summary-grid,
-  .summary-overview-grid,
   .session-domain-grid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 640px) {
-  .head-actions,
   .filter-actions,
   .dialog-footer {
     flex-direction: column;

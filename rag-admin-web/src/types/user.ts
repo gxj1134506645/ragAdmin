@@ -6,6 +6,8 @@ export interface UserListItem {
   mobile?: string | null
   status: string
   roles: string[]
+  adminOnline: boolean
+  appOnline: boolean
 }
 
 export interface UserListQuery {

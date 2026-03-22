@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChatDotRound, MoreFilled, Plus, RefreshRight } from '@element-plus/icons-vue'
+import { ArrowDown, ChatDotRound, MoreFilled, Plus, RefreshRight, SwitchButton } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   createChatSession,
@@ -15,8 +15,10 @@ import {
   updateChatSession,
   updateSessionKnowledgeBases,
 } from '@/api/chat'
+import { resolveErrorMessage } from '@/api/http'
 import { listKnowledgeBases } from '@/api/knowledge-base'
 import { listModels } from '@/api/model'
+import { useAuthStore } from '@/stores/auth'
 import type { ChatExchange, ChatFeedbackType, ChatReference, ChatSceneType, ChatSession, ChatStreamEvent } from '@/types/chat'
 import type { KnowledgeBaseSummary } from '@/types/knowledge-base'
 import type { ModelSummary } from '@/types/model'
@@ -63,6 +65,7 @@ interface StreamRecoveryNotice {
 
 const props = defineProps<Props>()
 const router = useRouter()
+const authStore = useAuthStore()
 const KNOWLEDGE_BASE_MENTION_STOP_PATTERN = /[\s@,，.。!！?？:：;；()（）\[\]【】]/
 
 const messageContainerRef = ref<HTMLElement | null>(null)
@@ -181,6 +184,10 @@ const currentModelName = computed(() => {
   }
   return availableModels.value.find((item) => item.id === selectedModelId.value)?.modelName || '指定模型'
 })
+const accountInitial = computed(() => {
+  const source = authStore.displayName || authStore.currentUser?.username || 'U'
+  return source.slice(0, 1).toUpperCase()
+})
 
 function handleOpenGeneralChat(): void {
   if (streaming.value || !isKnowledgeBaseScene.value) {
@@ -210,6 +217,15 @@ function handleSelectModel(modelId?: number): void {
   }
   selectedModelId.value = modelId
   modelPickerVisible.value = false
+}
+
+async function handleLogout(): Promise<void> {
+  try {
+    await authStore.logout()
+    await router.push('/login')
+  } catch (error) {
+    ElMessage.error(resolveErrorMessage(error))
+  }
 }
 
 const hasConversation = computed(() => {
@@ -1295,6 +1311,32 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
+
+      <div class="sidebar-footer">
+        <el-dropdown
+          placement="top-start"
+          trigger="click"
+          :teleported="false"
+          @command="handleLogout"
+        >
+          <button type="button" class="sidebar-account-button">
+            <span class="sidebar-account-avatar">{{ accountInitial }}</span>
+            <span class="sidebar-account-copy">
+              <strong>{{ authStore.displayName }}</strong>
+              <small>个人中心</small>
+            </span>
+            <el-icon class="sidebar-account-arrow"><ArrowDown /></el-icon>
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="logout">
+                <el-icon><SwitchButton /></el-icon>
+                退出登录
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
     </aside>
 
     <section class="workspace-main app-shell-panel">
@@ -1739,6 +1781,11 @@ onUnmounted(() => {
   min-height: 240px;
 }
 
+.sidebar-footer {
+  padding-top: 6px;
+  border-top: 1px solid var(--border-soft);
+}
+
 .sidebar-entry,
 .session-entry {
   display: flex;
@@ -1838,6 +1885,75 @@ onUnmounted(() => {
   font-size: 12px;
   line-height: 1.6;
   text-align: center;
+}
+
+.sidebar-account-button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+  padding: 10px 10px 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.52);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+.sidebar-account-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(122, 89, 53, 0.1);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.sidebar-account-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgba(157, 91, 47, 0.14);
+  color: var(--brand-strong);
+  font-size: 12px;
+  font-weight: 700;
+  flex: none;
+}
+
+.sidebar-account-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-account-copy strong,
+.sidebar-account-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-account-copy strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sidebar-account-copy small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.sidebar-account-arrow {
+  color: var(--text-muted);
+  flex: none;
 }
 
 .workspace-main {

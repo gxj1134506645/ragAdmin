@@ -180,12 +180,38 @@ const mentionPanelVisible = computed(() => {
   return !streaming.value && !isKnowledgeBaseScene.value && knowledgeBaseMentionState.value !== null
 })
 
+const sidebarKnowledgeBases = computed<KnowledgeBaseSummary[]>(() => {
+  return availableKnowledgeBases.value
+})
+
 const currentModelName = computed(() => {
   if (!selectedModelId.value) {
     return '系统默认模型'
   }
   return availableModels.value.find((item) => item.id === selectedModelId.value)?.modelName || '指定模型'
 })
+
+function handleOpenGeneralChat(): void {
+  if (streaming.value || !isKnowledgeBaseScene.value) {
+    return
+  }
+  void router.push({ name: 'app-chat-home' })
+}
+
+function handleOpenKnowledgeBase(kbId: number): void {
+  if (streaming.value) {
+    return
+  }
+  if (isKnowledgeBaseScene.value && props.anchorKbId === kbId) {
+    return
+  }
+  void router.push({
+    name: 'app-knowledge-base-chat',
+    params: {
+      kbId: String(kbId),
+    },
+  })
+}
 
 function handleSelectModel(modelId?: number): void {
   if (streaming.value) {
@@ -1178,14 +1204,7 @@ onUnmounted(() => {
 <template>
   <section class="workspace-shell">
     <aside class="workspace-sidebar app-shell-panel">
-      <div class="sidebar-section sidebar-sessions">
-        <div class="sidebar-section-head">
-          <div>
-            <p>{{ sessionPanelTitle }}</p>
-            <span>{{ sessionPanelHint }}</span>
-          </div>
-          <small>{{ sessions.length }}</small>
-        </div>
+      <div class="sidebar-section">
         <el-button
           class="sidebar-primary-action"
           type="primary"
@@ -1195,6 +1214,54 @@ onUnmounted(() => {
         >
           新会话
         </el-button>
+        <button
+          type="button"
+          class="sidebar-entry"
+          :class="{ 'is-active': !isKnowledgeBaseScene }"
+          :disabled="streaming"
+          @click="handleOpenGeneralChat"
+        >
+          <strong>通用问答</strong>
+          <span>默认纯模型对话，按需临时接入知识库。</span>
+        </button>
+      </div>
+
+      <div class="sidebar-section sidebar-knowledge">
+        <div class="sidebar-section-head">
+          <div>
+            <p>知识库</p>
+            <span>进入单知识库问答</span>
+          </div>
+          <small v-if="sidebarKnowledgeBases.length > 0">{{ sidebarKnowledgeBases.length }}</small>
+        </div>
+        <div class="sidebar-list thin-scrollbar">
+          <div v-if="optionLoading" class="sidebar-placeholder">正在加载知识库...</div>
+          <button
+            v-for="knowledgeBase in sidebarKnowledgeBases"
+            :key="knowledgeBase.id"
+            type="button"
+            class="sidebar-entry"
+            :class="{ 'is-active': isKnowledgeBaseScene && props.anchorKbId === knowledgeBase.id }"
+            :disabled="streaming"
+            @click="handleOpenKnowledgeBase(knowledgeBase.id)"
+          >
+            <strong>{{ knowledgeBase.kbName }}</strong>
+            <span>{{ knowledgeBase.kbCode }}</span>
+          </button>
+          <div v-if="!optionLoading && sidebarKnowledgeBases.length === 0" class="sidebar-placeholder">
+            暂无知识库
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section sidebar-sessions">
+        <div class="sidebar-section-head">
+          <div>
+            <p>{{ sessionPanelTitle }}</p>
+            <span>{{ sessionPanelHint }}</span>
+          </div>
+          <small>{{ sessions.length }}</small>
+        </div>
         <div class="sidebar-list thin-scrollbar">
           <div v-if="sessionLoading" class="sidebar-placeholder">正在加载会话...</div>
           <div
@@ -1210,13 +1277,6 @@ onUnmounted(() => {
               @click="handleSelectSession(session)"
             >
               <strong>{{ session.sessionName }}</strong>
-              <span>
-                {{
-                  session.selectedKbIds.length > 0
-                    ? `${session.selectedKbIds.length} 个知识库参与检索`
-                    : '纯模型上下文'
-                }}
-              </span>
             </button>
             <el-dropdown
               trigger="click"
@@ -1253,9 +1313,8 @@ onUnmounted(() => {
         <div class="toolbar-copy">
           <div class="toolbar-title-row">
             <h1>{{ workspaceTitle }}</h1>
-            <span class="toolbar-scene-tag">{{ isKnowledgeBaseScene ? '知识库问答' : '通用问答' }}</span>
           </div>
-          <p>{{ workspaceDescription }}</p>
+          <p class="toolbar-description">{{ workspaceDescription }}</p>
         </div>
         <div class="toolbar-actions">
           <el-button text :icon="ChatDotRound" :disabled="streaming" @click="handleClearView">清空视图</el-button>
@@ -1389,7 +1448,6 @@ onUnmounted(() => {
         </template>
 
         <div v-else class="conversation-empty">
-          <p class="conversation-empty-kicker">{{ isKnowledgeBaseScene ? '知识库问答' : '开始新的对话' }}</p>
           <h2>{{ workspaceTitle }}</h2>
           <p>{{ composerPlaceholder }}</p>
         </div>
@@ -1506,7 +1564,7 @@ onUnmounted(() => {
                 <template #reference>
                   <button type="button" class="composer-tool-button" :disabled="streaming">
                     <span>知识库</span>
-                    <strong>{{ selectedKbIds.length > 0 ? `已选择 ${selectedKbIds.length} 个` : '多选知识库' }}</strong>
+                    <strong>{{ selectedKbIds.length > 0 ? `${selectedKbIds.length} 个已选` : '多选知识库' }}</strong>
                   </button>
                 </template>
                 <div class="range-picker">
@@ -1560,8 +1618,8 @@ onUnmounted(() => {
                 :disabled="streaming"
                 @click="webSearchEnabled = !webSearchEnabled"
               >
-                <span>联网搜索</span>
-                <strong>{{ webSearchEnabled ? '已开启' : '已关闭' }}</strong>
+                <span>联网</span>
+                <strong>{{ webSearchEnabled ? '开启' : '关闭' }}</strong>
               </button>
             </div>
 
@@ -1615,7 +1673,7 @@ onUnmounted(() => {
   --accent-soft: rgba(157, 91, 47, 0.1);
   --accent-medium: rgba(157, 91, 47, 0.24);
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr);
   gap: 16px;
   min-height: calc(100vh - 40px);
 }
@@ -1644,6 +1702,10 @@ onUnmounted(() => {
 
 .sidebar-sessions {
   flex: 1;
+  min-height: 0;
+}
+
+.sidebar-knowledge {
   min-height: 0;
 }
 
@@ -1676,10 +1738,14 @@ onUnmounted(() => {
 .sidebar-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.sidebar-knowledge .sidebar-list {
+  max-height: 220px;
 }
 
 .sidebar-sessions .sidebar-list {
@@ -1687,14 +1753,15 @@ onUnmounted(() => {
   min-height: 240px;
 }
 
+.sidebar-entry,
 .session-entry {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 12px 12px 12px 14px;
+  padding: 11px 12px 11px 14px;
   border: 1px solid transparent;
-  border-radius: 18px;
+  border-radius: 16px;
   background: transparent;
   color: inherit;
   transition:
@@ -1703,27 +1770,39 @@ onUnmounted(() => {
     transform 180ms ease;
 }
 
+.sidebar-entry {
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar-entry:hover,
+.sidebar-entry.is-active,
 .session-entry:hover,
 .session-entry.is-active {
   transform: translateY(-1px);
-  border-color: var(--border-medium);
-  background: rgba(255, 255, 255, 0.64);
+  border-color: rgba(122, 89, 53, 0.1);
+  background: rgba(255, 255, 255, 0.52);
 }
 
+.sidebar-entry.is-active,
 .session-entry.is-active {
   border-color: var(--accent-medium);
-  background: rgba(255, 247, 238, 0.9);
+  background: rgba(255, 247, 238, 0.82);
 }
 
+.sidebar-entry:disabled,
 .session-entry-main:disabled {
   cursor: not-allowed;
 }
 
+.sidebar-entry strong,
+.sidebar-entry span,
 .session-entry-main strong,
 .session-entry-main span {
   display: block;
 }
 
+.sidebar-entry strong,
 .session-entry-main strong {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1732,6 +1811,7 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
+.sidebar-entry span,
 .session-entry-main span {
   margin-top: 4px;
   color: var(--text-muted);
@@ -1787,7 +1867,7 @@ onUnmounted(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 24px 24px 18px;
+  padding: 22px 24px 14px;
 }
 
 .toolbar-copy {
@@ -1806,25 +1886,14 @@ onUnmounted(() => {
 
 .toolbar-title-row h1 {
   margin: 0;
-  font-size: clamp(30px, 3vw, 44px);
-  line-height: 1.08;
+  font-size: clamp(26px, 3vw, 38px);
+  line-height: 1.04;
 }
 
-.toolbar-scene-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(255, 247, 238, 0.92);
-  border: 1px solid var(--accent-medium);
-  color: var(--brand-strong);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.toolbar-copy p {
+.toolbar-description {
   margin: 0;
   color: var(--text-secondary);
+  font-size: 14px;
   line-height: 1.7;
 }
 
@@ -1977,7 +2046,7 @@ onUnmounted(() => {
 .conversation-body {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 22px;
   min-height: 0;
   overflow-y: auto;
   padding: 26px 32px;
@@ -1992,29 +2061,22 @@ onUnmounted(() => {
 }
 
 .conversation-empty {
-  gap: 10px;
+  gap: 8px;
   padding: 24px;
   text-align: center;
 }
 
-.conversation-empty-kicker {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
 .conversation-empty h2 {
   margin: 0;
-  font-size: clamp(28px, 3vw, 42px);
-  line-height: 1.1;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.06;
 }
 
 .conversation-empty p:last-child {
-  max-width: 560px;
+  max-width: 520px;
   color: var(--text-secondary);
-  line-height: 1.8;
+  font-size: 14px;
+  line-height: 1.75;
 }
 
 .message-thread {
@@ -2215,28 +2277,28 @@ onUnmounted(() => {
 .composer-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 18px 24px 22px;
+  gap: 10px;
+  padding: 16px 24px 20px;
   border-top: 1px solid var(--border-soft);
   background: rgba(255, 252, 248, 0.92);
 }
 
 .composer-input-shell {
   position: relative;
-  padding: 10px 12px 12px;
+  padding: 8px 10px 10px;
   border: 1px solid var(--border-medium);
-  border-radius: 22px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.94);
 }
 
 .composer-input-shell :deep(.el-textarea__inner) {
-  min-height: 110px;
+  min-height: 96px;
   padding: 6px 4px 0;
   border: none;
   box-shadow: none;
   background: transparent;
   color: inherit;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.8;
 }
 
@@ -2365,15 +2427,15 @@ onUnmounted(() => {
 .composer-toolbelt {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .composer-tool-button {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 7px 11px;
   border: 1px solid var(--border-medium);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.9);
@@ -2409,11 +2471,11 @@ onUnmounted(() => {
 
 .composer-tool-button span {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .composer-tool-button strong {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -2486,7 +2548,7 @@ onUnmounted(() => {
   display: flex;
   flex: 1;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   min-height: 32px;
 }
 

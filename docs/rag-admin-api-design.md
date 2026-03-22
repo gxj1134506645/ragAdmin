@@ -644,6 +644,7 @@
 - `selectedKbIds` 为空时，走纯模型问答
 - `chatModelId` 为运行时模型选择，优先级高于知识库默认聊天模型
 - `webSearchEnabled=true` 时，由后端按 `WebSearchProvider` 配置决定是否补充联网搜索上下文
+- 控制器直接返回 `Flux<ChatStreamEventResponse>`，仍通过 `text/event-stream` 传输；前端按响应体中的 `eventType` 判断事件语义，不再依赖额外的 `event:` / `id:` SSE 包装字段
 - 流式 `DELTA` 事件只承载正文增量；`COMPLETE` 事件除 `messageId`、`answer`、`references`、`usage` 外，还会补充 `metadata`
 - 当前 `metadata` 最小字段为：`confidence`、`hasKnowledgeBaseEvidence`、`needFollowUp`
 

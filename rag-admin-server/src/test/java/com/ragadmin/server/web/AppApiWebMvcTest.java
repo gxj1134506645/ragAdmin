@@ -40,6 +40,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -473,16 +474,15 @@ class AppApiWebMvcTest {
         MvcResult streamResult = protectedMockMvc.perform(asyncDispatch(mvcResult))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
-                .andExpect(content().string(containsString("event:delta")))
-                .andExpect(content().string(containsString("event:complete")))
                 .andExpect(content().string(containsString("\"eventType\":\"DELTA\"")))
                 .andExpect(content().string(containsString("\"eventType\":\"COMPLETE\"")))
-                .andExpect(content().string(containsString("id:103")))
                 .andExpect(content().string(containsString("\"messageId\":103")))
                 .andExpect(content().string(containsString("\"promptTokens\":156")))
                 .andReturn();
 
         String body = streamResult.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertFalse(body.contains("event:"));
+        assertFalse(body.contains("id:103"));
         assertTrue(body.contains("先检查回归测试。"));
         assertTrue(body.contains("再确认知识库引用是否命中。"));
     }

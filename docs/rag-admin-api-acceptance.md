@@ -461,7 +461,7 @@ curl.exe -N `
 判定要点：
 
 - 返回头为 `text/event-stream`
-- 能持续收到 `DELTA` / `COMPLETE` 事件
+- 能持续收到包含 `eventType=DELTA` / `eventType=COMPLETE` 的 JSON 数据块
 - 最终可在消息列表中看到落库消息
 
 ### 5.23 查询前台消息列表

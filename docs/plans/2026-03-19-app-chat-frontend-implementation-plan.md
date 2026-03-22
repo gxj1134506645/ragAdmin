@@ -421,7 +421,7 @@ git commit -m "feat(chat): 支持前台模型切换与联网开关"
 
 - 入参只使用前台 DTO
 - 返回统一 `ApiResponse`
-- 流式接口返回 `Flux<ServerSentEvent<...>>`
+- 流式接口返回 `Flux<...>`
 
 - [ ] **Step 3: 端到端验证 SSE**
 
@@ -738,4 +738,3 @@ git commit -m "docs(app): 补充独立问答前台联调说明"
 - [ ] 后端测试、前端构建、SSE 联调全部通过
 
 Plan complete and saved to `docs/plans/2026-03-19-app-chat-frontend-implementation-plan.md`. Ready to execute?
-

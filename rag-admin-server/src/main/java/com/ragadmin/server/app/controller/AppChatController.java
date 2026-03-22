@@ -14,12 +14,10 @@ import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatStreamEventResponse;
 import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.common.model.PageResponse;
-import com.ragadmin.server.common.web.ServerSentEventSupport;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -112,16 +110,12 @@ public class AppChatController {
     }
 
     @PostMapping(value = "/sessions/{sessionId}/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<ChatStreamEventResponse>> streamChat(
+    public Flux<ChatStreamEventResponse> streamChat(
             @PathVariable Long sessionId,
             @Valid @RequestBody AppChatRequest request,
             HttpServletRequest httpServletRequest
     ) {
-        return ServerSentEventSupport.toEventStream(
-                appChatService.streamChat(sessionId, request, currentUser(httpServletRequest)),
-                ChatStreamEventResponse::eventType,
-                event -> event.messageId() == null ? null : String.valueOf(event.messageId())
-        );
+        return appChatService.streamChat(sessionId, request, currentUser(httpServletRequest));
     }
 
     @PostMapping("/messages/{messageId}/feedback")

@@ -12,6 +12,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -21,10 +22,7 @@ import static org.mockito.Mockito.when;
 class DefaultConversationSummaryGeneratorTest {
 
     @Mock
-    private ChatClientRegistry chatClientRegistry;
-
-    @Mock
-    private ChatModelClient chatModelClient;
+    private ConversationChatClient conversationChatClient;
 
     private DefaultConversationSummaryGenerator generator;
 
@@ -32,7 +30,7 @@ class DefaultConversationSummaryGeneratorTest {
     void setUp() {
         ChatMemoryProperties chatMemoryProperties = new ChatMemoryProperties();
         chatMemoryProperties.setSummaryMaxLength(50);
-        generator = new DefaultConversationSummaryGenerator(chatClientRegistry, chatMemoryProperties);
+        generator = new DefaultConversationSummaryGenerator(conversationChatClient, chatMemoryProperties);
     }
 
     @Test
@@ -47,16 +45,15 @@ class DefaultConversationSummaryGeneratorTest {
                 ),
                 null
         );
-        when(chatClientRegistry.getClient("BAILIAN")).thenReturn(chatModelClient);
-        when(chatModelClient.chat(eq("qwen-plus"), anyList()))
-                .thenReturn(new ChatModelClient.ChatCompletionResult("模型摘要结果", 10, 20));
+        when(conversationChatClient.chatEntity(eq("BAILIAN"), eq("qwen-plus"), anyList(), any()))
+                .thenReturn(new com.ragadmin.server.infra.ai.chat.ConversationSummaryStructuredOutput("模型摘要结果"));
 
         ConversationSummaryResult result = generator.generate(request);
 
         assertEquals(ConversationSummarySource.MODEL, result.source());
         assertEquals("模型摘要结果", result.summaryText());
         assertEquals(2, result.inputMessageSize());
-        verify(chatModelClient).chat(eq("qwen-plus"), anyList());
+        verify(conversationChatClient).chatEntity(eq("BAILIAN"), eq("qwen-plus"), anyList(), any());
     }
 
     @Test
@@ -71,8 +68,8 @@ class DefaultConversationSummaryGeneratorTest {
                 ),
                 null
         );
-        when(chatClientRegistry.getClient("BAILIAN")).thenReturn(chatModelClient);
-        when(chatModelClient.chat(eq("qwen-plus"), anyList())).thenThrow(new RuntimeException("model error"));
+        when(conversationChatClient.chatEntity(eq("BAILIAN"), eq("qwen-plus"), anyList(), any()))
+                .thenThrow(new RuntimeException("model error"));
 
         ConversationSummaryResult result = generator.generate(request);
 
@@ -95,7 +92,7 @@ class DefaultConversationSummaryGeneratorTest {
 
         assertEquals(ConversationSummarySource.RULE_BASED, result.source());
         assertTrue(result.summaryText().contains("用户：只做规则摘要"));
-        verify(chatClientRegistry, never()).getClient(eq("BAILIAN"));
+        verify(conversationChatClient, never()).chatEntity(eq("BAILIAN"), eq("qwen-plus"), anyList(), any());
     }
 
     @Test
@@ -123,18 +120,16 @@ class DefaultConversationSummaryGeneratorTest {
                 List.of(new ChatModelClient.ChatMessage("user", "你好")),
                 null
         );
-        when(chatClientRegistry.getClient("BAILIAN")).thenReturn(chatModelClient);
-        when(chatModelClient.chat(eq("qwen-plus"), anyList()))
-                .thenReturn(new ChatModelClient.ChatCompletionResult("ok", 1, 1));
+        when(conversationChatClient.chatEntity(eq("BAILIAN"), eq("qwen-plus"), anyList(), any()))
+                .thenReturn(new com.ragadmin.server.infra.ai.chat.ConversationSummaryStructuredOutput("ok"));
 
         generator.generate(request);
 
         ArgumentCaptor<List<ChatModelClient.ChatMessage>> captor = ArgumentCaptor.forClass(List.class);
-        verify(chatModelClient).chat(eq("qwen-plus"), captor.capture());
+        verify(conversationChatClient).chatEntity(eq("BAILIAN"), eq("qwen-plus"), captor.capture(), any());
         List<ChatModelClient.ChatMessage> modelMessages = captor.getValue();
         assertEquals(2, modelMessages.size());
         assertEquals("system", modelMessages.get(0).role());
         assertEquals("user", modelMessages.get(1).role());
     }
 }
-

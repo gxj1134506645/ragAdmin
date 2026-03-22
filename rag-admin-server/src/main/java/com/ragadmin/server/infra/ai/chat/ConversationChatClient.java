@@ -6,6 +6,13 @@ import java.util.List;
 
 public interface ConversationChatClient {
 
+    <T> T chatEntity(
+            String providerCode,
+            String modelCode,
+            List<ChatModelClient.ChatMessage> promptMessages,
+            Class<T> responseType
+    );
+
     ChatModelClient.ChatCompletionResult chat(
             String providerCode,
             String modelCode,

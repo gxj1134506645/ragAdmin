@@ -40,6 +40,26 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
     private ChatClientAdvisorProperties chatClientAdvisorProperties;
 
     @Override
+    public <T> T chatEntity(
+            String providerCode,
+            String modelCode,
+            List<ChatModelClient.ChatMessage> promptMessages,
+            Class<T> responseType
+    ) {
+        validatePromptMessages(promptMessages);
+        if (responseType == null) {
+            throw new BusinessException("CHAT_RESPONSE_TYPE_EMPTY", "结构化输出目标类型不能为空", HttpStatus.BAD_REQUEST);
+        }
+
+        var chatModel = springAiModelFactory.createChatModel(providerCode, modelCode);
+        ChatClient chatClient = buildStatelessChatClient(chatModel);
+        return chatClient.prompt()
+                .messages(SpringAiModelSupport.toSpringMessages(promptMessages))
+                .call()
+                .entity(responseType);
+    }
+
+    @Override
     public ChatModelClient.ChatCompletionResult chat(
             String providerCode,
             String modelCode,
@@ -50,9 +70,7 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
         if (!StringUtils.hasText(conversationId)) {
             throw new BusinessException("CHAT_CONVERSATION_ID_INVALID", "会话记忆 conversationId 不能为空", HttpStatus.BAD_REQUEST);
         }
-        if (promptMessages == null || promptMessages.isEmpty()) {
-            throw new BusinessException("CHAT_PROMPT_EMPTY", "聊天提示消息不能为空", HttpStatus.BAD_REQUEST);
-        }
+        validatePromptMessages(promptMessages);
 
         // 已有历史业务消息的旧会话首次切到 memory 链路时，需要先补种，避免上下文突然丢失。
         seedConversationMemoryIfNecessary(conversationId, historyMessages);
@@ -79,9 +97,7 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
         if (!StringUtils.hasText(conversationId)) {
             throw new BusinessException("CHAT_CONVERSATION_ID_INVALID", "会话记忆 conversationId 不能为空", HttpStatus.BAD_REQUEST);
         }
-        if (promptMessages == null || promptMessages.isEmpty()) {
-            throw new BusinessException("CHAT_PROMPT_EMPTY", "聊天提示消息不能为空", HttpStatus.BAD_REQUEST);
-        }
+        validatePromptMessages(promptMessages);
 
         seedConversationMemoryIfNecessary(conversationId, historyMessages);
 
@@ -101,6 +117,12 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
                 .build();
     }
 
+    ChatClient buildStatelessChatClient(org.springframework.ai.chat.model.ChatModel chatModel) {
+        return ChatClient.builder(chatModel)
+                .defaultAdvisors(buildStatelessAdvisors())
+                .build();
+    }
+
     List<Advisor> buildDefaultAdvisors() {
         List<Advisor> advisors = new ArrayList<>();
         advisors.add(MessageChatMemoryAdvisor.builder(chatMemory).build());
@@ -115,6 +137,16 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
         }
 
         return List.copyOf(advisors);
+    }
+
+    List<Advisor> buildStatelessAdvisors() {
+        if (!chatClientAdvisorProperties.isSimpleLoggerAdvisorEnabled()) {
+            return List.of();
+        }
+        return List.of(SimpleLoggerAdvisor.builder()
+                .requestToString(this::formatChatClientRequest)
+                .responseToString(this::formatChatResponse)
+                .build());
     }
 
     String formatChatClientRequest(ChatClientRequest request) {
@@ -219,6 +251,12 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
 
     private int safeInteger(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private void validatePromptMessages(List<ChatModelClient.ChatMessage> promptMessages) {
+        if (promptMessages == null || promptMessages.isEmpty()) {
+            throw new BusinessException("CHAT_PROMPT_EMPTY", "聊天提示消息不能为空", HttpStatus.BAD_REQUEST);
+        }
     }
 
     private String sha256Digest(String value) {

@@ -51,6 +51,17 @@ class SpringAiConversationChatClientTest {
     }
 
     @Test
+    void shouldNotBuildMemoryAdvisorForStatelessStructuredOutputClient() {
+        chatClientAdvisorProperties.setSimpleLoggerAdvisorEnabled(true);
+
+        List<Advisor> advisors = chatClient.buildStatelessAdvisors();
+
+        assertEquals(1, advisors.size());
+        assertInstanceOf(SimpleLoggerAdvisor.class, advisors.getFirst());
+        assertFalse(advisors.stream().anyMatch(MessageChatMemoryAdvisor.class::isInstance));
+    }
+
+    @Test
     void shouldBuildSimpleLoggerAdvisorAfterMemoryAdvisorWhenEnabled() {
         chatClientAdvisorProperties.setSimpleLoggerAdvisorEnabled(true);
 

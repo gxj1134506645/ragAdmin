@@ -29,15 +29,15 @@ public class DefaultConversationSummaryGenerator implements ConversationSummaryG
 
     private static final String EMPTY_SUMMARY = "暂无可摘要的会话内容。";
 
-    private final ChatClientRegistry chatClientRegistry;
+    private final ConversationChatClient conversationChatClient;
 
     private final ChatMemoryProperties chatMemoryProperties;
 
     public DefaultConversationSummaryGenerator(
-            ChatClientRegistry chatClientRegistry,
+            ConversationChatClient conversationChatClient,
             ChatMemoryProperties chatMemoryProperties
     ) {
-        this.chatClientRegistry = chatClientRegistry;
+        this.conversationChatClient = conversationChatClient;
         this.chatMemoryProperties = chatMemoryProperties;
     }
 
@@ -81,12 +81,19 @@ public class DefaultConversationSummaryGenerator implements ConversationSummaryG
             List<ChatModelClient.ChatMessage> messages,
             int maxLength
     ) {
-        ChatModelClient chatModelClient = chatClientRegistry.getClient(request.providerCode());
         List<ChatModelClient.ChatMessage> promptMessages = new ArrayList<>();
         promptMessages.add(new ChatModelClient.ChatMessage("system", SUMMARY_SYSTEM_PROMPT));
         promptMessages.add(new ChatModelClient.ChatMessage("user", buildConversationText(messages)));
-        ChatModelClient.ChatCompletionResult completion = chatModelClient.chat(request.modelCode(), promptMessages);
-        return truncate(normalize(completion.content()), maxLength);
+        ConversationSummaryStructuredOutput structuredOutput = conversationChatClient.chatEntity(
+                request.providerCode(),
+                request.modelCode(),
+                promptMessages,
+                ConversationSummaryStructuredOutput.class
+        );
+        if (structuredOutput == null) {
+            return "";
+        }
+        return truncate(normalize(structuredOutput.summary()), maxLength);
     }
 
     private String generateByRule(List<ChatModelClient.ChatMessage> messages, int maxLength) {
@@ -148,4 +155,3 @@ public class DefaultConversationSummaryGenerator implements ConversationSummaryG
         return text.substring(0, maxLength);
     }
 }
-

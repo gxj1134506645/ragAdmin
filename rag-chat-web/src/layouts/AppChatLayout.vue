@@ -17,5 +17,7 @@
 .chat-main {
   min-width: 0;
   flex: 1;
+  display: flex;
+  min-height: 0;
 }
 </style>

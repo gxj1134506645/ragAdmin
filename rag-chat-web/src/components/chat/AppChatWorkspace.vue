@@ -1702,6 +1702,7 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
   gap: 16px;
+  flex: 1;
   height: calc(100vh - 40px);
   min-height: calc(100vh - 40px);
 }
@@ -1957,9 +1958,10 @@ onUnmounted(() => {
 }
 
 .workspace-main {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  position: relative;
+  display: flex;
   flex: 1;
+  flex-direction: column;
   height: 100%;
   min-height: 0;
   background:
@@ -2135,6 +2137,7 @@ onUnmounted(() => {
 
 .conversation-body {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 22px;
   min-height: 0;
@@ -2365,9 +2368,12 @@ onUnmounted(() => {
 }
 
 .composer-card {
+  position: sticky;
+  bottom: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  margin-top: auto;
   padding: 12px 20px 18px;
   border-top: 1px solid var(--border-soft);
   background:

@@ -1529,161 +1529,160 @@ onUnmounted(() => {
             @keydown="handleComposerKeydown"
             @keyup="handleComposerCursorChange"
           />
-        </div>
-
-        <div class="composer-footer">
-          <div class="composer-footer-left">
-            <div class="composer-toolbelt">
-              <el-popover
-                v-model:visible="modelPickerVisible"
-                placement="top-start"
-                :width="320"
-                trigger="click"
-                :teleported="false"
-                :disabled="streaming"
-                popper-class="workspace-picker-popper"
-              >
-                <template #reference>
-                  <button type="button" class="composer-tool-button" :disabled="streaming">
-                    <span>模型</span>
-                    <strong>{{ currentModelName }}</strong>
-                  </button>
-                </template>
-                <div class="picker-panel">
-                  <div class="picker-panel-head">
-                    <strong>选择模型</strong>
-                    <span>不选择时使用系统默认模型</span>
-                  </div>
-                  <div class="picker-option-list thin-scrollbar">
-                    <button
-                      type="button"
-                      class="picker-option"
-                      :class="{ 'is-active': !selectedModelId }"
-                      @click="handleSelectModel()"
-                    >
-                      <strong>系统默认模型</strong>
-                      <span>由服务端按默认配置决定</span>
+          <div class="composer-bottom-bar">
+            <div class="composer-bottom-left">
+              <div class="composer-toolbelt">
+                <el-popover
+                  v-model:visible="modelPickerVisible"
+                  placement="top-start"
+                  :width="320"
+                  trigger="click"
+                  :teleported="false"
+                  :disabled="streaming"
+                  popper-class="workspace-picker-popper"
+                >
+                  <template #reference>
+                    <button type="button" class="composer-tool-button" :disabled="streaming">
+                      <span>模型</span>
+                      <strong>{{ currentModelName }}</strong>
                     </button>
-                    <button
-                      v-for="model in availableModels"
-                      :key="model.id"
-                      type="button"
-                      class="picker-option"
-                      :class="{ 'is-active': selectedModelId === model.id }"
-                      @click="handleSelectModel(model.id)"
-                    >
-                      <strong>{{ model.modelName }}</strong>
-                      <span>{{ model.modelCode }}</span>
-                    </button>
-                  </div>
-                </div>
-              </el-popover>
-
-              <el-popover
-                v-if="!isKnowledgeBaseScene"
-                v-model:visible="knowledgeBasePickerVisible"
-                placement="top-start"
-                :width="360"
-                trigger="click"
-                :disabled="streaming"
-                :teleported="false"
-                popper-class="workspace-picker-popper"
-              >
-                <template #reference>
-                  <button type="button" class="composer-tool-button" :disabled="streaming">
-                    <span>知识库</span>
-                    <strong>{{ selectedKbIds.length > 0 ? `${selectedKbIds.length} 个已选` : '多选知识库' }}</strong>
-                  </button>
-                </template>
-                <div class="range-picker">
-                  <div class="range-picker-head">
-                    <div>
-                      <strong>选择本轮检索知识库</strong>
-                      <span>支持多选，不选则走纯模型回答</span>
+                  </template>
+                  <div class="picker-panel">
+                    <div class="picker-panel-head">
+                      <strong>选择模型</strong>
+                      <span>不选择时使用系统默认模型</span>
                     </div>
-                    <el-button
-                      text
-                      size="small"
-                      :disabled="streaming || selectedKbIds.length === 0"
-                      @click="clearSelectedKnowledgeBases"
-                    >
-                      清空
-                    </el-button>
+                    <div class="picker-option-list thin-scrollbar">
+                      <button
+                        type="button"
+                        class="picker-option"
+                        :class="{ 'is-active': !selectedModelId }"
+                        @click="handleSelectModel()"
+                      >
+                        <strong>系统默认模型</strong>
+                        <span>由服务端按默认配置决定</span>
+                      </button>
+                      <button
+                        v-for="model in availableModels"
+                        :key="model.id"
+                        type="button"
+                        class="picker-option"
+                        :class="{ 'is-active': selectedModelId === model.id }"
+                        @click="handleSelectModel(model.id)"
+                      >
+                        <strong>{{ model.modelName }}</strong>
+                        <span>{{ model.modelCode }}</span>
+                      </button>
+                    </div>
                   </div>
-                  <el-input
-                    v-model="knowledgeBasePickerKeyword"
-                    clearable
-                    :disabled="streaming"
-                    placeholder="搜索知识库编码或名称"
-                  />
-                  <div class="range-picker-list thin-scrollbar">
-                    <button
-                      v-for="knowledgeBase in filteredKnowledgeBases"
-                      :key="knowledgeBase.id"
-                      type="button"
-                      class="range-picker-item"
-                      :class="{ 'is-selected': selectedKbIds.includes(knowledgeBase.id) }"
-                      :disabled="streaming"
-                      @click="toggleKnowledgeBaseSelection(knowledgeBase.id)"
-                    >
-                      <div class="range-picker-copy">
-                        <strong>{{ knowledgeBase.kbName }}</strong>
-                        <span>{{ knowledgeBase.kbCode }}</span>
+                </el-popover>
+
+                <el-popover
+                  v-if="!isKnowledgeBaseScene"
+                  v-model:visible="knowledgeBasePickerVisible"
+                  placement="top-start"
+                  :width="360"
+                  trigger="click"
+                  :disabled="streaming"
+                  :teleported="false"
+                  popper-class="workspace-picker-popper"
+                >
+                  <template #reference>
+                    <button type="button" class="composer-tool-button" :disabled="streaming">
+                      <span>知识库</span>
+                      <strong>{{ selectedKbIds.length > 0 ? `${selectedKbIds.length} 个已选` : '多选知识库' }}</strong>
+                    </button>
+                  </template>
+                  <div class="range-picker">
+                    <div class="range-picker-head">
+                      <div>
+                        <strong>选择本轮检索知识库</strong>
+                        <span>支持多选，不选则走纯模型回答</span>
                       </div>
-                      <small>{{ selectedKbIds.includes(knowledgeBase.id) ? '已选择' : '点击接入' }}</small>
-                    </button>
-                    <div v-if="filteredKnowledgeBases.length === 0" class="range-picker-empty">
-                      未找到匹配知识库
+                      <el-button
+                        text
+                        size="small"
+                        :disabled="streaming || selectedKbIds.length === 0"
+                        @click="clearSelectedKnowledgeBases"
+                      >
+                        清空
+                      </el-button>
+                    </div>
+                    <el-input
+                      v-model="knowledgeBasePickerKeyword"
+                      clearable
+                      :disabled="streaming"
+                      placeholder="搜索知识库编码或名称"
+                    />
+                    <div class="range-picker-list thin-scrollbar">
+                      <button
+                        v-for="knowledgeBase in filteredKnowledgeBases"
+                        :key="knowledgeBase.id"
+                        type="button"
+                        class="range-picker-item"
+                        :class="{ 'is-selected': selectedKbIds.includes(knowledgeBase.id) }"
+                        :disabled="streaming"
+                        @click="toggleKnowledgeBaseSelection(knowledgeBase.id)"
+                      >
+                        <div class="range-picker-copy">
+                          <strong>{{ knowledgeBase.kbName }}</strong>
+                          <span>{{ knowledgeBase.kbCode }}</span>
+                        </div>
+                        <small>{{ selectedKbIds.includes(knowledgeBase.id) ? '已选择' : '点击接入' }}</small>
+                      </button>
+                      <div v-if="filteredKnowledgeBases.length === 0" class="range-picker-empty">
+                        未找到匹配知识库
+                      </div>
                     </div>
                   </div>
-                </div>
-              </el-popover>
+                </el-popover>
 
-              <button
-                type="button"
-                class="composer-tool-button"
-                :class="{ 'is-active': webSearchEnabled }"
-                :disabled="streaming"
-                @click="webSearchEnabled = !webSearchEnabled"
-              >
-                <span>联网</span>
-                <strong>{{ webSearchEnabled ? '开启' : '关闭' }}</strong>
-              </button>
+                <button
+                  type="button"
+                  class="composer-tool-button"
+                  :class="{ 'is-active': webSearchEnabled }"
+                  :disabled="streaming"
+                  @click="webSearchEnabled = !webSearchEnabled"
+                >
+                  <span>联网</span>
+                  <strong>{{ webSearchEnabled ? '开启' : '关闭' }}</strong>
+                </button>
+              </div>
+
+              <div class="composer-footer-tags">
+                <el-tag
+                  v-for="knowledgeBase in selectedKnowledgeBases"
+                  :key="knowledgeBase.id"
+                  :closable="!isKnowledgeBaseScene && !streaming"
+                  effect="plain"
+                  type="info"
+                  @close="removeSelectedKnowledgeBase(knowledgeBase.id)"
+                >
+                  @{{ knowledgeBase.kbName }}
+                </el-tag>
+                <span v-if="selectedKnowledgeBases.length === 0" class="composer-footer-hint">
+                  输入 @ 接入知识库，Enter 发送
+                </span>
+              </div>
             </div>
 
-            <div class="composer-footer-tags">
+            <div class="composer-footer-actions">
               <el-tag
-                v-for="knowledgeBase in selectedKnowledgeBases"
-                :key="knowledgeBase.id"
-                :closable="!isKnowledgeBaseScene && !streaming"
+                v-if="isKnowledgeBaseScene"
                 effect="plain"
-                type="info"
-                @close="removeSelectedKnowledgeBase(knowledgeBase.id)"
+                type="warning"
               >
-                @{{ knowledgeBase.kbName }}
+                当前知识库已固定接入
               </el-tag>
-              <span v-if="selectedKnowledgeBases.length === 0" class="composer-footer-hint">
-                输入 @ 接入知识库，Enter 发送
-              </span>
+              <el-button
+                type="primary"
+                :loading="streaming"
+                :disabled="!draftQuestion.trim()"
+                @click="handleSendQuestion"
+              >
+                {{ streaming ? '生成中...' : '发送' }}
+              </el-button>
             </div>
-          </div>
-
-          <div class="composer-footer-actions">
-            <el-tag
-              v-if="isKnowledgeBaseScene"
-              effect="plain"
-              type="warning"
-            >
-              当前知识库已固定接入
-            </el-tag>
-            <el-button
-              type="primary"
-              :loading="streaming"
-              :disabled="!draftQuestion.trim()"
-              @click="handleSendQuestion"
-            >
-              {{ streaming ? '生成中...' : '发送' }}
-            </el-button>
           </div>
         </div>
       </footer>
@@ -1703,6 +1702,7 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
   gap: 16px;
+  height: calc(100vh - 40px);
   min-height: calc(100vh - 40px);
 }
 
@@ -1960,6 +1960,8 @@ onUnmounted(() => {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   flex: 1;
+  height: 100%;
+  min-height: 0;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(255, 252, 248, 0.92));
 }
@@ -2366,21 +2368,24 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px 20px 18px;
+  padding: 12px 20px 18px;
   border-top: 1px solid var(--border-soft);
-  background: rgba(255, 252, 248, 0.92);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 248, 0), rgba(255, 252, 248, 0.9) 22%, rgba(255, 252, 248, 0.96));
+  z-index: 3;
 }
 
 .composer-input-shell {
   position: relative;
-  padding: 8px 10px 8px;
+  padding: 8px 10px 10px;
   border: 1px solid rgba(122, 89, 53, 0.12);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10px 24px rgba(91, 58, 24, 0.04);
 }
 
 .composer-input-shell :deep(.el-textarea__inner) {
-  min-height: 88px;
+  min-height: 96px;
   padding: 6px 4px 0;
   border: none;
   box-shadow: none;
@@ -2497,14 +2502,17 @@ onUnmounted(() => {
   font-size: 12px;
 }
 
-.composer-footer {
+.composer-bottom-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(122, 89, 53, 0.08);
 }
 
-.composer-footer-left {
+.composer-bottom-left {
   display: flex;
   flex: 1;
   min-width: 0;
@@ -2650,6 +2658,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+  align-self: flex-end;
 }
 
 @media (max-width: 1280px) {
@@ -2664,7 +2673,7 @@ onUnmounted(() => {
 
 @media (max-width: 960px) {
   .workspace-toolbar,
-  .composer-footer {
+  .composer-bottom-bar {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -2690,6 +2699,11 @@ onUnmounted(() => {
   .reference-actions {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .composer-footer-actions {
+    align-self: stretch;
+    justify-content: space-between;
   }
 }
 

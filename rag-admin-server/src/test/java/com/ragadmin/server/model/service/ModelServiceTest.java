@@ -265,6 +265,63 @@ class ModelServiceTest {
     }
 
     @Test
+    void shouldPreferDatabaseDefaultChatModelWhenConfigured() {
+        AiProviderEntity provider = new AiProviderEntity();
+        provider.setId(80L);
+        provider.setProviderCode("BAILIAN");
+        provider.setProviderName("百炼");
+
+        AiModelEntity model = new AiModelEntity();
+        model.setId(8L);
+        model.setProviderId(80L);
+        model.setModelCode("qwen-plus");
+        model.setStatus("ENABLED");
+        model.setIsDefaultChatModel(Boolean.TRUE);
+
+        when(aiModelMapper.selectList(any())).thenReturn(List.of(model));
+        when(aiModelMapper.selectById(8L)).thenReturn(model);
+        when(aiProviderMapper.selectById(80L)).thenReturn(provider);
+        when(aiModelCapabilityMapper.selectEnabledByModelIds(List.of(8L)))
+                .thenReturn(List.of(capability(8L, "TEXT_GENERATION")));
+
+        ModelService.ChatModelDescriptor descriptor = modelService.resolveChatModelDescriptor(null);
+
+        assertEquals(8L, descriptor.modelId());
+        assertEquals("qwen-plus", descriptor.modelCode());
+        assertEquals("BAILIAN", descriptor.providerCode());
+    }
+
+    @Test
+    void shouldSetDefaultChatModel() {
+        AiModelEntity model = new AiModelEntity();
+        model.setId(9L);
+        model.setProviderId(90L);
+        model.setModelCode("qwen-max");
+        model.setModelName("通义千问 Max");
+        model.setModelType("CHAT");
+        model.setStatus("ENABLED");
+        model.setIsDefaultChatModel(Boolean.FALSE);
+
+        AiProviderEntity provider = new AiProviderEntity();
+        provider.setId(90L);
+        provider.setProviderCode("BAILIAN");
+        provider.setProviderName("百炼");
+
+        when(aiModelMapper.selectById(9L)).thenReturn(model);
+        when(aiProviderMapper.selectById(90L)).thenReturn(provider);
+        when(aiModelCapabilityMapper.selectEnabledByModelIds(List.of(9L)))
+                .thenReturn(List.of(capability(9L, "TEXT_GENERATION")));
+
+        ModelResponse response = modelService.setDefaultChatModel(9L);
+
+        assertTrue(response.isDefaultChatModel());
+        assertEquals(9L, response.id());
+        assertEquals("qwen-max", response.modelCode());
+        verify(aiModelMapper).update(any(AiModelEntity.class), any());
+        verify(aiModelMapper).updateById(model);
+    }
+
+    @Test
     void shouldResolveDefaultEmbeddingModelDescriptorForOllama() {
         AiProviderEntity provider = new AiProviderEntity();
         provider.setId(60L);

@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS ai_model (
     model_type          VARCHAR(32) NOT NULL,
     max_tokens          INTEGER,
     temperature_default NUMERIC(6, 3),
+    is_default_chat_model BOOLEAN NOT NULL DEFAULT FALSE,
     status              VARCHAR(16) NOT NULL DEFAULT 'ENABLED',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -105,6 +106,7 @@ CREATE TABLE IF NOT EXISTS ai_model (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ai_model_provider_id ON ai_model (provider_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_ai_model_default_chat_model ON ai_model (is_default_chat_model) WHERE is_default_chat_model = TRUE;
 
 CREATE TABLE IF NOT EXISTS ai_model_capability (
     id                  BIGSERIAL PRIMARY KEY,

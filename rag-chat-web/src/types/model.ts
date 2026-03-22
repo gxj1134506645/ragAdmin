@@ -10,4 +10,5 @@ export interface ModelSummary {
   maxTokens: number | null
   temperatureDefault: number | null
   status: string
+  isDefaultChatModel: boolean
 }

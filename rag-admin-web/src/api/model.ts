@@ -52,6 +52,11 @@ export async function updateModel(modelId: number, payload: UpdateModelRequest):
   return unwrapResponse(response.data)
 }
 
+export async function setDefaultChatModel(modelId: number): Promise<ModelDefinition> {
+  const response = await http.post<ApiResponse<ModelDefinition>>(`/admin/models/${modelId}/default-chat-model`)
+  return unwrapResponse(response.data)
+}
+
 export async function deleteModel(modelId: number): Promise<void> {
   const response = await http.delete<ApiResponse<null>>(`/admin/models/${modelId}`)
   unwrapResponse(response.data)

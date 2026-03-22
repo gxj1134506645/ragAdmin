@@ -18,6 +18,7 @@ import {
   healthCheckModelProvider,
   listModelProviders,
   listModels,
+  setDefaultChatModel,
   updateModel,
 } from '@/api/model'
 import { resolveErrorMessage } from '@/api/http'
@@ -37,6 +38,7 @@ const modelDialogVisible = ref(false)
 const modelDialogMode = ref<'create' | 'edit'>('create')
 const editingModelId = ref<number | null>(null)
 const modelCheckingIds = ref<number[]>([])
+const defaultChatModelLoadingId = ref<number | null>(null)
 const models = ref<ModelDefinition[]>([])
 const modelHealthResult = ref<ModelHealthCheck | null>(null)
 const activeModelHealthId = ref<number | null>(null)
@@ -143,6 +145,10 @@ function providerNameById(providerId: number | null): string {
 
 function isEmbeddingModel(modelType: string): boolean {
   return modelType === 'EMBEDDING'
+}
+
+function isChatModel(model: ModelDefinition): boolean {
+  return model.modelType === 'CHAT' || model.capabilityTypes.includes('TEXT_GENERATION')
 }
 
 function allowedCapabilityTypes(modelType: string): string[] {
@@ -388,6 +394,22 @@ async function handleDeleteModel(model: ModelDefinition): Promise<void> {
   }
 }
 
+async function handleSetDefaultChatModel(model: ModelDefinition): Promise<void> {
+  if (model.isDefaultChatModel) {
+    return
+  }
+  defaultChatModelLoadingId.value = model.id
+  try {
+    await setDefaultChatModel(model.id)
+    await loadModels()
+    ElMessage.success(`已将 ${model.modelName} 设为默认聊天模型`)
+  } catch (error) {
+    ElMessage.error(resolveErrorMessage(error))
+  } finally {
+    defaultChatModelLoadingId.value = null
+  }
+}
+
 async function handleSearchModels(): Promise<void> {
   pagination.pageNo = 1
   await loadModels()
@@ -485,7 +507,21 @@ onMounted(async () => {
 
       <el-table :data="models" v-loading="modelLoading" empty-text="暂无模型定义" stripe>
         <el-table-column prop="modelCode" label="模型编码" min-width="180" />
-        <el-table-column prop="modelName" label="模型名称" min-width="180" />
+        <el-table-column label="模型名称" min-width="220">
+          <template #default="{ row }">
+            <div class="model-name-cell">
+              <span>{{ row.modelName }}</span>
+              <el-tag
+                v-if="row.isDefaultChatModel"
+                effect="plain"
+                type="warning"
+                class="default-model-tag"
+              >
+                默认聊天模型
+              </el-tag>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="提供方" min-width="140">
           <template #default="{ row }">
             {{ row.providerName || row.providerCode || '未知' }}
@@ -519,7 +555,7 @@ onMounted(async () => {
             <el-tag :type="statusTagType(row.status)">{{ row.status }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="310" fixed="right">
           <template #default="{ row }">
             <div class="action-links">
               <el-button link type="primary" @click="openEditModelDialog(row)">编辑</el-button>
@@ -530,6 +566,16 @@ onMounted(async () => {
                 @click="handleModelHealthCheck(row)"
               >
                 探活
+              </el-button>
+              <el-button
+                v-if="isChatModel(row)"
+                link
+                :type="row.isDefaultChatModel ? 'warning' : 'primary'"
+                :loading="defaultChatModelLoadingId === row.id"
+                :disabled="row.status !== 'ENABLED' || row.isDefaultChatModel"
+                @click="handleSetDefaultChatModel(row)"
+              >
+                {{ row.isDefaultChatModel ? '默认中' : '设为默认' }}
               </el-button>
               <el-button link type="danger" @click="handleDeleteModel(row)">删除</el-button>
             </div>
@@ -854,6 +900,17 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.model-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.default-model-tag {
+  flex: none;
 }
 
 .health-result {

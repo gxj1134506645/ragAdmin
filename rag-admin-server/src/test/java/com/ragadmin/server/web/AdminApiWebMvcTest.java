@@ -560,7 +560,8 @@ class AdminApiWebMvcTest {
                 "CHAT",
                 null,
                 null,
-                "ENABLED"
+                "ENABLED",
+                false
         ));
 
         protectedMockMvc.perform(put("/api/admin/models/5")
@@ -580,6 +581,32 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.id").value(5))
                 .andExpect(jsonPath("$.data.capabilityTypes[0]").value("TEXT_GENERATION"));
+    }
+
+    @Test
+    void shouldSetDefaultChatModelWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
+        when(modelService.setDefaultChatModel(5L)).thenReturn(new ModelResponse(
+                5L,
+                1L,
+                "BAILIAN",
+                "阿里百炼",
+                "qwen-max",
+                "通义千问 Max",
+                List.of("TEXT_GENERATION"),
+                "CHAT",
+                8000,
+                null,
+                "ENABLED",
+                true
+        ));
+
+        protectedMockMvc.perform(post("/api/admin/models/5/default-chat-model")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.id").value(5))
+                .andExpect(jsonPath("$.data.isDefaultChatModel").value(true));
     }
 
     @Test

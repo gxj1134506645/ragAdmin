@@ -21,6 +21,7 @@ public class AiModelEntity {
     private Integer maxTokens;
     private BigDecimal temperatureDefault;
     private String status;
+    private Boolean isDefaultChatModel;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

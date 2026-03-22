@@ -51,6 +51,11 @@ public class ModelController {
         return ApiResponse.success(modelService.update(modelId, request));
     }
 
+    @PostMapping("/{modelId}/default-chat-model")
+    public ApiResponse<ModelResponse> setDefaultChatModel(@PathVariable Long modelId) {
+        return ApiResponse.success(modelService.setDefaultChatModel(modelId));
+    }
+
     @DeleteMapping("/{modelId}")
     public ApiResponse<Void> delete(@PathVariable Long modelId) {
         modelService.delete(modelId);

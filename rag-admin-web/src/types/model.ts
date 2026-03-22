@@ -27,6 +27,7 @@ export interface ModelDefinition {
   maxTokens?: number | null
   temperatureDefault?: number | null
   status: string
+  isDefaultChatModel: boolean
 }
 
 export interface ModelCreateRequest {

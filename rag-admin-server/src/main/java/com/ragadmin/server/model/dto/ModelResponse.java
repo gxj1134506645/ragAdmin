@@ -14,6 +14,7 @@ public record ModelResponse(
         String modelType,
         Integer maxTokens,
         BigDecimal temperatureDefault,
-        String status
+        String status,
+        boolean isDefaultChatModel
 ) {
 }

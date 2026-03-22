@@ -178,9 +178,13 @@ const sidebarKnowledgeBases = computed<KnowledgeBaseSummary[]>(() => {
   return availableKnowledgeBases.value
 })
 
+const defaultChatModel = computed<ModelSummary | null>(() => {
+  return availableModels.value.find((item) => item.isDefaultChatModel) ?? null
+})
+
 const currentModelName = computed(() => {
   if (!selectedModelId.value) {
-    return '系统默认模型'
+    return defaultChatModel.value?.modelName || '系统默认模型'
   }
   return availableModels.value.find((item) => item.id === selectedModelId.value)?.modelName || '指定模型'
 })
@@ -1553,7 +1557,7 @@ onUnmounted(() => {
                   <div class="picker-panel">
                     <div class="picker-panel-head">
                       <strong>选择模型</strong>
-                      <span>不选择时使用系统默认模型</span>
+                      <span>不选择时使用当前默认聊天模型</span>
                     </div>
                     <div class="picker-option-list thin-scrollbar">
                       <button
@@ -1563,7 +1567,9 @@ onUnmounted(() => {
                         @click="handleSelectModel()"
                       >
                         <strong>系统默认模型</strong>
-                        <span>由服务端按默认配置决定</span>
+                        <span>
+                          {{ defaultChatModel ? `当前为 ${defaultChatModel.modelName} / ${defaultChatModel.modelCode}` : '由服务端默认配置决定' }}
+                        </span>
                       </button>
                       <button
                         v-for="model in availableModels"
@@ -1573,7 +1579,7 @@ onUnmounted(() => {
                         :class="{ 'is-active': selectedModelId === model.id }"
                         @click="handleSelectModel(model.id)"
                       >
-                        <strong>{{ model.modelName }}</strong>
+                        <strong>{{ model.isDefaultChatModel ? `${model.modelName} · 默认` : model.modelName }}</strong>
                         <span>{{ model.modelCode }}</span>
                       </button>
                     </div>

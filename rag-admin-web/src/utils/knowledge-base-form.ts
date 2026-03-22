@@ -97,6 +97,7 @@ function appendSelectedModel(
       capabilityTypes: [],
       modelType: fallbackType,
       status: 'ENABLED',
+      isDefaultChatModel: false,
     },
     ...options,
   ]

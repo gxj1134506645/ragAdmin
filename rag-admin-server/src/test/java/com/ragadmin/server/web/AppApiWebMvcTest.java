@@ -249,7 +249,8 @@ class AppApiWebMvcTest {
                         "CHAT",
                         8000,
                         new BigDecimal("0.7"),
-                        "ENABLED"
+                        "ENABLED",
+                        true
                 )),
                 1,
                 20,
@@ -262,7 +263,8 @@ class AppApiWebMvcTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.list[0].modelCode").value("qwen-max"))
-                .andExpect(jsonPath("$.data.list[0].modelType").value("CHAT"));
+                .andExpect(jsonPath("$.data.list[0].modelType").value("CHAT"))
+                .andExpect(jsonPath("$.data.list[0].isDefaultChatModel").value(true));
     }
 
     @Test

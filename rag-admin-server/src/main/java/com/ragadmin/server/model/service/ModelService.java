@@ -42,6 +42,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -89,6 +90,7 @@ public class ModelService {
     public PageResponse<ModelResponse> list(String providerCode, String capabilityType, String status, long pageNo, long pageSize) {
         LambdaQueryWrapper<AiModelEntity> wrapper = new LambdaQueryWrapper<AiModelEntity>()
                 .eq(StringUtils.hasText(status), AiModelEntity::getStatus, status)
+                .orderByDesc(AiModelEntity::getIsDefaultChatModel)
                 .orderByDesc(AiModelEntity::getId);
 
         if (StringUtils.hasText(providerCode)) {
@@ -130,9 +132,15 @@ public class ModelService {
                         AiModelCapabilityEntity::getModelId,
                         Collectors.mapping(AiModelCapabilityEntity::getCapabilityType, Collectors.toList())
                 ));
+        Long effectiveDefaultChatModelId = resolveEffectiveDefaultChatModelId();
 
         List<ModelResponse> list = records.stream()
-                .map(model -> toResponse(model, providerMap.get(model.getProviderId()), capabilityMap.getOrDefault(model.getId(), List.of())))
+                .map(model -> toResponse(
+                        model,
+                        providerMap.get(model.getProviderId()),
+                        capabilityMap.getOrDefault(model.getId(), List.of()),
+                        Objects.equals(model.getId(), effectiveDefaultChatModelId)
+                ))
                 .toList();
 
         return new PageResponse<>(list, pageNo, pageSize, page.getTotal());
@@ -154,10 +162,11 @@ public class ModelService {
         entity.setMaxTokens(normalizedMaxTokens);
         entity.setTemperatureDefault(normalizedTemperatureDefault);
         entity.setStatus(request.getStatus());
+        entity.setIsDefaultChatModel(Boolean.FALSE);
         aiModelMapper.insert(entity);
         replaceCapabilities(entity.getId(), capabilityTypes);
 
-        return toResponse(entity, provider, capabilityTypes);
+        return toResponse(entity, provider, capabilityTypes, false);
     }
 
     @Transactional
@@ -177,10 +186,43 @@ public class ModelService {
         entity.setMaxTokens(normalizedMaxTokens);
         entity.setTemperatureDefault(normalizedTemperatureDefault);
         entity.setStatus(request.getStatus());
+        if (!isEligibleAsDefaultChatModel(entity, capabilityTypes)) {
+            entity.setIsDefaultChatModel(Boolean.FALSE);
+        }
         aiModelMapper.updateById(entity);
         replaceCapabilities(modelId, capabilityTypes);
 
-        return toResponse(entity, provider, capabilityTypes);
+        return toResponse(entity, provider, capabilityTypes, Boolean.TRUE.equals(entity.getIsDefaultChatModel()));
+    }
+
+    @Transactional
+    public ModelResponse setDefaultChatModel(Long modelId) {
+        AiModelEntity model = requireModelWithCapability(modelId, "TEXT_GENERATION");
+        if (!"ENABLED".equalsIgnoreCase(model.getStatus())) {
+            throw new BusinessException("DEFAULT_CHAT_MODEL_INVALID", "默认聊天模型必须处于启用状态", HttpStatus.BAD_REQUEST);
+        }
+
+        AiModelEntity clearPatch = new AiModelEntity();
+        clearPatch.setIsDefaultChatModel(Boolean.FALSE);
+        aiModelMapper.update(
+                clearPatch,
+                new LambdaQueryWrapper<AiModelEntity>()
+                        .eq(AiModelEntity::getIsDefaultChatModel, Boolean.TRUE)
+                        .ne(AiModelEntity::getId, modelId)
+        );
+
+        if (!Boolean.TRUE.equals(model.getIsDefaultChatModel())) {
+            model.setIsDefaultChatModel(Boolean.TRUE);
+            aiModelMapper.updateById(model);
+        }
+
+        AiProviderEntity provider = requireProvider(model.getProviderId());
+        List<String> capabilityTypes = aiModelCapabilityMapper.selectEnabledByModelIds(List.of(modelId))
+                .stream()
+                .map(AiModelCapabilityEntity::getCapabilityType)
+                .distinct()
+                .toList();
+        return toResponse(model, provider, capabilityTypes, true);
     }
 
     @Transactional
@@ -443,6 +485,14 @@ public class ModelService {
     }
 
     private ChatModelDescriptor resolveDefaultChatModelDescriptor() {
+        ChatModelDescriptor databaseDefault = findSystemDefaultChatModelDescriptor();
+        if (databaseDefault != null) {
+            return databaseDefault;
+        }
+        return resolveConfiguredDefaultChatModelDescriptor();
+    }
+
+    private ChatModelDescriptor resolveConfiguredDefaultChatModelDescriptor() {
         String providerCode = resolveDefaultProviderCode();
         if ("BAILIAN".equalsIgnoreCase(providerCode)) {
             return requireChatDescriptorByProviderAndCode(providerCode, bailianProperties.getDefaultChatModel());
@@ -451,6 +501,53 @@ public class ModelService {
             return requireChatDescriptorByProviderAndCode(providerCode, ollamaProperties.getDefaultChatModel());
         }
         throw new BusinessException("DEFAULT_CHAT_MODEL_UNSUPPORTED", "当前默认提供方未配置聊天默认模型", HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    private ChatModelDescriptor findSystemDefaultChatModelDescriptor() {
+        AiModelEntity defaultModel = findStoredDefaultChatModel();
+        if (defaultModel == null) {
+            return null;
+        }
+        if (!"ENABLED".equalsIgnoreCase(defaultModel.getStatus())) {
+            return null;
+        }
+        return requireChatModelDescriptor(defaultModel.getId());
+    }
+
+    private Long resolveEffectiveDefaultChatModelId() {
+        AiModelEntity storedDefault = findStoredDefaultChatModel();
+        if (storedDefault != null && "ENABLED".equalsIgnoreCase(storedDefault.getStatus())) {
+            try {
+                requireModelWithCapability(storedDefault.getId(), "TEXT_GENERATION");
+                return storedDefault.getId();
+            } catch (BusinessException ex) {
+                log.warn("已忽略无效的后台默认聊天模型，modelId={}, message={}", storedDefault.getId(), ex.getMessage());
+            }
+        }
+
+        try {
+            return resolveConfiguredDefaultChatModelDescriptor().modelId();
+        } catch (BusinessException ex) {
+            log.warn("配置文件默认聊天模型未生效，message={}", ex.getMessage());
+            return null;
+        }
+    }
+
+    private AiModelEntity findStoredDefaultChatModel() {
+        List<AiModelEntity> candidates = aiModelMapper.selectList(new LambdaQueryWrapper<AiModelEntity>()
+                .eq(AiModelEntity::getIsDefaultChatModel, Boolean.TRUE)
+                .orderByDesc(AiModelEntity::getUpdatedAt, AiModelEntity::getId)
+                .last("LIMIT 1"));
+        if (candidates == null || candidates.isEmpty()) {
+            return null;
+        }
+        return candidates.getFirst();
+    }
+
+    private boolean isEligibleAsDefaultChatModel(AiModelEntity model, List<String> capabilityTypes) {
+        return "ENABLED".equalsIgnoreCase(model.getStatus())
+                && "CHAT".equalsIgnoreCase(model.getModelType())
+                && capabilityTypes.contains("TEXT_GENERATION");
     }
 
     private EmbeddingModelDescriptor requireEmbeddingDescriptorByProviderAndCode(String providerCode, String modelCode) {
@@ -513,7 +610,12 @@ public class ModelService {
         return model.getModelCode();
     }
 
-    private ModelResponse toResponse(AiModelEntity entity, AiProviderEntity provider, List<String> capabilityTypes) {
+    private ModelResponse toResponse(
+            AiModelEntity entity,
+            AiProviderEntity provider,
+            List<String> capabilityTypes,
+            boolean isDefaultChatModel
+    ) {
         return new ModelResponse(
                 entity.getId(),
                 entity.getProviderId(),
@@ -525,7 +627,8 @@ public class ModelService {
                 entity.getModelType(),
                 entity.getMaxTokens(),
                 entity.getTemperatureDefault(),
-                entity.getStatus()
+                entity.getStatus(),
+                isDefaultChatModel
         );
     }
 

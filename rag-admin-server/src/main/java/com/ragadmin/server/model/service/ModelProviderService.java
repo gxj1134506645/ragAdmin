@@ -12,8 +12,8 @@ import com.ragadmin.server.model.entity.AiProviderEntity;
 import com.ragadmin.server.model.mapper.AiModelCapabilityMapper;
 import com.ragadmin.server.model.mapper.AiModelMapper;
 import com.ragadmin.server.model.mapper.AiProviderMapper;
-import com.ragadmin.server.infra.ai.chat.ChatClientRegistry;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +41,7 @@ public class ModelProviderService {
     private AiModelCapabilityMapper aiModelCapabilityMapper;
 
     @Autowired
-    private ChatClientRegistry chatClientRegistry;
+    private ConversationChatClient conversationChatClient;
 
     @Autowired
     private EmbeddingClientRegistry embeddingClientRegistry;
@@ -113,8 +113,11 @@ public class ModelProviderService {
             return new ModelProviderCapabilityHealthResponse("TEXT_GENERATION", null, null, "UNKNOWN", "当前提供方下未配置可用聊天模型");
         }
         try {
-            ChatModelClient client = chatClientRegistry.getClient(provider.getProviderCode());
-            client.chat(model.getModelCode(), List.of(new ChatModelClient.ChatMessage("user", "ping")));
+            conversationChatClient.chat(
+                    provider.getProviderCode(),
+                    model.getModelCode(),
+                    List.of(new ChatModelClient.ChatMessage("user", "ping"))
+            );
             return new ModelProviderCapabilityHealthResponse("TEXT_GENERATION", model.getId(), model.getModelCode(), "UP", "聊天能力可用");
         } catch (Exception ex) {
             return new ModelProviderCapabilityHealthResponse("TEXT_GENERATION", model.getId(), model.getModelCode(), "DOWN", resolveMessage(ex, "聊天能力探活失败"));

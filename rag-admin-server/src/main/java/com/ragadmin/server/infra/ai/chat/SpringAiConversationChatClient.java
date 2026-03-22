@@ -40,6 +40,23 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
     private ChatClientAdvisorProperties chatClientAdvisorProperties;
 
     @Override
+    public ChatModelClient.ChatCompletionResult chat(
+            String providerCode,
+            String modelCode,
+            List<ChatModelClient.ChatMessage> promptMessages
+    ) {
+        validatePromptMessages(promptMessages);
+
+        var chatModel = springAiModelFactory.createChatModel(providerCode, modelCode);
+        ChatClient chatClient = buildStatelessChatClient(chatModel);
+        ChatResponse response = chatClient.prompt()
+                .messages(SpringAiModelSupport.toSpringMessages(promptMessages))
+                .call()
+                .chatResponse();
+        return SpringAiModelSupport.toChatCompletionResult(response);
+    }
+
+    @Override
     public <T> T chatEntity(
             String providerCode,
             String modelCode,

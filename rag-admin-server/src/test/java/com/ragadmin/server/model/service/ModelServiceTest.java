@@ -4,8 +4,8 @@ import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
 import com.ragadmin.server.infra.ai.AiProperties;
 import com.ragadmin.server.infra.ai.bailian.BailianProperties;
-import com.ragadmin.server.infra.ai.chat.ChatClientRegistry;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
 import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
@@ -63,7 +63,7 @@ class ModelServiceTest {
     private ModelProviderService modelProviderService;
 
     @Mock
-    private ChatClientRegistry chatClientRegistry;
+    private ConversationChatClient conversationChatClient;
 
     @Mock
     private EmbeddingClientRegistry embeddingClientRegistry;
@@ -83,7 +83,7 @@ class ModelServiceTest {
         ReflectionTestUtils.setField(modelService, "knowledgeBaseMapper", knowledgeBaseMapper);
         ReflectionTestUtils.setField(modelService, "chunkVectorRefMapper", chunkVectorRefMapper);
         ReflectionTestUtils.setField(modelService, "modelProviderService", modelProviderService);
-        ReflectionTestUtils.setField(modelService, "chatClientRegistry", chatClientRegistry);
+        ReflectionTestUtils.setField(modelService, "conversationChatClient", conversationChatClient);
         ReflectionTestUtils.setField(modelService, "embeddingClientRegistry", embeddingClientRegistry);
         ReflectionTestUtils.setField(modelService, "aiProperties", aiProperties);
         ReflectionTestUtils.setField(modelService, "bailianProperties", bailianProperties);
@@ -304,18 +304,6 @@ class ModelServiceTest {
         provider.setProviderCode("OLLAMA");
         provider.setProviderName("Ollama");
 
-        ChatModelClient chatClient = new ChatModelClient() {
-            @Override
-            public boolean supports(String providerCode) {
-                return true;
-            }
-
-            @Override
-            public ChatCompletionResult chat(String modelCode, List<ChatMessage> messages) {
-                return new ChatCompletionResult("pong", 1, 1);
-            }
-        };
-
         EmbeddingModelClient embeddingClient = new EmbeddingModelClient() {
             @Override
             public boolean supports(String providerCode) {
@@ -335,7 +323,8 @@ class ModelServiceTest {
                         capability(3L, "TEXT_GENERATION"),
                         capability(3L, "EMBEDDING")
                 ));
-        when(chatClientRegistry.getClient("OLLAMA")).thenReturn(chatClient);
+        when(conversationChatClient.chat("OLLAMA", "qwen2.5:7b", List.of(new ChatModelClient.ChatMessage("user", "ping"))))
+                .thenReturn(new ChatModelClient.ChatCompletionResult("pong", 1, 1));
         when(embeddingClientRegistry.getClient("OLLAMA")).thenReturn(embeddingClient);
 
         ModelHealthCheckResponse response = modelService.healthCheck(3L);
@@ -358,23 +347,12 @@ class ModelServiceTest {
         provider.setProviderCode("OLLAMA");
         provider.setProviderName("Ollama");
 
-        ChatModelClient chatClient = new ChatModelClient() {
-            @Override
-            public boolean supports(String providerCode) {
-                return true;
-            }
-
-            @Override
-            public ChatCompletionResult chat(String modelCode, List<ChatMessage> messages) {
-                throw new IllegalStateException("聊天探活失败");
-            }
-        };
-
         when(aiModelMapper.selectById(4L)).thenReturn(model);
         when(aiProviderMapper.selectById(40L)).thenReturn(provider);
         when(aiModelCapabilityMapper.selectEnabledByModelIds(List.of(4L)))
                 .thenReturn(List.of(capability(4L, "TEXT_GENERATION")));
-        when(chatClientRegistry.getClient("OLLAMA")).thenReturn(chatClient);
+        when(conversationChatClient.chat("OLLAMA", "qwen-bad", List.of(new ChatModelClient.ChatMessage("user", "ping"))))
+                .thenThrow(new IllegalStateException("聊天探活失败"));
 
         ModelHealthCheckResponse response = modelService.healthCheck(4L);
 

@@ -1,7 +1,7 @@
 package com.ragadmin.server.model.service;
 
-import com.ragadmin.server.infra.ai.chat.ChatClientRegistry;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
 import com.ragadmin.server.model.dto.ModelProviderHealthCheckResponse;
@@ -36,7 +36,7 @@ class ModelProviderServiceTest {
     private AiModelCapabilityMapper aiModelCapabilityMapper;
 
     @Mock
-    private ChatClientRegistry chatClientRegistry;
+    private ConversationChatClient conversationChatClient;
 
     @Mock
     private EmbeddingClientRegistry embeddingClientRegistry;
@@ -49,7 +49,7 @@ class ModelProviderServiceTest {
         ReflectionTestUtils.setField(modelProviderService, "aiProviderMapper", aiProviderMapper);
         ReflectionTestUtils.setField(modelProviderService, "aiModelMapper", aiModelMapper);
         ReflectionTestUtils.setField(modelProviderService, "aiModelCapabilityMapper", aiModelCapabilityMapper);
-        ReflectionTestUtils.setField(modelProviderService, "chatClientRegistry", chatClientRegistry);
+        ReflectionTestUtils.setField(modelProviderService, "conversationChatClient", conversationChatClient);
         ReflectionTestUtils.setField(modelProviderService, "embeddingClientRegistry", embeddingClientRegistry);
     }
 
@@ -63,17 +63,8 @@ class ModelProviderServiceTest {
         when(aiModelCapabilityMapper.selectModelIdsByCapabilityType("TEXT_GENERATION")).thenReturn(List.of(10L));
         when(aiModelCapabilityMapper.selectModelIdsByCapabilityType("EMBEDDING")).thenReturn(List.of(11L));
         when(aiModelMapper.selectOne(org.mockito.ArgumentMatchers.any())).thenReturn(chatModel, embeddingModel);
-        when(chatClientRegistry.getClient("BAILIAN")).thenReturn(new ChatModelClient() {
-            @Override
-            public boolean supports(String providerCode) {
-                return true;
-            }
-
-            @Override
-            public ChatCompletionResult chat(String modelCode, List<ChatMessage> messages) {
-                return new ChatCompletionResult("pong", 1, 1);
-            }
-        });
+        when(conversationChatClient.chat("BAILIAN", "qwen-max", List.of(new ChatModelClient.ChatMessage("user", "ping"))))
+                .thenReturn(new ChatModelClient.ChatCompletionResult("pong", 1, 1));
         when(embeddingClientRegistry.getClient("BAILIAN")).thenReturn(new EmbeddingModelClient() {
             @Override
             public boolean supports(String providerCode) {

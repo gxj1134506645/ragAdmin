@@ -12,8 +12,8 @@ import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
 import com.ragadmin.server.infra.ai.AiProperties;
 import com.ragadmin.server.infra.ai.SpringAiModelSupport;
 import com.ragadmin.server.infra.ai.bailian.BailianProperties;
-import com.ragadmin.server.infra.ai.chat.ChatClientRegistry;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
@@ -71,7 +71,7 @@ public class ModelService {
     private ModelProviderService modelProviderService;
 
     @Autowired
-    private ChatClientRegistry chatClientRegistry;
+    private ConversationChatClient conversationChatClient;
 
     @Autowired
     private EmbeddingClientRegistry embeddingClientRegistry;
@@ -305,8 +305,11 @@ public class ModelService {
     private ModelCapabilityHealthResponse checkCapability(AiProviderEntity provider, AiModelEntity model, String capabilityType) {
         try {
             if ("TEXT_GENERATION".equals(capabilityType)) {
-                ChatModelClient client = chatClientRegistry.getClient(provider.getProviderCode());
-                client.chat(model.getModelCode(), List.of(new ChatModelClient.ChatMessage("user", "ping")));
+                conversationChatClient.chat(
+                        provider.getProviderCode(),
+                        model.getModelCode(),
+                        List.of(new ChatModelClient.ChatMessage("user", "ping"))
+                );
                 return new ModelCapabilityHealthResponse(capabilityType, "UP", "聊天能力可用");
             }
             if ("EMBEDDING".equals(capabilityType)) {

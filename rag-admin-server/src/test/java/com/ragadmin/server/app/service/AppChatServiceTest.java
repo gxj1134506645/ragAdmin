@@ -68,6 +68,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import reactor.core.publisher.Flux;
 
 @ExtendWith(MockitoExtension.class)
 class AppChatServiceTest {
@@ -596,6 +597,92 @@ class AppChatServiceTest {
         assertEquals(1, events.size());
         assertEquals("ERROR", events.getFirst().eventType());
         assertEquals("会话不存在", events.getFirst().errorMessage());
+    }
+
+    @Test
+    void shouldIgnoreEmptyStreamChunkAndStillCompleteInAppChat() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(601L);
+        session.setUserId(8001L);
+        session.setSceneType(ChatSceneTypes.GENERAL);
+        session.setTerminalType(ChatTerminalTypes.APP);
+        session.setSessionName("首页会话");
+        session.setStatus("ENABLED");
+
+        AppChatRequest request = new AppChatRequest();
+        request.setQuestion("帮我总结一下");
+
+        ModelService.ChatModelDescriptor modelDescriptor = new ModelService.ChatModelDescriptor(
+                901L,
+                "qwen-max",
+                "BAILIAN",
+                "百炼"
+        );
+        RetrievalService.RetrievalResult retrievalResult = new RetrievalService.RetrievalResult(List.of(), "");
+
+        when(chatSessionMapper.selectById(601L)).thenReturn(session);
+        when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of());
+        when(modelService.resolveChatModelDescriptor(null)).thenReturn(modelDescriptor);
+        when(conversationChatClient.stream(eq("BAILIAN"), eq("qwen-max"), any(), any(), any()))
+                .thenReturn(Flux.just(
+                        chatChunk("先给出结论。", 30, 5),
+                        chatChunk("", 30, 18)
+                ));
+        when(chatExchangePersistenceService.persistExchange(
+                eq(session),
+                eq(8001L),
+                eq("帮我总结一下"),
+                eq("先给出结论。"),
+                eq(901L),
+                eq(30),
+                eq(18),
+                anyInt(),
+                any(),
+                eq(retrievalResult)
+        )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
+                3001L,
+                "先给出结论。",
+                List.of(),
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(30, 18),
+                null
+        ));
+
+        List<ChatStreamEventResponse> events = appChatService.streamChat(601L, request, user(8001L))
+                .collectList()
+                .block();
+
+        assertNotNull(events);
+        assertEquals(2, events.size());
+        assertEquals("DELTA", events.get(0).eventType());
+        assertEquals("先给出结论。", events.get(0).delta());
+        assertEquals("COMPLETE", events.get(1).eventType());
+        assertEquals(3001L, events.get(1).messageId());
+    }
+
+    private org.springframework.ai.chat.model.ChatResponse chatChunk(String text, int promptTokens, int completionTokens) {
+        return org.springframework.ai.chat.model.ChatResponse.builder()
+                .metadata(org.springframework.ai.chat.metadata.ChatResponseMetadata.builder()
+                        .usage(new org.springframework.ai.chat.metadata.Usage() {
+                            @Override
+                            public Integer getPromptTokens() {
+                                return promptTokens;
+                            }
+
+                            @Override
+                            public Integer getCompletionTokens() {
+                                return completionTokens;
+                            }
+
+                            @Override
+                            public Object getNativeUsage() {
+                                return null;
+                            }
+                        })
+                        .build())
+                .generations(List.of(new org.springframework.ai.chat.model.Generation(
+                        new org.springframework.ai.chat.messages.AssistantMessage(text)
+                )))
+                .build();
     }
 
     private AuthenticatedUser user(Long userId) {

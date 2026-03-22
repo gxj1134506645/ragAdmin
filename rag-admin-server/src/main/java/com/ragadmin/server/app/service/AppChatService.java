@@ -349,16 +349,15 @@ public class AppChatService {
                                     execution.promptMessages(),
                                     execution.historyMessages()
                             )
-                            .map(chunk -> {
+                            .<ChatStreamEventResponse>handle((chunk, sink) -> {
                                 updateUsage(chunk, promptTokensRef, completionTokensRef);
                                 String delta = extractStreamText(chunk);
                                 if (!StringUtils.hasLength(delta)) {
-                                    return null;
+                                    return;
                                 }
                                 answerBuilder.append(delta);
-                                return ChatStreamEventResponse.delta(delta);
+                                sink.next(ChatStreamEventResponse.delta(delta));
                             })
-                            .filter(Objects::nonNull)
                             .concatWith(Mono.fromSupplier(() -> {
                                 ChatAnswerMetadata answerMetadata = generateAnswerMetadata(
                                         execution,

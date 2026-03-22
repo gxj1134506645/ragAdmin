@@ -1,6 +1,7 @@
 package com.ragadmin.server.chat.service;
 
 import com.ragadmin.server.auth.model.AuthenticatedUser;
+import com.ragadmin.server.chat.ChatSceneTypes;
 import com.ragadmin.server.chat.dto.ChatRequest;
 import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatStreamEventResponse;
@@ -527,6 +528,60 @@ class ChatServiceTest {
         assertEquals("COMPLETE", events.get(2).eventType());
         assertEquals("MEDIUM", events.get(2).metadata().confidence());
         assertEquals(true, events.get(2).metadata().hasKnowledgeBaseEvidence());
+    }
+
+    @Test
+    void shouldIgnoreEmptyStreamChunkAndStillCompleteInAdminChat() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(35L);
+        session.setUserId(100L);
+        session.setSceneType(ChatSceneTypes.GENERAL);
+
+        ChatRequest request = new ChatRequest();
+        request.setQuestion("制度重点是什么？");
+
+        ModelService.ChatModelDescriptor modelDescriptor = new ModelService.ChatModelDescriptor(
+                501L,
+                "qwen-max",
+                "BAILIAN",
+                "百炼"
+        );
+        RetrievalService.RetrievalResult retrievalResult = new RetrievalService.RetrievalResult(List.of(), "");
+
+        when(chatSessionMapper.selectById(35L)).thenReturn(session);
+        when(modelService.resolveChatModelDescriptor(null)).thenReturn(modelDescriptor);
+        when(conversationChatClient.stream(eq("BAILIAN"), eq("qwen-max"), any(), any(), any()))
+                .thenReturn(Flux.just(
+                        chatChunk("先看制度要求。", 12, 4),
+                        chatChunk("", 12, 16)
+                ));
+        when(chatExchangePersistenceService.persistExchange(
+                eq(session),
+                eq(100L),
+                eq("制度重点是什么？"),
+                eq("先看制度要求。"),
+                eq(501L),
+                eq(12),
+                eq(16),
+                anyInt(),
+                any(),
+                eq(retrievalResult)
+        )).thenReturn(new ChatResponse(
+                2002L,
+                "先看制度要求。",
+                List.of(),
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(12, 16),
+                null
+        ));
+
+        List<ChatStreamEventResponse> events = chatService.streamChat(35L, request, user(100L)).collectList().block();
+
+        assertNotNull(events);
+        assertEquals(2, events.size());
+        assertEquals("DELTA", events.get(0).eventType());
+        assertEquals("先看制度要求。", events.get(0).delta());
+        assertEquals("COMPLETE", events.get(1).eventType());
+        assertEquals(2002L, events.get(1).messageId());
     }
 
     private org.springframework.ai.chat.model.ChatResponse chatChunk(String text, int promptTokens, int completionTokens) {

@@ -1,5 +1,6 @@
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import type { TaskRealtimeEvent } from '@/types/realtime'
+import { parseStreamEventData } from '@/api/stream'
 import { getAccessToken } from '@/utils/token-storage'
 
 export interface RealtimeStreamHandle {
@@ -31,11 +32,12 @@ function subscribe(
           Accept: 'text/event-stream',
         },
     onmessage(message) {
-      if (!message.data) {
-        return
-      }
       try {
-        options.onEvent(JSON.parse(message.data) as TaskRealtimeEvent)
+        const event = parseStreamEventData<TaskRealtimeEvent>(message)
+        if (!event) {
+          return
+        }
+        options.onEvent(event)
       } catch (error) {
         options.onError?.(error)
       }

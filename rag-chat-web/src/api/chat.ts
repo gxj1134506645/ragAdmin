@@ -1,5 +1,6 @@
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { http, resolveErrorMessage, unwrapResponse } from '@/api/http'
+import { parseStreamEventData } from '@/api/stream'
 import type { PageResponse } from '@/types/api'
 import type {
   ChatExchange,
@@ -138,10 +139,10 @@ export function streamChatMessage(
       }
     },
     onmessage(message) {
-      if (!message.data) {
+      const event = parseStreamEventData<ChatStreamEvent>(message)
+      if (!event) {
         return
       }
-      const event = JSON.parse(message.data) as ChatStreamEvent
       if (event.eventType === 'COMPLETE' || event.eventType === 'ERROR') {
         completed = true
       }

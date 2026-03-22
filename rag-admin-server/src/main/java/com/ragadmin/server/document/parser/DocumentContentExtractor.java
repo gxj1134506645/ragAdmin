@@ -46,6 +46,9 @@ public class DocumentContentExtractor {
     public String extract(DocumentEntity document, DocumentVersionEntity version) throws Exception {
         String docType = normalizeDocType(document.getDocType());
         byte[] content = loadContent(version);
+        if (content == null || content.length == 0) {
+            throw new IllegalArgumentException("文件内容为空，无法解析");
+        }
         if (OCR_IMAGE_TYPES.contains(docType)) {
             return extractImageByOcr(content, docType);
         }

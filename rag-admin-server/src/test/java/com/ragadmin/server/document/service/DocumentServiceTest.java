@@ -2,6 +2,7 @@ package com.ragadmin.server.document.service;
 
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.document.dto.ActivateDocumentVersionResponse;
+import com.ragadmin.server.document.dto.CreateDocumentRequest;
 import com.ragadmin.server.document.dto.CreateDocumentVersionRequest;
 import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.entity.DocumentParseTaskEntity;
@@ -206,6 +207,48 @@ class DocumentServiceTest {
         );
 
         assertEquals("DOCUMENT_VERSION_NOT_FOUND", exception.getCode());
+    }
+
+    @Test
+    void shouldRejectCreateDocumentWhenFileSizeIsZero() {
+        CreateDocumentRequest request = new CreateDocumentRequest();
+        request.setDocName("空文件.pdf");
+        request.setDocType("PDF");
+        request.setStorageBucket("bucket");
+        request.setStorageObjectKey("docs/empty.pdf");
+        request.setFileSize(0L);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> documentService.createDocument(1001L, request, 1L)
+        );
+
+        assertEquals("DOCUMENT_FILE_EMPTY", exception.getCode());
+        assertEquals("文件不能为空，请重新上传", exception.getMessage());
+        verify(documentMapper, never()).insert(any(DocumentEntity.class));
+        verify(documentVersionMapper, never()).insert(any(DocumentVersionEntity.class));
+    }
+
+    @Test
+    void shouldRejectCreateDocumentVersionWhenFileSizeIsZero() {
+        DocumentEntity document = new DocumentEntity();
+        document.setId(101L);
+        document.setKbId(1001L);
+
+        CreateDocumentVersionRequest request = new CreateDocumentVersionRequest();
+        request.setStorageBucket("bucket");
+        request.setStorageObjectKey("docs/empty-v2.pdf");
+        request.setFileSize(0L);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> documentService.createDocumentVersion(101L, request, 1L)
+        );
+
+        assertEquals("DOCUMENT_FILE_EMPTY", exception.getCode());
+        assertEquals("文件不能为空，请重新上传", exception.getMessage());
+        verify(documentVersionMapper, never()).insert(any(DocumentVersionEntity.class));
+        verify(documentMapper, never()).updateById(any(DocumentEntity.class));
     }
 
     private KnowledgeBaseEntity mockKnowledgeBase(Long kbId, String kbName) {

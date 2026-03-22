@@ -66,6 +66,18 @@ class DocumentContentExtractorTest {
         verify(tesseractOcrService, never()).extractImageText(any(InputStream.class), org.mockito.ArgumentMatchers.anyString());
     }
 
+    @Test
+    void shouldRejectZeroByteDocumentBeforeInvokingTika() {
+        DocumentContentExtractor extractor = new TestableDocumentContentExtractor(minioClientFactory, tesseractOcrService, new byte[0]);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> extractor.extract(document("PDF"), version())
+        );
+
+        assertEquals("文件内容为空，无法解析", exception.getMessage());
+    }
+
     private DocumentEntity document(String docType) {
         DocumentEntity entity = new DocumentEntity();
         entity.setDocType(docType);

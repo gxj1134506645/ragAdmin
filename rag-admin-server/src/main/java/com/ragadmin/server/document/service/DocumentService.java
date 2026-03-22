@@ -75,6 +75,7 @@ public class DocumentService {
 
     @Transactional
     public DocumentResponse createDocument(Long kbId, CreateDocumentRequest request, Long operatorUserId) {
+        validateFileSize(request.getFileSize());
         KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(kbId);
 
         DocumentEntity document = new DocumentEntity();
@@ -157,6 +158,7 @@ public class DocumentService {
 
     @Transactional
     public DocumentResponse createDocumentVersion(Long documentId, CreateDocumentVersionRequest request, Long operatorUserId) {
+        validateFileSize(request.getFileSize());
         DocumentEntity document = requireDocument(documentId);
         int newVersionNo = document.getCurrentVersion() + 1;
 
@@ -337,6 +339,12 @@ public class DocumentService {
         taskRealtimeEventService.publishTaskQueued(task, document);
 
         return task;
+    }
+
+    private void validateFileSize(Long fileSize) {
+        if (fileSize != null && fileSize <= 0) {
+            throw new BusinessException("DOCUMENT_FILE_EMPTY", "文件不能为空，请重新上传", HttpStatus.BAD_REQUEST);
+        }
     }
 
     @Transactional

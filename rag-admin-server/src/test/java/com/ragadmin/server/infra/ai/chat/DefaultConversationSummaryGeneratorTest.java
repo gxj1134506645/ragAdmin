@@ -40,8 +40,8 @@ class DefaultConversationSummaryGeneratorTest {
                 "BAILIAN",
                 "qwen-plus",
                 List.of(
-                        new ChatModelClient.ChatMessage("user", "请总结今天讨论的重点"),
-                        new ChatModelClient.ChatMessage("assistant", "重点是会话隔离和流式输出")
+                        new ChatPromptMessage("user", "请总结今天讨论的重点"),
+                        new ChatPromptMessage("assistant", "重点是会话隔离和流式输出")
                 ),
                 null
         );
@@ -63,8 +63,8 @@ class DefaultConversationSummaryGeneratorTest {
                 "BAILIAN",
                 "qwen-plus",
                 List.of(
-                        new ChatModelClient.ChatMessage("user", "第一条"),
-                        new ChatModelClient.ChatMessage("assistant", "第二条")
+                        new ChatPromptMessage("user", "第一条"),
+                        new ChatPromptMessage("assistant", "第二条")
                 ),
                 null
         );
@@ -84,7 +84,7 @@ class DefaultConversationSummaryGeneratorTest {
                 "conv-3",
                 null,
                 null,
-                List.of(new ChatModelClient.ChatMessage("user", "只做规则摘要")),
+                List.of(new ChatPromptMessage("user", "只做规则摘要")),
                 null
         );
 
@@ -101,7 +101,7 @@ class DefaultConversationSummaryGeneratorTest {
                 "conv-4",
                 null,
                 null,
-                List.of(new ChatModelClient.ChatMessage("user", "0123456789012345678901234567890123456789")),
+                List.of(new ChatPromptMessage("user", "0123456789012345678901234567890123456789")),
                 10
         );
 
@@ -117,7 +117,7 @@ class DefaultConversationSummaryGeneratorTest {
                 "conv-5",
                 "BAILIAN",
                 "qwen-plus",
-                List.of(new ChatModelClient.ChatMessage("user", "你好")),
+                List.of(new ChatPromptMessage("user", "你好")),
                 null
         );
         when(conversationChatClient.chatEntity(eq("BAILIAN"), eq("qwen-plus"), anyList(), any()))
@@ -125,9 +125,9 @@ class DefaultConversationSummaryGeneratorTest {
 
         generator.generate(request);
 
-        ArgumentCaptor<List<ChatModelClient.ChatMessage>> captor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<ChatPromptMessage>> captor = ArgumentCaptor.forClass(List.class);
         verify(conversationChatClient).chatEntity(eq("BAILIAN"), eq("qwen-plus"), captor.capture(), any());
-        List<ChatModelClient.ChatMessage> modelMessages = captor.getValue();
+        List<ChatPromptMessage> modelMessages = captor.getValue();
         assertEquals(2, modelMessages.size());
         assertEquals("system", modelMessages.get(0).role());
         assertEquals("user", modelMessages.get(1).role());

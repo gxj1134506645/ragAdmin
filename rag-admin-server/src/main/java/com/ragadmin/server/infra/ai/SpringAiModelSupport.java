@@ -1,7 +1,8 @@
 package com.ragadmin.server.infra.ai;
 
 import com.ragadmin.server.common.exception.BusinessException;
-import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
+import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -76,9 +77,9 @@ public final class SpringAiModelSupport {
         return resolved + "/v1";
     }
 
-    public static List<Message> toSpringMessages(List<ChatModelClient.ChatMessage> messages) {
+    public static List<Message> toSpringMessages(List<ChatPromptMessage> messages) {
         List<Message> springMessages = new ArrayList<>(messages.size());
-        for (ChatModelClient.ChatMessage message : messages) {
+        for (ChatPromptMessage message : messages) {
             String role = message.role() == null ? "user" : message.role().trim().toLowerCase();
             switch (role) {
                 case "system" -> springMessages.add(new SystemMessage(message.content()));
@@ -89,12 +90,12 @@ public final class SpringAiModelSupport {
         return springMessages;
     }
 
-    public static ChatModelClient.ChatCompletionResult toChatCompletionResult(ChatResponse response) {
+    public static ChatCompletionResult toChatCompletionResult(ChatResponse response) {
         if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
             throw new BusinessException("CHAT_FAILED", "模型聊天返回为空", HttpStatus.BAD_GATEWAY);
         }
         Usage usage = response.getMetadata() == null ? null : response.getMetadata().getUsage();
-        return new ChatModelClient.ChatCompletionResult(
+        return new ChatCompletionResult(
                 response.getResult().getOutput().getText(),
                 usage == null ? null : usage.getPromptTokens(),
                 usage == null ? null : usage.getCompletionTokens()

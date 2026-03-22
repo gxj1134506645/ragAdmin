@@ -15,7 +15,7 @@ public record ConversationSummaryRequest(
         String conversationId,
         String providerCode,
         String modelCode,
-        List<ChatModelClient.ChatMessage> messages,
+        List<ChatPromptMessage> messages,
         Integer maxLength
 ) {
 }

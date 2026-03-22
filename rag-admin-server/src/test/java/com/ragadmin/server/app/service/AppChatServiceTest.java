@@ -21,7 +21,8 @@ import com.ragadmin.server.chat.mapper.ChatSessionMapper;
 import com.ragadmin.server.chat.service.ChatExchangePersistenceService;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
-import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
+import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
@@ -325,7 +326,7 @@ class AppChatServiceTest {
         when(webSearchProvider.search("今天适合安排哪些工作？", 5)).thenThrow(new RuntimeException("search down"));
         when(modelService.resolveChatModelDescriptor(901L)).thenReturn(modelDescriptor);
         when(conversationChatClient.chat(eq("BAILIAN"), eq("qwen-plus"), any(), any(), any()))
-                .thenReturn(new ChatModelClient.ChatCompletionResult("建议先处理高优先级事项。", 80, 20));
+                .thenReturn(new ChatCompletionResult("建议先处理高优先级事项。", 80, 20));
         when(chatExchangePersistenceService.persistExchange(
                 eq(session),
                 eq(6001L),
@@ -345,9 +346,9 @@ class AppChatServiceTest {
 
         com.ragadmin.server.chat.dto.ChatResponse response = appChatService.chat(501L, request, user(6001L));
 
-        ArgumentCaptor<List<ChatModelClient.ChatMessage>> promptCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<ChatPromptMessage>> promptCaptor = ArgumentCaptor.forClass(List.class);
         verify(conversationChatClient).chat(eq("BAILIAN"), eq("qwen-plus"), any(), promptCaptor.capture(), any());
-        List<ChatModelClient.ChatMessage> promptMessages = promptCaptor.getValue();
+        List<ChatPromptMessage> promptMessages = promptCaptor.getValue();
         assertEquals(2, promptMessages.size());
         assertEquals("今天适合安排哪些工作？", promptMessages.get(1).content());
         verify(modelService).resolveChatModelDescriptor(901L);
@@ -390,7 +391,7 @@ class AppChatServiceTest {
         ));
         when(modelService.resolveChatModelDescriptor(902L)).thenReturn(modelDescriptor);
         when(conversationChatClient.chat(eq("BAILIAN"), eq("qwen-max"), any(), any(), any()))
-                .thenReturn(new ChatModelClient.ChatCompletionResult("可以重点关注智能体应用落地。", 96, 26));
+                .thenReturn(new ChatCompletionResult("可以重点关注智能体应用落地。", 96, 26));
         when(chatExchangePersistenceService.persistExchange(
                 eq(session),
                 eq(6002L),
@@ -410,9 +411,9 @@ class AppChatServiceTest {
 
         appChatService.chat(502L, request, user(6002L));
 
-        ArgumentCaptor<List<ChatModelClient.ChatMessage>> promptCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<ChatPromptMessage>> promptCaptor = ArgumentCaptor.forClass(List.class);
         verify(conversationChatClient).chat(eq("BAILIAN"), eq("qwen-max"), any(), promptCaptor.capture(), any());
-        List<ChatModelClient.ChatMessage> promptMessages = promptCaptor.getValue();
+        List<ChatPromptMessage> promptMessages = promptCaptor.getValue();
         assertEquals(2, promptMessages.size());
         assertTrue(promptMessages.get(1).content().contains("联网搜索摘要"));
         assertTrue(promptMessages.get(1).content().contains("行业快讯"));

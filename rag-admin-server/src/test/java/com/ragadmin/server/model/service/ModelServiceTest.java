@@ -4,7 +4,8 @@ import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
 import com.ragadmin.server.infra.ai.AiProperties;
 import com.ragadmin.server.infra.ai.bailian.BailianProperties;
-import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
+import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
@@ -323,8 +324,8 @@ class ModelServiceTest {
                         capability(3L, "TEXT_GENERATION"),
                         capability(3L, "EMBEDDING")
                 ));
-        when(conversationChatClient.chat("OLLAMA", "qwen2.5:7b", List.of(new ChatModelClient.ChatMessage("user", "ping"))))
-                .thenReturn(new ChatModelClient.ChatCompletionResult("pong", 1, 1));
+        when(conversationChatClient.chat("OLLAMA", "qwen2.5:7b", List.of(new ChatPromptMessage("user", "ping"))))
+                .thenReturn(new ChatCompletionResult("pong", 1, 1));
         when(embeddingClientRegistry.getClient("OLLAMA")).thenReturn(embeddingClient);
 
         ModelHealthCheckResponse response = modelService.healthCheck(3L);
@@ -351,7 +352,7 @@ class ModelServiceTest {
         when(aiProviderMapper.selectById(40L)).thenReturn(provider);
         when(aiModelCapabilityMapper.selectEnabledByModelIds(List.of(4L)))
                 .thenReturn(List.of(capability(4L, "TEXT_GENERATION")));
-        when(conversationChatClient.chat("OLLAMA", "qwen-bad", List.of(new ChatModelClient.ChatMessage("user", "ping"))))
+        when(conversationChatClient.chat("OLLAMA", "qwen-bad", List.of(new ChatPromptMessage("user", "ping"))))
                 .thenThrow(new IllegalStateException("聊天探活失败"));
 
         ModelHealthCheckResponse response = modelService.healthCheck(4L);

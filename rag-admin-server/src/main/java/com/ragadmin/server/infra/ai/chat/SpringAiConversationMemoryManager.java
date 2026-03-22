@@ -270,23 +270,23 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
         }
     }
 
-    private List<ChatModelClient.ChatMessage> buildSummaryMessages(
+    private List<ChatPromptMessage> buildSummaryMessages(
             String existingSummaryText,
             List<ChatMessageEntity> exchanges
     ) {
-        List<ChatModelClient.ChatMessage> messages = new ArrayList<>(exchanges.size() * 2 + 1);
+        List<ChatPromptMessage> messages = new ArrayList<>(exchanges.size() * 2 + 1);
         if (StringUtils.hasText(existingSummaryText)) {
-            messages.add(new ChatModelClient.ChatMessage(
+            messages.add(new ChatPromptMessage(
                     "system",
                     SUMMARY_CONTEXT_PROMPT + "\n" + existingSummaryText
             ));
         }
         for (ChatMessageEntity exchange : exchanges) {
             if (StringUtils.hasText(exchange.getQuestionText())) {
-                messages.add(new ChatModelClient.ChatMessage("user", exchange.getQuestionText()));
+                messages.add(new ChatPromptMessage("user", exchange.getQuestionText()));
             }
             if (StringUtils.hasText(exchange.getAnswerText())) {
-                messages.add(new ChatModelClient.ChatMessage("assistant", exchange.getAnswerText()));
+                messages.add(new ChatPromptMessage("assistant", exchange.getAnswerText()));
             }
         }
         return messages;

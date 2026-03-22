@@ -12,7 +12,8 @@ import com.ragadmin.server.model.entity.AiProviderEntity;
 import com.ragadmin.server.model.mapper.AiModelCapabilityMapper;
 import com.ragadmin.server.model.mapper.AiModelMapper;
 import com.ragadmin.server.model.mapper.AiProviderMapper;
-import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
+import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import org.slf4j.Logger;
@@ -116,7 +117,7 @@ public class ModelProviderService {
             conversationChatClient.chat(
                     provider.getProviderCode(),
                     model.getModelCode(),
-                    List.of(new ChatModelClient.ChatMessage("user", "ping"))
+                    List.of(new ChatPromptMessage("user", "ping"))
             );
             return new ModelProviderCapabilityHealthResponse("TEXT_GENERATION", model.getId(), model.getModelCode(), "UP", "聊天能力可用");
         } catch (Exception ex) {

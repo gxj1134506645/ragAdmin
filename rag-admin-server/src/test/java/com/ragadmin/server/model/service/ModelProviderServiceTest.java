@@ -1,6 +1,7 @@
 package com.ragadmin.server.model.service;
 
-import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
+import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
@@ -63,8 +64,8 @@ class ModelProviderServiceTest {
         when(aiModelCapabilityMapper.selectModelIdsByCapabilityType("TEXT_GENERATION")).thenReturn(List.of(10L));
         when(aiModelCapabilityMapper.selectModelIdsByCapabilityType("EMBEDDING")).thenReturn(List.of(11L));
         when(aiModelMapper.selectOne(org.mockito.ArgumentMatchers.any())).thenReturn(chatModel, embeddingModel);
-        when(conversationChatClient.chat("BAILIAN", "qwen-max", List.of(new ChatModelClient.ChatMessage("user", "ping"))))
-                .thenReturn(new ChatModelClient.ChatCompletionResult("pong", 1, 1));
+        when(conversationChatClient.chat("BAILIAN", "qwen-max", List.of(new ChatPromptMessage("user", "ping"))))
+                .thenReturn(new ChatCompletionResult("pong", 1, 1));
         when(embeddingClientRegistry.getClient("BAILIAN")).thenReturn(new EmbeddingModelClient() {
             @Override
             public boolean supports(String providerCode) {

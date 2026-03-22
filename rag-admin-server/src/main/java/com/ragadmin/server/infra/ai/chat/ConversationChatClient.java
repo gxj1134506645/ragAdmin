@@ -6,32 +6,32 @@ import java.util.List;
 
 public interface ConversationChatClient {
 
-    ChatModelClient.ChatCompletionResult chat(
+    ChatCompletionResult chat(
             String providerCode,
             String modelCode,
-            List<ChatModelClient.ChatMessage> promptMessages
+            List<ChatPromptMessage> promptMessages
     );
 
     <T> T chatEntity(
             String providerCode,
             String modelCode,
-            List<ChatModelClient.ChatMessage> promptMessages,
+            List<ChatPromptMessage> promptMessages,
             Class<T> responseType
     );
 
-    ChatModelClient.ChatCompletionResult chat(
+    ChatCompletionResult chat(
             String providerCode,
             String modelCode,
             String conversationId,
-            List<ChatModelClient.ChatMessage> promptMessages,
-            List<ChatModelClient.ChatMessage> historyMessages
+            List<ChatPromptMessage> promptMessages,
+            List<ChatPromptMessage> historyMessages
     );
 
     Flux<org.springframework.ai.chat.model.ChatResponse> stream(
             String providerCode,
             String modelCode,
             String conversationId,
-            List<ChatModelClient.ChatMessage> promptMessages,
-            List<ChatModelClient.ChatMessage> historyMessages
+            List<ChatPromptMessage> promptMessages,
+            List<ChatPromptMessage> historyMessages
     );
 }

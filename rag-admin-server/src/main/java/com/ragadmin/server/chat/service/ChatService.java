@@ -26,7 +26,8 @@ import com.ragadmin.server.document.entity.ChunkEntity;
 import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
-import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
+import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryRefreshDispatcher;
@@ -186,7 +187,7 @@ public class ChatService {
         PreparedChatExecution execution = prepareChatExecution(sessionId, request, user);
 
         Instant start = Instant.now();
-        ChatModelClient.ChatCompletionResult completion = conversationChatClient.chat(
+        ChatCompletionResult completion = conversationChatClient.chat(
                 execution.chatModel().providerCode(),
                 execution.chatModel().modelCode(),
                 execution.conversationId(),
@@ -313,20 +314,20 @@ public class ChatService {
     /**
      * 旧会话首次切到 Spring AI memory 时，按历史问答补种 USER / ASSISTANT 消息。
      */
-    private List<ChatModelClient.ChatMessage> buildHistoryMessages(Long sessionId) {
+    private List<ChatPromptMessage> buildHistoryMessages(Long sessionId) {
         List<ChatMessageEntity> history = chatMessageMapper.selectList(new LambdaQueryWrapper<ChatMessageEntity>()
                 .eq(ChatMessageEntity::getSessionId, sessionId)
                 .orderByAsc(ChatMessageEntity::getId));
         if (history.isEmpty()) {
             return List.of();
         }
-        List<ChatModelClient.ChatMessage> messages = new ArrayList<>(history.size() * 2);
+        List<ChatPromptMessage> messages = new ArrayList<>(history.size() * 2);
         for (ChatMessageEntity item : history) {
             if (StringUtils.hasText(item.getQuestionText())) {
-                messages.add(new ChatModelClient.ChatMessage("user", item.getQuestionText()));
+                messages.add(new ChatPromptMessage("user", item.getQuestionText()));
             }
             if (StringUtils.hasText(item.getAnswerText())) {
-                messages.add(new ChatModelClient.ChatMessage("assistant", item.getAnswerText()));
+                messages.add(new ChatPromptMessage("assistant", item.getAnswerText()));
             }
         }
         return messages;
@@ -338,7 +339,7 @@ public class ChatService {
 
         RetrievalService.RetrievalResult retrievalResult;
         ModelService.ChatModelDescriptor chatModel;
-        List<ChatModelClient.ChatMessage> promptMessages;
+        List<ChatPromptMessage> promptMessages;
         if (ChatSceneTypes.KNOWLEDGE_BASE.equals(sceneType)) {
             Long kbId = requireKnowledgeBaseId(session.getKbId());
             if (!kbId.equals(request.getKbId())) {
@@ -348,8 +349,8 @@ public class ChatService {
             retrievalResult = retrievalService.retrieve(knowledgeBase, request.getQuestion());
             chatModel = modelService.resolveChatModelDescriptor(knowledgeBase.getChatModelId());
             promptMessages = List.of(
-                    new ChatModelClient.ChatMessage("system", buildKnowledgeBaseSystemPrompt()),
-                    new ChatModelClient.ChatMessage("user", buildKnowledgeBaseUserPrompt(request.getQuestion(), retrievalResult.context()))
+                    new ChatPromptMessage("system", buildKnowledgeBaseSystemPrompt()),
+                    new ChatPromptMessage("user", buildKnowledgeBaseUserPrompt(request.getQuestion(), retrievalResult.context()))
             );
         } else {
             if (request.getKbId() != null) {
@@ -358,8 +359,8 @@ public class ChatService {
             retrievalResult = new RetrievalService.RetrievalResult(List.of(), "");
             chatModel = modelService.resolveChatModelDescriptor(null);
             promptMessages = List.of(
-                    new ChatModelClient.ChatMessage("system", buildGeneralSystemPrompt()),
-                    new ChatModelClient.ChatMessage("user", request.getQuestion())
+                    new ChatPromptMessage("system", buildGeneralSystemPrompt()),
+                    new ChatPromptMessage("user", request.getQuestion())
             );
         }
         return new PreparedChatExecution(
@@ -436,8 +437,8 @@ public class ChatService {
             ChatSessionEntity session,
             ModelService.ChatModelDescriptor chatModel,
             RetrievalService.RetrievalResult retrievalResult,
-            List<ChatModelClient.ChatMessage> promptMessages,
-            List<ChatModelClient.ChatMessage> historyMessages,
+            List<ChatPromptMessage> promptMessages,
+            List<ChatPromptMessage> historyMessages,
             String conversationId
     ) {
     }

@@ -12,7 +12,8 @@ import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
 import com.ragadmin.server.infra.ai.AiProperties;
 import com.ragadmin.server.infra.ai.SpringAiModelSupport;
 import com.ragadmin.server.infra.ai.bailian.BailianProperties;
-import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
+import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
@@ -308,7 +309,7 @@ public class ModelService {
                 conversationChatClient.chat(
                         provider.getProviderCode(),
                         model.getModelCode(),
-                        List.of(new ChatModelClient.ChatMessage("user", "ping"))
+                        List.of(new ChatPromptMessage("user", "ping"))
                 );
                 return new ModelCapabilityHealthResponse(capabilityType, "UP", "聊天能力可用");
             }

@@ -16,7 +16,8 @@ import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.document.entity.ChunkEntity;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
-import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
+import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryRefreshDispatcher;
@@ -168,7 +169,7 @@ class ChatServiceTest {
         when(retrievalService.retrieve(knowledgeBase, "请总结制度要点")).thenReturn(retrievalResult);
         when(modelService.resolveChatModelDescriptor(501L)).thenReturn(modelDescriptor);
         when(conversationChatClient.chat(eq("OLLAMA"), eq("qwen2.5:7b"), any(), any(), any()))
-                .thenReturn(new ChatModelClient.ChatCompletionResult("制度要求按时提交周报。", 120, 30));
+                .thenReturn(new ChatCompletionResult("制度要求按时提交周报。", 120, 30));
         when(chatExchangePersistenceService.persistExchange(
                 eq(session),
                 eq(100L),
@@ -248,7 +249,7 @@ class ChatServiceTest {
         when(retrievalService.retrieve(knowledgeBase, "没有命中时应该怎么回答")).thenReturn(retrievalResult);
         when(modelService.resolveChatModelDescriptor(502L)).thenReturn(modelDescriptor);
         when(conversationChatClient.chat(eq("OLLAMA"), eq("qwen2.5:7b"), any(), any(), any()))
-                .thenReturn(new ChatModelClient.ChatCompletionResult("当前无法从知识库确认答案。", 64, 18));
+                .thenReturn(new ChatCompletionResult("当前无法从知识库确认答案。", 64, 18));
         when(chatExchangePersistenceService.persistExchange(
                 eq(session),
                 eq(100L),

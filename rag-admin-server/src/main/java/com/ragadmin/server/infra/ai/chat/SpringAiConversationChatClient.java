@@ -40,10 +40,10 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
     private ChatClientAdvisorProperties chatClientAdvisorProperties;
 
     @Override
-    public ChatModelClient.ChatCompletionResult chat(
+    public ChatCompletionResult chat(
             String providerCode,
             String modelCode,
-            List<ChatModelClient.ChatMessage> promptMessages
+            List<ChatPromptMessage> promptMessages
     ) {
         validatePromptMessages(promptMessages);
 
@@ -60,7 +60,7 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
     public <T> T chatEntity(
             String providerCode,
             String modelCode,
-            List<ChatModelClient.ChatMessage> promptMessages,
+            List<ChatPromptMessage> promptMessages,
             Class<T> responseType
     ) {
         validatePromptMessages(promptMessages);
@@ -77,12 +77,12 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
     }
 
     @Override
-    public ChatModelClient.ChatCompletionResult chat(
+    public ChatCompletionResult chat(
             String providerCode,
             String modelCode,
             String conversationId,
-            List<ChatModelClient.ChatMessage> promptMessages,
-            List<ChatModelClient.ChatMessage> historyMessages
+            List<ChatPromptMessage> promptMessages,
+            List<ChatPromptMessage> historyMessages
     ) {
         if (!StringUtils.hasText(conversationId)) {
             throw new BusinessException("CHAT_CONVERSATION_ID_INVALID", "会话记忆 conversationId 不能为空", HttpStatus.BAD_REQUEST);
@@ -108,8 +108,8 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
             String providerCode,
             String modelCode,
             String conversationId,
-            List<ChatModelClient.ChatMessage> promptMessages,
-            List<ChatModelClient.ChatMessage> historyMessages
+            List<ChatPromptMessage> promptMessages,
+            List<ChatPromptMessage> historyMessages
     ) {
         if (!StringUtils.hasText(conversationId)) {
             throw new BusinessException("CHAT_CONVERSATION_ID_INVALID", "会话记忆 conversationId 不能为空", HttpStatus.BAD_REQUEST);
@@ -270,7 +270,7 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
         return value == null ? 0 : value;
     }
 
-    private void validatePromptMessages(List<ChatModelClient.ChatMessage> promptMessages) {
+    private void validatePromptMessages(List<ChatPromptMessage> promptMessages) {
         if (promptMessages == null || promptMessages.isEmpty()) {
             throw new BusinessException("CHAT_PROMPT_EMPTY", "聊天提示消息不能为空", HttpStatus.BAD_REQUEST);
         }
@@ -288,7 +288,7 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
 
     private void seedConversationMemoryIfNecessary(
             String conversationId,
-            List<ChatModelClient.ChatMessage> historyMessages
+            List<ChatPromptMessage> historyMessages
     ) {
         if (historyMessages == null || historyMessages.isEmpty()) {
             return;

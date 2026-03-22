@@ -43,7 +43,7 @@ public class DefaultConversationSummaryGenerator implements ConversationSummaryG
 
     @Override
     public ConversationSummaryResult generate(ConversationSummaryRequest request) {
-        List<ChatModelClient.ChatMessage> sourceMessages = request == null || request.messages() == null
+        List<ChatPromptMessage> sourceMessages = request == null || request.messages() == null
                 ? List.of()
                 : request.messages();
         int maxLength = resolveMaxLength(request == null ? null : request.maxLength());
@@ -69,7 +69,7 @@ public class DefaultConversationSummaryGenerator implements ConversationSummaryG
         return new ConversationSummaryResult(fallbackSummary, ConversationSummarySource.RULE_BASED, sourceMessages.size());
     }
 
-    private boolean canUseModel(ConversationSummaryRequest request, List<ChatModelClient.ChatMessage> messages) {
+    private boolean canUseModel(ConversationSummaryRequest request, List<ChatPromptMessage> messages) {
         if (request == null || CollectionUtils.isEmpty(messages)) {
             return false;
         }
@@ -78,12 +78,12 @@ public class DefaultConversationSummaryGenerator implements ConversationSummaryG
 
     private String generateByModel(
             ConversationSummaryRequest request,
-            List<ChatModelClient.ChatMessage> messages,
+            List<ChatPromptMessage> messages,
             int maxLength
     ) {
-        List<ChatModelClient.ChatMessage> promptMessages = new ArrayList<>();
-        promptMessages.add(new ChatModelClient.ChatMessage("system", SUMMARY_SYSTEM_PROMPT));
-        promptMessages.add(new ChatModelClient.ChatMessage("user", buildConversationText(messages)));
+        List<ChatPromptMessage> promptMessages = new ArrayList<>();
+        promptMessages.add(new ChatPromptMessage("system", SUMMARY_SYSTEM_PROMPT));
+        promptMessages.add(new ChatPromptMessage("user", buildConversationText(messages)));
         ConversationSummaryStructuredOutput structuredOutput = conversationChatClient.chatEntity(
                 request.providerCode(),
                 request.modelCode(),
@@ -96,7 +96,7 @@ public class DefaultConversationSummaryGenerator implements ConversationSummaryG
         return truncate(normalize(structuredOutput.summary()), maxLength);
     }
 
-    private String generateByRule(List<ChatModelClient.ChatMessage> messages, int maxLength) {
+    private String generateByRule(List<ChatPromptMessage> messages, int maxLength) {
         if (CollectionUtils.isEmpty(messages)) {
             return truncate(EMPTY_SUMMARY, maxLength);
         }
@@ -110,7 +110,7 @@ public class DefaultConversationSummaryGenerator implements ConversationSummaryG
         return truncate(summary, maxLength);
     }
 
-    private String buildConversationText(List<ChatModelClient.ChatMessage> messages) {
+    private String buildConversationText(List<ChatPromptMessage> messages) {
         return messages.stream()
                 .filter(message -> message != null && StringUtils.hasText(message.content()))
                 .map(message -> formatRole(message.role()) + "：" + normalize(message.content()))

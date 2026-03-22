@@ -2,10 +2,12 @@ package com.ragadmin.server.infra.ai.bailian;
 
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.infra.ai.SpringAiModelFactory;
-import com.ragadmin.server.infra.ai.chat.BailianChatClient;
-import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
+import com.ragadmin.server.infra.ai.chat.ChatClientAdvisorProperties;
+import com.ragadmin.server.infra.ai.chat.SpringAiConversationChatClient;
 import com.ragadmin.server.infra.ai.embedding.BailianEmbeddingClient;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -18,12 +20,13 @@ class BailianApiClientInitializationTest {
     void shouldNotRequireApiKeyAtBeanInitializationTimeForChatClient() {
         BailianProperties properties = new BailianProperties();
         SpringAiModelFactory springAiModelFactory = new SpringAiModelFactory(List.of(new BailianModelFactory(properties)));
-
-        BailianChatClient client = new BailianChatClient(springAiModelFactory);
+        SpringAiConversationChatClient client = new SpringAiConversationChatClient();
+        ReflectionTestUtils.setField(client, "springAiModelFactory", springAiModelFactory);
+        ReflectionTestUtils.setField(client, "chatClientAdvisorProperties", new ChatClientAdvisorProperties());
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> client.chat("qwen-max", List.of(new ChatModelClient.ChatMessage("user", "ping")))
+                () -> client.chat("BAILIAN", "qwen-max", List.of(new ChatPromptMessage("user", "ping")))
         );
 
         assertEquals("BAILIAN_API_KEY_MISSING", exception.getCode());

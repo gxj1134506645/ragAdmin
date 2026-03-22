@@ -49,6 +49,7 @@ import com.ragadmin.server.statistics.controller.StatisticsController;
 import com.ragadmin.server.statistics.dto.VectorIndexOverviewResponse;
 import com.ragadmin.server.statistics.service.StatisticsService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -58,7 +59,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import reactor.core.publisher.Flux;
 
 import java.nio.charset.StandardCharsets;
@@ -124,6 +124,8 @@ class AdminApiWebMvcTest {
 
     private MockMvc publicMockMvc;
     private MockMvc protectedMockMvc;
+    private TestWebMvcContextSupport.ManagedMockMvc publicContext;
+    private TestWebMvcContextSupport.ManagedMockMvc protectedContext;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
@@ -170,12 +172,15 @@ class AdminApiWebMvcTest {
         AuthInterceptor authInterceptor = new AuthInterceptor();
         ReflectionTestUtils.setField(authInterceptor, "authService", authService);
 
-        publicMockMvc = MockMvcBuilders.standaloneSetup(authController)
-                .setControllerAdvice(exceptionHandler)
-                .build();
-        publicMockMvc = MockMvcAsyncTestSupport.withStreamingExecutor(publicMockMvc);
+        publicContext = TestWebMvcContextSupport.create(
+                List.of(authController),
+                List.of(exceptionHandler),
+                List.of()
+        );
+        publicMockMvc = publicContext.mockMvc();
 
-        protectedMockMvc = MockMvcBuilders.standaloneSetup(
+        protectedContext = TestWebMvcContextSupport.create(
+                List.of(
                         taskController,
                         taskEventController,
                         knowledgeBaseController,
@@ -187,11 +192,21 @@ class AdminApiWebMvcTest {
                         statisticsController,
                         userController,
                         userSessionController
-                )
-                .addInterceptors(authInterceptor)
-                .setControllerAdvice(exceptionHandler)
-                .build();
-        protectedMockMvc = MockMvcAsyncTestSupport.withStreamingExecutor(protectedMockMvc);
+                ),
+                List.of(exceptionHandler),
+                List.of(authInterceptor)
+        );
+        protectedMockMvc = protectedContext.mockMvc();
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (publicContext != null) {
+            publicContext.close();
+        }
+        if (protectedContext != null) {
+            protectedContext.close();
+        }
     }
 
     @Test

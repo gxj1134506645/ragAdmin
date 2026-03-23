@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import ModelBatchDeleteResultDialog from '@/components/model/ModelBatchDeleteResultDialog.vue'
 import ModelFormDialog from '@/components/model/ModelFormDialog.vue'
 import ModelProviderDrawer from '@/components/model/ModelProviderDrawer.vue'
 import ModelProviderFormDialog from '@/components/model/ModelProviderFormDialog.vue'
@@ -19,7 +18,6 @@ const {
   modelLoading,
   modelSubmitting,
   batchDeleteSubmitting,
-  batchDeleteResultDialogVisible,
   modelDialogVisible,
   modelDialogMode,
   modelCheckingIds,
@@ -29,7 +27,6 @@ const {
   activeModelHealthId,
   modelLoadError,
   modelDialogDraft,
-  batchDeleteResult,
   pagination,
   modelQuery,
   selectedModelCount,
@@ -123,11 +120,6 @@ const {
       :providers="providers"
       :initial-form="modelDialogDraft"
       @submit="handleSaveModel"
-    />
-
-    <ModelBatchDeleteResultDialog
-      v-model="batchDeleteResultDialogVisible"
-      :result="batchDeleteResult"
     />
   </section>
 </template>

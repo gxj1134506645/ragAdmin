@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import { useRouter } from 'vue-router'
 import {
   assignUserRoles,
@@ -69,7 +70,18 @@ const query = reactive({
   status: '',
 })
 
-const userForm = reactive({
+interface UserFormState {
+  username: string
+  password: string
+  displayName: string
+  email: string
+  mobile: string
+  status: string
+  roleCodes: string[]
+}
+
+const userFormRef = ref<FormInstance>()
+const userForm = reactive<UserFormState>({
   username: '',
   password: '',
   displayName: '',
@@ -86,6 +98,41 @@ const roleForm = reactive({
 const hasData = computed(() => rows.value.length > 0)
 const dialogTitle = computed(() => (userDialogMode.value === 'create' ? '新增用户' : '编辑用户'))
 const dialogConfirmText = computed(() => (userDialogMode.value === 'create' ? '确认创建' : '确认保存'))
+
+function createTrimmedRequiredRule(message: string) {
+  return {
+    trigger: 'blur',
+    validator: (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+      if (typeof value === 'string' && value.trim()) {
+        callback()
+        return
+      }
+      callback(new Error(message))
+    },
+  }
+}
+
+const userFormRules = computed<FormRules<UserFormState>>(() => {
+  const rules: FormRules<UserFormState> = {
+    displayName: [
+      createTrimmedRequiredRule('请输入用户名称'),
+    ],
+    status: [
+      { required: true, message: '请选择账号状态', trigger: 'change' },
+    ],
+  }
+
+  if (userDialogMode.value === 'create') {
+    rules.username = [
+      createTrimmedRequiredRule('请输入登录账号'),
+    ]
+    rules.password = [
+      createTrimmedRequiredRule('请输入初始密码'),
+    ]
+  }
+
+  return rules
+})
 const sessionDetailLoading = ref(false)
 const sessionDetailError = ref('')
 const sessionDrawerVisible = ref(false)
@@ -233,6 +280,11 @@ function resetUserForm(): void {
   userForm.roleCodes = ['APP_USER']
 }
 
+function handleUserDialogClosed(): void {
+  resetUserForm()
+  nextTick(() => userFormRef.value?.clearValidate())
+}
+
 function buildCreatePayload(): CreateUserRequest {
   return {
     username: userForm.username.trim(),
@@ -350,12 +402,12 @@ async function handleSizeChange(pageSize: number): Promise<void> {
 }
 
 async function handleSaveUser(): Promise<void> {
-  if (!userForm.displayName.trim()) {
-    ElMessage.warning('请输入用户名称')
+  if (!userFormRef.value) {
     return
   }
-  if (userDialogMode.value === 'create' && (!userForm.username.trim() || !userForm.password.trim())) {
-    ElMessage.warning('新增用户时必须填写账号和密码')
+
+  const valid = await userFormRef.value.validate().then(() => true).catch(() => false)
+  if (!valid) {
     return
   }
 
@@ -369,7 +421,6 @@ async function handleSaveUser(): Promise<void> {
       ElMessage.success('用户资料已更新')
     }
     userDialogVisible.value = false
-    resetUserForm()
     await loadData()
   } catch (error) {
     ElMessage.error(resolveErrorMessage(error))
@@ -618,13 +669,18 @@ onMounted(async () => {
       </div>
     </section>
 
-    <el-dialog v-model="userDialogVisible" :title="dialogTitle" width="620px" @closed="resetUserForm">
-      <el-form label-position="top">
+    <el-dialog v-model="userDialogVisible" :title="dialogTitle" width="620px" @closed="handleUserDialogClosed">
+      <el-form
+        ref="userFormRef"
+        :model="userForm"
+        :rules="userFormRules"
+        label-position="top"
+      >
         <div v-if="userDialogMode === 'create'" class="form-grid">
-          <el-form-item label="登录账号">
+          <el-form-item label="登录账号" prop="username" required>
             <el-input v-model="userForm.username" placeholder="请输入唯一账号" />
           </el-form-item>
-          <el-form-item label="初始密码">
+          <el-form-item label="初始密码" prop="password" required>
             <el-input v-model="userForm.password" type="password" show-password placeholder="请输入初始密码" />
           </el-form-item>
         </div>
@@ -635,10 +691,10 @@ onMounted(async () => {
         </div>
 
         <div class="form-grid">
-          <el-form-item label="用户名称">
+          <el-form-item label="用户名称" prop="displayName" required>
             <el-input v-model="userForm.displayName" placeholder="请输入用户名称" />
           </el-form-item>
-          <el-form-item label="账号状态">
+          <el-form-item label="账号状态" prop="status" required>
             <el-select v-model="userForm.status">
               <el-option
                 v-for="item in ENABLED_STATUS_OPTIONS"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowDown, ChatDotRound, MoreFilled, Plus, RefreshRight, SwitchButton } from '@element-plus/icons-vue'
+import { ArrowDown, ChatDotRound, CopyDocument, EditPen, MoreFilled, Plus, RefreshRight, SwitchButton } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChatMarkdownContent from '@/components/chat/ChatMarkdownContent.vue'
 import {
@@ -10,6 +10,7 @@ import {
   listChatMessages,
   listChatSessions,
   resolveChatStreamError,
+  streamRegenerateChatMessage,
   submitChatFeedback,
   streamChatMessage,
   type ChatStreamHandle,
@@ -73,6 +74,16 @@ interface StreamRecoveryNotice {
   description: string
 }
 
+interface RegenerationSnapshot {
+  messageId: number
+  answerText: string
+  answerContentType: ChatContentType
+  references: ChatReference[]
+  usage: ChatExchange['usage']
+  feedbackType: ChatFeedbackType | null
+  feedbackComment: string | null
+}
+
 const props = defineProps<Props>()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -98,6 +109,7 @@ const streaming = ref(false)
 const sessionActionLoadingId = ref<number | null>(null)
 const feedbackSubmittingMessageIds = ref<number[]>([])
 const expandedReferenceMessageIds = ref<number[]>([])
+const regeneratingMessageId = ref<number | null>(null)
 const knowledgeBasePickerVisible = ref(false)
 const modelPickerVisible = ref(false)
 const knowledgeBasePickerKeyword = ref('')
@@ -113,6 +125,7 @@ let composerBlurTimer: number | null = null
 let sessionMetadataSyncTask: Promise<void> = Promise.resolve()
 let sessionKnowledgeBaseSyncTask: Promise<void> = Promise.resolve()
 let preferenceSyncResetTimer: number | null = null
+let regenerationSnapshot: RegenerationSnapshot | null = null
 
 const isKnowledgeBaseScene = computed(() => props.sceneType === 'KNOWLEDGE_BASE')
 const activeKnowledgeBase = computed<KnowledgeBaseSummary | null>(() => {
@@ -246,6 +259,13 @@ const hasConversation = computed(() => {
   return messages.value.length > 0 || pendingExchange.value !== null
 })
 
+const latestCompletedMessageId = computed<number | null>(() => {
+  if (messages.value.length === 0) {
+    return null
+  }
+  return messages.value[messages.value.length - 1]?.id ?? null
+})
+
 const activeSession = computed<ChatSession | null>(() => {
   if (activeSessionId.value === null) {
     return null
@@ -356,6 +376,8 @@ function resetPreferenceInputs(): void {
 
 function resetConversationViewState(): void {
   expandedReferenceMessageIds.value = []
+  regeneratingMessageId.value = null
+  regenerationSnapshot = null
 }
 
 function resetKnowledgeBasePickerState(): void {
@@ -457,6 +479,21 @@ function closeStream(): void {
   streamHandle?.close()
   streamHandle = null
   streaming.value = false
+}
+
+function isRegeneratingMessage(messageId: number): boolean {
+  return regeneratingMessageId.value === messageId
+}
+
+function canRegenerateMessage(messageId: number): boolean {
+  return pendingExchange.value === null && latestCompletedMessageId.value === messageId
+}
+
+function resolveMessageAnswerContent(message: ChatExchange): string {
+  if (isRegeneratingMessage(message.id) && !message.answerText.trim()) {
+    return '正在重新生成回答...'
+  }
+  return message.answerText || '模型没有返回内容'
 }
 
 function isConnectionInterruptedMessage(message: string): boolean {
@@ -561,6 +598,41 @@ async function scrollToBottom(): Promise<void> {
     top: messageContainerRef.value.scrollHeight,
     behavior: 'smooth',
   })
+}
+
+async function writeTextToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', 'true')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  textarea.style.pointerEvents = 'none'
+  document.body.appendChild(textarea)
+  textarea.select()
+  const copied = document.execCommand('copy')
+  document.body.removeChild(textarea)
+  if (!copied) {
+    throw new Error('复制失败')
+  }
+}
+
+async function handleCopyText(text: string, successMessage: string): Promise<void> {
+  const normalized = text.trim()
+  if (!normalized) {
+    ElMessage.warning('当前没有可复制的内容')
+    return
+  }
+  try {
+    await writeTextToClipboard(normalized)
+    ElMessage.success(successMessage)
+  } catch {
+    ElMessage.error('复制失败，请稍后重试')
+  }
 }
 
 function buildSessionName(question: string): string {
@@ -995,6 +1067,14 @@ function handleComposerBlur(): void {
   }, 120)
 }
 
+function handleEditQuestion(question: string): void {
+  if (streaming.value) {
+    return
+  }
+  draftQuestion.value = question
+  focusComposerTextarea(question.length)
+}
+
 function isFeedbackSubmitting(messageId: number): boolean {
   return feedbackSubmittingMessageIds.value.includes(messageId)
 }
@@ -1009,6 +1089,108 @@ function toggleReferencePanel(messageId: number): void {
     return
   }
   expandedReferenceMessageIds.value = [...expandedReferenceMessageIds.value, messageId]
+}
+
+function restoreRegenerationSnapshot(): void {
+  if (!regenerationSnapshot) {
+    regeneratingMessageId.value = null
+    return
+  }
+  const targetMessage = messages.value.find((item) => item.id === regenerationSnapshot?.messageId)
+  if (targetMessage) {
+    targetMessage.answerText = regenerationSnapshot.answerText
+    targetMessage.answerContentType = regenerationSnapshot.answerContentType
+    targetMessage.references = [...regenerationSnapshot.references]
+    targetMessage.usage = regenerationSnapshot.usage
+    targetMessage.feedbackType = regenerationSnapshot.feedbackType
+    targetMessage.feedbackComment = regenerationSnapshot.feedbackComment
+  }
+  regenerationSnapshot = null
+  regeneratingMessageId.value = null
+}
+
+function clearRegenerationState(): void {
+  regenerationSnapshot = null
+  regeneratingMessageId.value = null
+}
+
+async function handleRegenerateMessage(message: ChatExchange): Promise<void> {
+  if (streaming.value || !canRegenerateMessage(message.id)) {
+    return
+  }
+
+  const targetMessage = messages.value.find((item) => item.id === message.id)
+  if (!targetMessage) {
+    return
+  }
+
+  closeStream()
+  loadingError.value = ''
+  regenerationSnapshot = {
+    messageId: targetMessage.id,
+    answerText: targetMessage.answerText,
+    answerContentType: targetMessage.answerContentType,
+    references: [...targetMessage.references],
+    usage: targetMessage.usage,
+    feedbackType: targetMessage.feedbackType,
+    feedbackComment: targetMessage.feedbackComment,
+  }
+  regeneratingMessageId.value = targetMessage.id
+  targetMessage.answerText = ''
+  targetMessage.answerContentType = 'text/markdown'
+  targetMessage.references = []
+  targetMessage.usage = null
+  targetMessage.feedbackType = null
+  targetMessage.feedbackComment = null
+  streaming.value = true
+  await scrollToBottom()
+
+  streamHandle = streamRegenerateChatMessage(
+    message.id,
+    {
+      chatModelId: selectedModelId.value,
+      selectedKbIds: [...selectedKbIds.value],
+      webSearchEnabled: webSearchEnabled.value,
+    },
+    {
+      onEvent(event) {
+        if (event.eventType === 'DELTA') {
+          const currentMessage = messages.value.find((item) => item.id === message.id)
+          if (!currentMessage) {
+            return
+          }
+          currentMessage.answerText += event.delta ?? ''
+          void scrollToBottom()
+          return
+        }
+
+        if (event.eventType === 'COMPLETE') {
+          const currentMessage = messages.value.find((item) => item.id === message.id)
+          if (currentMessage) {
+            currentMessage.answerText = event.answer ?? currentMessage.answerText
+            currentMessage.answerContentType = event.answerContentType ?? currentMessage.answerContentType
+            currentMessage.references = event.references ?? []
+            currentMessage.usage = event.usage ?? null
+            currentMessage.feedbackType = null
+            currentMessage.feedbackComment = null
+          }
+          closeStream()
+          clearRegenerationState()
+          void scrollToBottom()
+          return
+        }
+
+        closeStream()
+        restoreRegenerationSnapshot()
+        ElMessage.error(event.errorMessage || '重新生成回答失败')
+      },
+      onError(error) {
+        closeStream()
+        restoreRegenerationSnapshot()
+        ElMessage.error(resolveChatStreamError(error))
+      },
+    },
+  )
 }
 
 async function handleSubmitFeedback(messageId: number, feedbackType: ChatFeedbackType): Promise<void> {
@@ -1408,29 +1590,73 @@ onUnmounted(() => {
           <div v-for="message in messages" :key="message.id" class="message-thread">
             <article class="message-row is-user">
               <div class="message-card is-user">
-                <span class="message-role">你</span>
                 <p>{{ message.questionText }}</p>
+                <div class="message-card-tools is-user">
+                  <button
+                    type="button"
+                    class="message-icon-action is-user"
+                    title="复制问题"
+                    aria-label="复制问题"
+                    :disabled="streaming"
+                    @click="handleCopyText(message.questionText, '问题已复制')"
+                  >
+                    <el-icon><CopyDocument /></el-icon>
+                  </button>
+                  <button
+                    type="button"
+                    class="message-icon-action is-user"
+                    title="编辑问题"
+                    aria-label="编辑问题"
+                    :disabled="streaming"
+                    @click="handleEditQuestion(message.questionText)"
+                  >
+                    <el-icon><EditPen /></el-icon>
+                  </button>
+                </div>
               </div>
             </article>
 
             <article class="message-row is-assistant">
               <div class="message-card is-assistant">
-                <span class="message-role">助手</span>
                 <ChatMarkdownContent
-                  :content="message.answerText || '模型没有返回内容'"
+                  :content="resolveMessageAnswerContent(message)"
                   :content-type="message.answerContentType"
                 />
 
                 <div class="assistant-actions">
-                  <button
-                    v-if="message.references.length > 0"
-                    type="button"
-                    class="assistant-action assistant-reference-toggle"
-                    @click="toggleReferencePanel(message.id)"
-                  >
-                    <span>{{ isReferenceExpanded(message.id) ? '收起引用' : '查看引用' }}</span>
-                    <strong>{{ message.references.length }}</strong>
-                  </button>
+                  <div class="assistant-action-group">
+                    <button
+                      type="button"
+                      class="message-icon-action"
+                      title="复制回答"
+                      aria-label="复制回答"
+                      :disabled="streaming"
+                      @click="handleCopyText(message.answerText, '回答已复制')"
+                    >
+                      <el-icon><CopyDocument /></el-icon>
+                    </button>
+                    <button
+                      v-if="canRegenerateMessage(message.id)"
+                      type="button"
+                      class="message-icon-action"
+                      title="重新生成回答"
+                      aria-label="重新生成回答"
+                      :disabled="streaming"
+                      @click="handleRegenerateMessage(message)"
+                    >
+                      <el-icon><RefreshRight /></el-icon>
+                    </button>
+                    <button
+                      v-if="message.references.length > 0"
+                      type="button"
+                      class="assistant-action assistant-reference-toggle"
+                      :disabled="streaming"
+                      @click="toggleReferencePanel(message.id)"
+                    >
+                      <span>{{ isReferenceExpanded(message.id) ? '收起引用' : '查看引用' }}</span>
+                      <strong>{{ message.references.length }}</strong>
+                    </button>
+                  </div>
                   <div class="assistant-feedback">
                     <el-button
                       text
@@ -1498,17 +1724,40 @@ onUnmounted(() => {
           <div v-if="pendingExchange" class="message-thread">
             <article class="message-row is-user">
               <div class="message-card is-user">
-                <span class="message-role">你</span>
                 <p>{{ pendingExchange.question }}</p>
+                <div class="message-card-tools is-user">
+                  <button
+                    type="button"
+                    class="message-icon-action is-user"
+                    title="复制问题"
+                    aria-label="复制问题"
+                    @click="handleCopyText(pendingExchange.question, '问题已复制')"
+                  >
+                    <el-icon><CopyDocument /></el-icon>
+                  </button>
+                </div>
               </div>
             </article>
             <article class="message-row is-assistant">
               <div class="message-card is-assistant" :class="{ 'is-error': pendingExchange.errorMessage }">
-                <span class="message-role">助手</span>
                 <ChatMarkdownContent
                   :content="pendingExchange.answer || '正在生成回答...'"
                   :content-type="pendingExchange.answerContentType"
                 />
+                <div class="assistant-actions">
+                  <div class="assistant-action-group">
+                    <button
+                      type="button"
+                      class="message-icon-action"
+                      title="复制回答"
+                      aria-label="复制回答"
+                      :disabled="!pendingExchange.answer.trim()"
+                      @click="handleCopyText(pendingExchange.answer, '回答已复制')"
+                    >
+                      <el-icon><CopyDocument /></el-icon>
+                    </button>
+                  </div>
+                </div>
                 <p v-if="pendingExchange.errorMessage" class="pending-error">{{ pendingExchange.errorMessage }}</p>
                 <div
                   v-if="pendingStreamRecoveryNotice"
@@ -2319,15 +2568,6 @@ onUnmounted(() => {
   background: rgba(255, 244, 240, 0.92);
 }
 
-.message-role {
-  display: inline-flex;
-  margin-bottom: 8px;
-  opacity: 0.78;
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
 .assistant-actions {
   display: flex;
   align-items: center;
@@ -2335,6 +2575,69 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 12px;
+}
+
+.assistant-action-group,
+.message-card-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.message-card-tools {
+  margin-top: 10px;
+}
+
+.message-card-tools.is-user {
+  justify-content: flex-end;
+}
+
+.message-icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(157, 91, 47, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 251, 245, 0.9);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    color 180ms ease,
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+.message-icon-action .el-icon {
+  font-size: 14px;
+}
+
+.message-icon-action:hover {
+  border-color: rgba(157, 91, 47, 0.28);
+  color: var(--brand-strong);
+  background: rgba(255, 246, 236, 0.96);
+  transform: translateY(-1px);
+}
+
+.message-icon-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+  transform: none;
+}
+
+.message-icon-action.is-user {
+  border-color: rgba(255, 250, 244, 0.24);
+  background: rgba(255, 250, 244, 0.12);
+  color: rgba(255, 250, 244, 0.92);
+}
+
+.message-icon-action.is-user:hover {
+  border-color: rgba(255, 250, 244, 0.4);
+  background: rgba(255, 250, 244, 0.18);
+  color: #fffaf4;
 }
 
 .assistant-action strong {
@@ -2831,6 +3134,7 @@ onUnmounted(() => {
   }
 
   .composer-toolbelt,
+  .assistant-action-group,
   .assistant-actions,
   .reference-head,
   .reference-actions {

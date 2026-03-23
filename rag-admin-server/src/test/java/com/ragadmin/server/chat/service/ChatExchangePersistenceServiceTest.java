@@ -7,6 +7,7 @@ import com.ragadmin.server.chat.entity.ChatAnswerReferenceEntity;
 import com.ragadmin.server.chat.entity.ChatMessageEntity;
 import com.ragadmin.server.chat.entity.ChatSessionEntity;
 import com.ragadmin.server.chat.mapper.ChatAnswerReferenceMapper;
+import com.ragadmin.server.chat.mapper.ChatFeedbackMapper;
 import com.ragadmin.server.chat.mapper.ChatMessageMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.infra.ai.chat.ChatAnswerMetadata;
@@ -36,6 +37,9 @@ class ChatExchangePersistenceServiceTest {
 
     @Mock
     private ChatAnswerReferenceMapper chatAnswerReferenceMapper;
+
+    @Mock
+    private ChatFeedbackMapper chatFeedbackMapper;
 
     @Mock
     private DocumentMapper documentMapper;
@@ -121,5 +125,40 @@ class ChatExchangePersistenceServiceTest {
         assertEquals(802L, response.messageId());
         assertEquals("text/markdown", response.answerContentType());
         assertEquals(null, response.metadata());
+    }
+
+    @Test
+    void shouldReplaceExistingExchangeAndRebuildReferences() {
+        ChatMessageEntity message = new ChatMessageEntity();
+        message.setId(9001L);
+        message.setAnswerText("旧答案");
+
+        ChatAnswerMetadata answerMetadata = new ChatAnswerMetadata("MEDIUM", true, false);
+        RetrievalService.RetrievalResult retrievalResult = new RetrievalService.RetrievalResult(List.of(), "");
+
+        when(retrievalService.toReferenceResponses(eq(List.of()), any())).thenReturn(List.of());
+
+        ChatResponse response = chatExchangePersistenceService.replaceExchange(
+                message,
+                "新答案",
+                1001L,
+                66,
+                22,
+                48,
+                answerMetadata,
+                retrievalResult
+        );
+
+        ArgumentCaptor<ChatMessageEntity> messageCaptor = ArgumentCaptor.forClass(ChatMessageEntity.class);
+        verify(chatMessageMapper).updateById(messageCaptor.capture());
+        ChatMessageEntity updated = messageCaptor.getValue();
+        assertEquals("新答案", updated.getAnswerText());
+        assertEquals(1001L, updated.getModelId());
+        verify(chatAnswerReferenceMapper).delete(any());
+
+        assertEquals(9001L, response.messageId());
+        assertEquals("新答案", response.answer());
+        assertNotNull(response.metadata());
+        assertEquals("MEDIUM", response.metadata().confidence());
     }
 }

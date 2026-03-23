@@ -1,14 +1,17 @@
 package com.ragadmin.server.chat.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ragadmin.server.chat.ChatContentTypes;
 import com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse;
 import com.ragadmin.server.chat.dto.ChatReferenceResponse;
 import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatUsageResponse;
 import com.ragadmin.server.chat.entity.ChatAnswerReferenceEntity;
+import com.ragadmin.server.chat.entity.ChatFeedbackEntity;
 import com.ragadmin.server.chat.entity.ChatMessageEntity;
 import com.ragadmin.server.chat.entity.ChatSessionEntity;
 import com.ragadmin.server.chat.mapper.ChatAnswerReferenceMapper;
+import com.ragadmin.server.chat.mapper.ChatFeedbackMapper;
 import com.ragadmin.server.chat.mapper.ChatMessageMapper;
 import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.mapper.DocumentMapper;
@@ -31,6 +34,9 @@ public class ChatExchangePersistenceService {
 
     @Autowired
     private ChatAnswerReferenceMapper chatAnswerReferenceMapper;
+
+    @Autowired
+    private ChatFeedbackMapper chatFeedbackMapper;
 
     @Autowired
     private DocumentMapper documentMapper;
@@ -66,16 +72,62 @@ public class ChatExchangePersistenceService {
         message.setLatencyMs(latencyMs);
         chatMessageMapper.insert(message);
 
+        persistReferences(message.getId(), retrievalResult);
+        return buildChatResponse(message.getId(), answer, promptTokens, completionTokens, answerMetadata, retrievalResult);
+    }
+
+    /**
+     * 重新生成只允许覆盖既有消息，避免同一轮问答在会话里落出重复记录。
+     */
+    @Transactional
+    public ChatResponse replaceExchange(
+            ChatMessageEntity message,
+            String answer,
+            Long modelId,
+            Integer promptTokens,
+            Integer completionTokens,
+            int latencyMs,
+            ChatAnswerMetadata answerMetadata,
+            RetrievalService.RetrievalResult retrievalResult
+    ) {
+        message.setAnswerText(answer);
+        message.setModelId(modelId);
+        message.setAnswerConfidence(answerMetadata == null ? null : answerMetadata.confidence());
+        message.setHasKnowledgeBaseEvidence(answerMetadata == null ? null : answerMetadata.hasKnowledgeBaseEvidence());
+        message.setNeedFollowUp(answerMetadata == null ? null : answerMetadata.needFollowUp());
+        message.setPromptTokens(promptTokens);
+        message.setCompletionTokens(completionTokens);
+        message.setLatencyMs(latencyMs);
+        chatMessageMapper.updateById(message);
+
+        chatAnswerReferenceMapper.delete(new LambdaQueryWrapper<ChatAnswerReferenceEntity>()
+                .eq(ChatAnswerReferenceEntity::getMessageId, message.getId()));
+        chatFeedbackMapper.delete(new LambdaQueryWrapper<ChatFeedbackEntity>()
+                .eq(ChatFeedbackEntity::getMessageId, message.getId()));
+        persistReferences(message.getId(), retrievalResult);
+        return buildChatResponse(message.getId(), answer, promptTokens, completionTokens, answerMetadata, retrievalResult);
+    }
+
+    private void persistReferences(Long messageId, RetrievalService.RetrievalResult retrievalResult) {
         for (int i = 0; i < retrievalResult.chunks().size(); i++) {
             var chunk = retrievalResult.chunks().get(i);
             ChatAnswerReferenceEntity ref = new ChatAnswerReferenceEntity();
-            ref.setMessageId(message.getId());
+            ref.setMessageId(messageId);
             ref.setChunkId(chunk.chunk().getId());
             ref.setScore(BigDecimal.valueOf(chunk.score()));
             ref.setRankNo(i + 1);
             chatAnswerReferenceMapper.insert(ref);
         }
+    }
 
+    private ChatResponse buildChatResponse(
+            Long messageId,
+            String answer,
+            Integer promptTokens,
+            Integer completionTokens,
+            ChatAnswerMetadata answerMetadata,
+            RetrievalService.RetrievalResult retrievalResult
+    ) {
         List<Long> documentIds = retrievalResult.chunks().stream()
                 .map(item -> item.chunk().getDocumentId())
                 .distinct()
@@ -92,7 +144,7 @@ public class ChatExchangePersistenceService {
         );
 
         return new ChatResponse(
-                message.getId(),
+                messageId,
                 answer,
                 ChatContentTypes.MARKDOWN,
                 references,

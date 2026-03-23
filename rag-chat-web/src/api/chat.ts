@@ -43,6 +43,12 @@ interface StreamChatOptions {
   onError?: (error: unknown) => void
 }
 
+export interface RegenerateChatMessageRequest {
+  chatModelId?: number
+  selectedKbIds?: number[]
+  webSearchEnabled?: boolean
+}
+
 function normalizeChatErrorMessage(message: string): string {
   const normalized = message.trim()
   if (!normalized) {
@@ -131,16 +137,16 @@ export async function submitChatFeedback(
   unwrapResponse(response.data)
 }
 
-export function streamChatMessage(
-  sessionId: number,
-  payload: ChatRequest,
+function createStreamHandle(
+  url: string,
+  payload: object,
   options: StreamChatOptions,
 ): ChatStreamHandle {
   const controller = new AbortController()
   const token = getAccessToken()
   let completed = false
 
-  void fetchEventSource(`/api/app/chat/sessions/${sessionId}/messages/stream`, {
+  void fetchEventSource(url, {
     method: 'POST',
     signal: controller.signal,
     openWhenHidden: true,
@@ -196,6 +202,22 @@ export function streamChatMessage(
       controller.abort()
     },
   }
+}
+
+export function streamChatMessage(
+  sessionId: number,
+  payload: ChatRequest,
+  options: StreamChatOptions,
+): ChatStreamHandle {
+  return createStreamHandle(`/api/app/chat/sessions/${sessionId}/messages/stream`, payload, options)
+}
+
+export function streamRegenerateChatMessage(
+  messageId: number,
+  payload: RegenerateChatMessageRequest,
+  options: StreamChatOptions,
+): ChatStreamHandle {
+  return createStreamHandle(`/api/app/chat/messages/${messageId}/regenerate/stream`, payload, options)
 }
 
 export function resolveChatStreamError(error: unknown): string {

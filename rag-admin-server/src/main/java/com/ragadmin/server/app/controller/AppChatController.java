@@ -1,6 +1,7 @@
 package com.ragadmin.server.app.controller;
 
 import com.ragadmin.server.app.dto.AppChatRequest;
+import com.ragadmin.server.app.dto.AppRegenerateChatMessageRequest;
 import com.ragadmin.server.app.dto.AppChatSessionResponse;
 import com.ragadmin.server.app.dto.AppCreateChatSessionRequest;
 import com.ragadmin.server.app.dto.AppUpdateChatSessionRequest;
@@ -116,6 +117,15 @@ public class AppChatController {
             HttpServletRequest httpServletRequest
     ) {
         return appChatService.streamChat(sessionId, request, currentUser(httpServletRequest));
+    }
+
+    @PostMapping(value = "/messages/{messageId}/regenerate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ChatStreamEventResponse> regenerateMessage(
+            @PathVariable Long messageId,
+            @RequestBody AppRegenerateChatMessageRequest request,
+            HttpServletRequest httpServletRequest
+    ) {
+        return appChatService.regenerateMessage(messageId, request, currentUser(httpServletRequest));
     }
 
     @PostMapping("/messages/{messageId}/feedback")

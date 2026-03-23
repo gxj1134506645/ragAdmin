@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
-import { resolveChatStreamError, streamChatMessage } from '@/api/chat'
+import { resolveChatStreamError, streamChatMessage, streamRegenerateChatMessage } from '@/api/chat'
 import { getAccessToken } from '@/utils/token-storage'
 
 vi.mock('@microsoft/fetch-event-source', () => ({
@@ -158,6 +158,28 @@ describe('streamChatMessage', () => {
       errorMessage: null,
     })
     expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('重新生成回答时应命中消息级流式接口', () => {
+    let capturedUrl = ''
+    fetchEventSourceMock.mockImplementation((url) => {
+      capturedUrl = String(url)
+      return Promise.resolve()
+    })
+
+    streamRegenerateChatMessage(
+      108,
+      {
+        chatModelId: 3,
+        selectedKbIds: [9],
+        webSearchEnabled: true,
+      },
+      {
+        onEvent: vi.fn(),
+      },
+    )
+
+    expect(capturedUrl).toBe('/api/app/chat/messages/108/regenerate/stream')
   })
 
   it('应将供应商欠费错误转换为友好提示', () => {

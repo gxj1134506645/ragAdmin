@@ -493,6 +493,42 @@ class AppApiWebMvcTest {
         assertTrue(body.contains("再确认知识库引用是否命中。"));
     }
 
+    @Test
+    void shouldStreamRegenerateMessageThroughAppEndpointWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token", AuthService.APP_LOGIN_TYPE)).thenReturn(authenticatedUser());
+        when(appChatService.regenerateMessage(eq(103L), any(), any())).thenReturn(Flux.just(
+                ChatStreamEventResponse.delta("新的回答片段。"),
+                ChatStreamEventResponse.complete(new ChatResponse(
+                        103L,
+                        "新的完整回答。",
+                        "text/markdown",
+                        List.of(),
+                        new ChatUsageResponse(120, 24),
+                        null
+                ))
+        ));
+
+        MvcResult mvcResult = protectedMockMvc.perform(post("/api/app/chat/messages/103/regenerate/stream")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new AppRegeneratePayload(
+                                1L,
+                                List.of(11L),
+                                true
+                        ))))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        protectedMockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(content().string(containsString("\"eventType\":\"DELTA\"")))
+                .andExpect(content().string(containsString("\"eventType\":\"COMPLETE\"")))
+                .andExpect(content().string(containsString("\"messageId\":103")))
+                .andExpect(content().string(containsString("\"answerContentType\":\"text/markdown\"")))
+                .andExpect(content().string(containsString("\"promptTokens\":120")));
+    }
+
     private AuthenticatedUser authenticatedUser() {
         return new AuthenticatedUser()
                 .setUserId(2L)
@@ -504,6 +540,13 @@ class AppApiWebMvcTest {
 
     private record AppChatPayload(
             String question,
+            Long chatModelId,
+            List<Long> selectedKbIds,
+            Boolean webSearchEnabled
+    ) {
+    }
+
+    private record AppRegeneratePayload(
             Long chatModelId,
             List<Long> selectedKbIds,
             Boolean webSearchEnabled

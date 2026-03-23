@@ -3,6 +3,7 @@ package com.ragadmin.server.app.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ragadmin.server.app.dto.AppChatRequest;
+import com.ragadmin.server.app.dto.AppRegenerateChatMessageRequest;
 import com.ragadmin.server.app.dto.AppChatSessionResponse;
 import com.ragadmin.server.app.dto.AppCreateChatSessionRequest;
 import com.ragadmin.server.app.dto.AppUpdateChatSessionRequest;
@@ -390,6 +391,66 @@ public class AppChatService {
                 .onErrorResume(ex -> Flux.just(ChatStreamEventResponse.error(resolveStreamErrorMessage(ex))));
     }
 
+    public Flux<ChatStreamEventResponse> regenerateMessage(
+            Long messageId,
+            AppRegenerateChatMessageRequest request,
+            AuthenticatedUser user
+    ) {
+        return Flux.defer(() -> {
+                    ChatMessageEntity message = requireLatestAppMessage(messageId, user.getUserId());
+                    PreparedChatExecution execution = prepareChatExecution(
+                            message.getSessionId(),
+                            message.getQuestionText(),
+                            request == null ? null : request.getSelectedKbIds(),
+                            request == null ? null : request.getChatModelId(),
+                            request == null ? null : request.getWebSearchEnabled(),
+                            user,
+                            message.getId()
+                    );
+                    StringBuilder answerBuilder = new StringBuilder();
+                    Instant start = Instant.now();
+                    AtomicReference<Integer> promptTokensRef = new AtomicReference<>();
+                    AtomicReference<Integer> completionTokensRef = new AtomicReference<>();
+
+                    return conversationChatClient.stream(
+                                    execution.chatModel().providerCode(),
+                                    execution.chatModel().modelCode(),
+                                    execution.conversationId(),
+                                    execution.promptMessages(),
+                                    execution.historyMessages()
+                            )
+                            .<ChatStreamEventResponse>handle((chunk, sink) -> {
+                                updateUsage(chunk, promptTokensRef, completionTokensRef);
+                                String delta = extractStreamText(chunk);
+                                if (!StringUtils.hasLength(delta)) {
+                                    return;
+                                }
+                                answerBuilder.append(delta);
+                                sink.next(ChatStreamEventResponse.delta(delta));
+                            })
+                            .concatWith(Mono.fromSupplier(() -> {
+                                ChatAnswerMetadata answerMetadata = generateAnswerMetadata(
+                                        execution,
+                                        message.getQuestionText(),
+                                        answerBuilder.toString()
+                                );
+                                ChatResponse response = chatExchangePersistenceService.replaceExchange(
+                                        message,
+                                        answerBuilder.toString(),
+                                        execution.chatModel().modelId(),
+                                        promptTokensRef.get(),
+                                        completionTokensRef.get(),
+                                        (int) Duration.between(start, Instant.now()).toMillis(),
+                                        answerMetadata,
+                                        execution.retrievalResult()
+                                );
+                                conversationMemoryRefreshDispatcher.dispatchRefresh(execution.conversationId());
+                                return ChatStreamEventResponse.complete(response);
+                            }));
+                })
+                .onErrorResume(ex -> Flux.just(ChatStreamEventResponse.error(resolveStreamErrorMessage(ex))));
+    }
+
     private ChatAnswerMetadata generateAnswerMetadata(
             PreparedChatExecution execution,
             String question,
@@ -438,6 +499,25 @@ public class AppChatService {
             throw new BusinessException("CHAT_SESSION_NOT_FOUND", "会话不存在", HttpStatus.NOT_FOUND);
         }
         return session;
+    }
+
+    /**
+     * 重新生成只支持会话最后一条问答，避免改写历史回答后使后续上下文与摘要失真。
+     */
+    private ChatMessageEntity requireLatestAppMessage(Long messageId, Long userId) {
+        ChatMessageEntity message = chatMessageMapper.selectById(messageId);
+        if (message == null) {
+            throw new BusinessException("CHAT_MESSAGE_NOT_FOUND", "消息不存在", HttpStatus.NOT_FOUND);
+        }
+        ChatSessionEntity session = requireAppSession(message.getSessionId(), userId);
+        ChatMessageEntity latestMessage = chatMessageMapper.selectOne(new LambdaQueryWrapper<ChatMessageEntity>()
+                .eq(ChatMessageEntity::getSessionId, session.getId())
+                .orderByDesc(ChatMessageEntity::getId)
+                .last("LIMIT 1"));
+        if (latestMessage == null || !Objects.equals(latestMessage.getId(), messageId)) {
+            throw new BusinessException("CHAT_MESSAGE_REGENERATE_INVALID", "当前仅支持重新生成本会话最后一条回答", HttpStatus.BAD_REQUEST);
+        }
+        return message;
     }
 
     private AppChatSessionResponse toSessionResponse(ChatSessionEntity session, List<Long> selectedKbIds) {
@@ -546,9 +626,10 @@ public class AppChatService {
         return builder.toString().trim();
     }
 
-    private List<ChatPromptMessage> buildHistoryMessages(Long sessionId) {
+    private List<ChatPromptMessage> buildHistoryMessages(Long sessionId, Long beforeMessageIdExclusive) {
         List<ChatMessageEntity> history = chatMessageMapper.selectList(new LambdaQueryWrapper<ChatMessageEntity>()
                 .eq(ChatMessageEntity::getSessionId, sessionId)
+                .lt(beforeMessageIdExclusive != null, ChatMessageEntity::getId, beforeMessageIdExclusive)
                 .orderByAsc(ChatMessageEntity::getId));
         if (history.isEmpty()) {
             return List.of();
@@ -566,24 +647,44 @@ public class AppChatService {
     }
 
     private PreparedChatExecution prepareChatExecution(Long sessionId, AppChatRequest request, AuthenticatedUser user) {
+        return prepareChatExecution(
+                sessionId,
+                request.getQuestion(),
+                request.getSelectedKbIds(),
+                request.getChatModelId(),
+                request.getWebSearchEnabled(),
+                user,
+                null
+        );
+    }
+
+    private PreparedChatExecution prepareChatExecution(
+            Long sessionId,
+            String question,
+            List<Long> requestedSelectedKbIds,
+            Long requestedChatModelId,
+            Boolean requestedWebSearchEnabled,
+            AuthenticatedUser user,
+            Long historyBeforeMessageIdExclusive
+    ) {
         ChatSessionEntity session = requireAppSession(sessionId, user.getUserId());
         String sceneType = normalizeSceneType(session.getSceneType());
 
-        List<Long> effectiveSelectedKbIds = request.getSelectedKbIds() == null
+        List<Long> effectiveSelectedKbIds = requestedSelectedKbIds == null
                 ? loadSelectedKnowledgeBaseIds(session.getId()).getOrDefault(session.getId(), defaultSelectedKnowledgeBaseIds(session))
-                : normalizeSelectedKnowledgeBaseIds(sceneType, session.getKbId(), request.getSelectedKbIds());
-        if (request.getSelectedKbIds() != null) {
+                : normalizeSelectedKnowledgeBaseIds(sceneType, session.getKbId(), requestedSelectedKbIds);
+        if (requestedSelectedKbIds != null) {
             replaceSessionKnowledgeBaseRelations(session.getId(), effectiveSelectedKbIds);
         }
 
-        refreshSessionPreferences(session, request.getChatModelId(), request.getWebSearchEnabled());
-        ModelService.ChatModelDescriptor chatModel = resolveChatModel(session, request.getChatModelId());
+        refreshSessionPreferences(session, requestedChatModelId, requestedWebSearchEnabled);
+        ModelService.ChatModelDescriptor chatModel = resolveChatModel(session, requestedChatModelId);
         var executionPlan = chatExecutionPlanningService.plan(new ChatExecutionPlanningRequest(
                 chatModel.providerCode(),
                 chatModel.modelCode(),
-                request.getQuestion(),
+                question,
                 !effectiveSelectedKbIds.isEmpty(),
-                Boolean.TRUE.equals(request.getWebSearchEnabled()),
+                Boolean.TRUE.equals(requestedWebSearchEnabled),
                 effectiveSelectedKbIds.size(),
                 ChatSceneTypes.KNOWLEDGE_BASE.equals(sceneType)
         ));
@@ -602,7 +703,7 @@ public class AppChatService {
 
         List<ChatPromptMessage> promptMessages = buildPromptMessages(
                 sceneType,
-                request.getQuestion(),
+                question,
                 retrievalResult,
                 effectiveSelectedKbIds,
                 webSearchSnippets
@@ -613,7 +714,7 @@ public class AppChatService {
                 chatModel,
                 retrievalResult,
                 promptMessages,
-                buildHistoryMessages(session.getId()),
+                buildHistoryMessages(session.getId(), historyBeforeMessageIdExclusive),
                 conversationIdCodec.encode(session)
         );
     }

@@ -1,6 +1,7 @@
 package com.ragadmin.server.app.service;
 
 import com.ragadmin.server.app.dto.AppChatRequest;
+import com.ragadmin.server.app.dto.AppRegenerateChatMessageRequest;
 import com.ragadmin.server.app.dto.AppChatSessionResponse;
 import com.ragadmin.server.app.dto.AppCreateChatSessionRequest;
 import com.ragadmin.server.app.dto.AppUpdateChatSessionRequest;
@@ -704,6 +705,109 @@ class AppChatServiceTest {
         assertEquals("先给出结论。", events.get(0).delta());
         assertEquals("COMPLETE", events.get(1).eventType());
         assertEquals(3001L, events.get(1).messageId());
+    }
+
+    @Test
+    void shouldRegenerateLatestAppMessageAndOverwriteExistingAnswer() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(901L);
+        session.setUserId(9201L);
+        session.setSceneType(ChatSceneTypes.GENERAL);
+        session.setTerminalType(ChatTerminalTypes.APP);
+        session.setSessionName("首页会话");
+        session.setStatus("ENABLED");
+
+        ChatMessageEntity latestMessage = new ChatMessageEntity();
+        latestMessage.setId(9902L);
+        latestMessage.setSessionId(901L);
+        latestMessage.setUserId(9201L);
+        latestMessage.setQuestionText("请重新整理这段说明");
+        latestMessage.setAnswerText("旧答案");
+
+        ChatMessageEntity historyMessage = new ChatMessageEntity();
+        historyMessage.setId(9901L);
+        historyMessage.setSessionId(901L);
+        historyMessage.setUserId(9201L);
+        historyMessage.setQuestionText("上一轮问题");
+        historyMessage.setAnswerText("上一轮回答");
+
+        AppRegenerateChatMessageRequest request = new AppRegenerateChatMessageRequest();
+        request.setChatModelId(901L);
+        request.setWebSearchEnabled(Boolean.FALSE);
+
+        ModelService.ChatModelDescriptor modelDescriptor = new ModelService.ChatModelDescriptor(
+                901L,
+                "qwen-plus",
+                "BAILIAN",
+                "百炼"
+        );
+        RetrievalService.RetrievalResult retrievalResult = new RetrievalService.RetrievalResult(List.of(), "");
+        ChatAnswerMetadata metadata = new ChatAnswerMetadata("LOW", false, false);
+
+        when(chatMessageMapper.selectById(9902L)).thenReturn(latestMessage);
+        when(chatSessionMapper.selectById(901L)).thenReturn(session);
+        when(chatMessageMapper.selectOne(any())).thenReturn(latestMessage);
+        when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of());
+        when(modelService.resolveChatModelDescriptor(901L)).thenReturn(modelDescriptor);
+        doReturn(new ChatExecutionPlan(
+                "MODEL_ONLY",
+                false,
+                "请重新整理这段说明",
+                false,
+                null,
+                "直接回答",
+                "MODEL"
+        )).when(chatExecutionPlanningService).plan(any(ChatExecutionPlanningRequest.class));
+        when(chatMessageMapper.selectList(any())).thenReturn(List.of(historyMessage));
+        when(conversationChatClient.stream(eq("BAILIAN"), eq("qwen-plus"), any(), any(), any()))
+                .thenReturn(Flux.just(chatChunk("新的回答。", 40, 12)));
+        when(chatAnswerMetadataGenerationService.generate(any())).thenReturn(metadata);
+        when(chatExchangePersistenceService.replaceExchange(
+                eq(latestMessage),
+                eq("新的回答。"),
+                eq(901L),
+                eq(40),
+                eq(12),
+                anyInt(),
+                eq(metadata),
+                eq(retrievalResult)
+        )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
+                9902L,
+                "新的回答。",
+                "text/markdown",
+                List.of(),
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(40, 12),
+                new com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse("LOW", false, false)
+        ));
+
+        List<ChatStreamEventResponse> events = appChatService.regenerateMessage(9902L, request, user(9201L))
+                .collectList()
+                .block();
+
+        assertNotNull(events);
+        assertEquals(2, events.size());
+        assertEquals("DELTA", events.get(0).eventType());
+        assertEquals("COMPLETE", events.get(1).eventType());
+        assertEquals(9902L, events.get(1).messageId());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ChatPromptMessage>> historyCaptor = ArgumentCaptor.forClass(List.class);
+        verify(conversationChatClient).stream(eq("BAILIAN"), eq("qwen-plus"), any(), any(), historyCaptor.capture());
+        List<ChatPromptMessage> historyMessages = historyCaptor.getValue();
+        assertEquals(2, historyMessages.size());
+        assertEquals("上一轮问题", historyMessages.get(0).content());
+        assertEquals("上一轮回答", historyMessages.get(1).content());
+        verify(chatExchangePersistenceService).replaceExchange(
+                eq(latestMessage),
+                eq("新的回答。"),
+                eq(901L),
+                eq(40),
+                eq(12),
+                anyInt(),
+                eq(metadata),
+                eq(retrievalResult)
+        );
+        verify(conversationMemoryRefreshDispatcher).dispatchRefresh("chat-terminal-app-scene-general-user-9201-session-901");
     }
 
     private org.springframework.ai.chat.model.ChatResponse chatChunk(String text, int promptTokens, int completionTokens) {

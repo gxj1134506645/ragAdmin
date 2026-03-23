@@ -681,8 +681,9 @@ function applyStreamComplete(question: string, event: ChatStreamEvent): void {
   ]
 }
 
-async function handleSendQuestion(questionOverride?: string): Promise<void> {
-  const question = (questionOverride ?? draftQuestion.value).trim()
+// 统一收口问题发送入口，避免按钮点击事件对象误入字符串处理链路。
+async function sendQuestion(rawQuestion: string): Promise<void> {
+  const question = rawQuestion.trim()
   if (!question || streaming.value) {
     return
   }
@@ -763,12 +764,16 @@ async function handleSendQuestion(questionOverride?: string): Promise<void> {
   )
 }
 
+async function handleSendQuestion(): Promise<void> {
+  await sendQuestion(draftQuestion.value)
+}
+
 function handleRetryPendingExchange(): void {
   const question = pendingExchange.value?.question
   if (!question || streaming.value) {
     return
   }
-  void handleSendQuestion(question)
+  void sendQuestion(question)
 }
 
 function handleStartNewSession(): void {

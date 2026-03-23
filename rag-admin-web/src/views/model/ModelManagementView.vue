@@ -95,6 +95,17 @@ const modelTypeOptions = [
 ]
 
 const hasModelData = computed(() => models.value.length > 0)
+const hasDefaultChatModel = computed(() => models.value.some((item) => item.isDefaultChatModel))
+const shouldShowDefaultChatModelAlert = computed(() => {
+  return !modelLoading.value
+    && !modelLoadError.value
+    && pagination.pageNo === 1
+    && !modelQuery.providerCode
+    && !modelQuery.capabilityType
+    && !modelQuery.status
+    && pagination.total > 0
+    && !hasDefaultChatModel.value
+})
 const showGenerationOptionFields = computed(() => !isEmbeddingModel(modelForm.modelType))
 const modelDialogTitle = computed(() => (modelDialogMode.value === 'create' ? '新增模型定义' : '编辑模型定义'))
 const modelDialogConfirmText = computed(() => (modelDialogMode.value === 'create' ? '确认创建' : '确认保存'))
@@ -346,6 +357,16 @@ async function handleSaveModel(): Promise<void> {
   modelSubmitting.value = true
   try {
     const payload = buildModelPayload()
+    const editingModel = editingModelId.value
+      ? models.value.find((item) => item.id === editingModelId.value)
+      : null
+    if (
+      editingModel?.isDefaultChatModel
+      && (payload.modelType !== 'CHAT' || payload.status !== 'ENABLED')
+    ) {
+      ElMessage.warning('当前模型已是默认聊天模型，请先切换新的默认聊天模型后再修改状态或用途')
+      return
+    }
     if (modelDialogMode.value === 'create') {
       await createModel(payload)
       ElMessage.success('模型创建成功')
@@ -364,6 +385,11 @@ async function handleSaveModel(): Promise<void> {
 }
 
 async function handleDeleteModel(model: ModelDefinition): Promise<void> {
+  if (model.isDefaultChatModel) {
+    ElMessage.warning('请先将其他聊天模型设为默认，再删除当前默认聊天模型')
+    return
+  }
+
   try {
     await ElMessageBox.confirm(
       `删除后无法恢复，确定删除模型“${model.modelName}”吗？`,
@@ -460,10 +486,18 @@ onMounted(async () => {
         <div>
           <h2 class="section-title">模型定义</h2>
           <p class="section-subtitle">
-            聊天模型用于问答生成，向量模型用于文档切片向量化与检索。页面按模型用途和状态筛选，并提供新增、编辑、删除和探活能力。
+            聊天模型用于问答生成，向量模型用于文档切片向量化与检索。默认聊天模型只能在本页手动设置，且运行时只允许存在一个启用中的默认聊天模型。
           </p>
         </div>
       </div>
+
+      <el-alert
+        v-if="shouldShowDefaultChatModelAlert"
+        type="error"
+        :closable="false"
+        show-icon
+        title="当前尚未设置默认聊天模型，问答链路将不可用，请先在本页选择一个启用中的聊天模型设为默认。"
+      />
 
       <section class="filter-panel">
         <div class="filter-grid">

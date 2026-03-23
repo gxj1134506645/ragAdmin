@@ -7,7 +7,6 @@ public class OllamaProperties {
 
     private boolean enabled = false;
     private String baseUrl;
-    private String defaultChatModel;
     private String defaultEmbeddingModel;
     private int timeoutSeconds = 30;
 
@@ -25,14 +24,6 @@ public class OllamaProperties {
 
     public void setBaseUrl(String baseUrl) {
         this.baseUrl = baseUrl;
-    }
-
-    public String getDefaultChatModel() {
-        return defaultChatModel;
-    }
-
-    public void setDefaultChatModel(String defaultChatModel) {
-        this.defaultChatModel = defaultChatModel;
     }
 
     public String getDefaultEmbeddingModel() {

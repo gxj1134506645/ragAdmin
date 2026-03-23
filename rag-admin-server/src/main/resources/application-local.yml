@@ -36,13 +36,11 @@ rag:
     bailian:
       enabled: true
       base-url: https://dashscope.aliyuncs.com
-      default-chat-model: qwen-max
       default-embedding-model: text-embedding-v3
       timeout-seconds: 60
     ollama:
       enabled: false
       base-url: http://127.0.0.1:11434
-      default-chat-model: qwen2.5:7b
       default-embedding-model: nomic-embed-text
       timeout-seconds: 180
   storage:

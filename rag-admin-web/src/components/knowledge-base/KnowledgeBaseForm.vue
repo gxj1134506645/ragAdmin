@@ -78,7 +78,7 @@ async function handleSubmit(): Promise<void> {
       type="warning"
       :closable="false"
       show-icon
-      title="模型列表暂不可用，当前可直接创建知识库并使用平台默认模型兜底。"
+      title="模型列表暂不可用，当前仍可创建知识库；若未显式选择聊天模型，将使用模型管理中设置的默认聊天模型。"
     />
 
     <el-form
@@ -123,7 +123,7 @@ async function handleSubmit(): Promise<void> {
             clearable
             filterable
             :loading="modelLoading"
-            placeholder="留空时使用平台默认聊天模型"
+            placeholder="留空时使用模型管理中设置的默认聊天模型"
           >
             <el-option
               v-for="item in chatModelOptions"
@@ -138,7 +138,7 @@ async function handleSubmit(): Promise<void> {
             </el-option>
           </el-select>
           <p class="field-tip">
-            {{ hasRealModelOptions ? '不选择时由平台默认聊天模型兜底。' : '当前无可用聊天模型，留空即可。' }}
+            {{ hasRealModelOptions ? '不选择时由模型管理中设置的默认聊天模型兜底。' : '当前无可用聊天模型，可先到模型管理中维护并设置默认聊天模型。' }}
           </p>
         </el-form-item>
 

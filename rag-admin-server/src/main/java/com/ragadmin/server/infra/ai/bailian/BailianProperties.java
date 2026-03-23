@@ -8,7 +8,6 @@ public class BailianProperties {
     private boolean enabled = true;
     private String baseUrl;
     private String apiKey;
-    private String defaultChatModel;
     private String defaultEmbeddingModel;
     private int timeoutSeconds = 60;
 
@@ -34,14 +33,6 @@ public class BailianProperties {
 
     public void setApiKey(String apiKey) {
         this.apiKey = apiKey;
-    }
-
-    public String getDefaultChatModel() {
-        return defaultChatModel;
-    }
-
-    public void setDefaultChatModel(String defaultChatModel) {
-        this.defaultChatModel = defaultChatModel;
     }
 
     public String getDefaultEmbeddingModel() {

@@ -1,6 +1,7 @@
 package com.ragadmin.server.model.service;
 
 import com.ragadmin.server.common.exception.BusinessException;
+import com.ragadmin.server.chat.mapper.ChatMessageMapper;
 import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
 import com.ragadmin.server.infra.ai.AiProperties;
 import com.ragadmin.server.infra.ai.bailian.BailianProperties;
@@ -61,6 +62,9 @@ class ModelServiceTest {
     private ChunkVectorRefMapper chunkVectorRefMapper;
 
     @Mock
+    private ChatMessageMapper chatMessageMapper;
+
+    @Mock
     private ModelProviderService modelProviderService;
 
     @Mock
@@ -83,6 +87,7 @@ class ModelServiceTest {
         ReflectionTestUtils.setField(modelService, "aiModelCapabilityMapper", aiModelCapabilityMapper);
         ReflectionTestUtils.setField(modelService, "knowledgeBaseMapper", knowledgeBaseMapper);
         ReflectionTestUtils.setField(modelService, "chunkVectorRefMapper", chunkVectorRefMapper);
+        ReflectionTestUtils.setField(modelService, "chatMessageMapper", chatMessageMapper);
         ReflectionTestUtils.setField(modelService, "modelProviderService", modelProviderService);
         ReflectionTestUtils.setField(modelService, "conversationChatClient", conversationChatClient);
         ReflectionTestUtils.setField(modelService, "embeddingClientRegistry", embeddingClientRegistry);
@@ -236,36 +241,17 @@ class ModelServiceTest {
     }
 
     @Test
-    void shouldResolveDefaultChatModelDescriptorWhenKnowledgeBaseModelIsEmpty() {
-        AiProviderEntity provider = new AiProviderEntity();
-        provider.setId(50L);
-        provider.setProviderCode("BAILIAN");
-        provider.setProviderName("百炼");
+    void shouldRejectWhenDefaultChatModelIsNotConfiguredInDatabase() {
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> modelService.resolveChatModelDescriptor(null)
+        );
 
-        AiModelEntity model = new AiModelEntity();
-        model.setId(5L);
-        model.setProviderId(50L);
-        model.setModelCode("qwen-max");
-
-        aiProperties.setDefaultProvider("BAILIAN");
-        bailianProperties.setDefaultChatModel("qwen-max");
-
-        when(aiProviderMapper.selectOne(any())).thenReturn(provider);
-        when(aiModelMapper.selectOne(any())).thenReturn(model);
-        when(aiModelMapper.selectById(5L)).thenReturn(model);
-        when(aiModelCapabilityMapper.selectEnabledByModelIds(List.of(5L)))
-                .thenReturn(List.of(capability(5L, "TEXT_GENERATION")));
-
-        ModelService.ChatModelDescriptor descriptor = modelService.resolveChatModelDescriptor(null);
-
-        assertEquals(5L, descriptor.modelId());
-        assertEquals("qwen-max", descriptor.modelCode());
-        assertEquals("BAILIAN", descriptor.providerCode());
-        assertEquals("百炼", descriptor.providerName());
+        assertEquals("DEFAULT_CHAT_MODEL_NOT_CONFIGURED", exception.getCode());
     }
 
     @Test
-    void shouldPreferDatabaseDefaultChatModelWhenConfigured() {
+    void shouldResolveDatabaseDefaultChatModelWhenConfigured() {
         AiProviderEntity provider = new AiProviderEntity();
         provider.setId(80L);
         provider.setProviderCode("BAILIAN");
@@ -289,6 +275,41 @@ class ModelServiceTest {
         assertEquals(8L, descriptor.modelId());
         assertEquals("qwen-plus", descriptor.modelCode());
         assertEquals("BAILIAN", descriptor.providerCode());
+    }
+
+    @Test
+    void shouldRejectWhenUpdatingDefaultChatModelToDisabled() {
+        AiModelEntity entity = new AiModelEntity();
+        entity.setId(12L);
+        entity.setProviderId(12L);
+        entity.setModelCode("qwen-max");
+        entity.setModelName("通义千问 Max");
+        entity.setModelType("CHAT");
+        entity.setStatus("ENABLED");
+        entity.setIsDefaultChatModel(Boolean.TRUE);
+
+        AiProviderEntity provider = new AiProviderEntity();
+        provider.setId(12L);
+        provider.setProviderCode("BAILIAN");
+        provider.setProviderName("百炼");
+
+        UpdateModelRequest request = new UpdateModelRequest();
+        request.setProviderId(12L);
+        request.setModelCode("qwen-max");
+        request.setModelName("通义千问 Max");
+        request.setCapabilityTypes(List.of("TEXT_GENERATION"));
+        request.setModelType("CHAT");
+        request.setStatus("DISABLED");
+
+        when(aiModelMapper.selectById(12L)).thenReturn(entity);
+        when(modelProviderService.requireProvider(12L)).thenReturn(provider);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> modelService.update(12L, request)
+        );
+
+        assertEquals("DEFAULT_CHAT_MODEL_CHANGE_FORBIDDEN", exception.getCode());
     }
 
     @Test
@@ -319,6 +340,23 @@ class ModelServiceTest {
         assertEquals("qwen-max", response.modelCode());
         verify(aiModelMapper).update(any(AiModelEntity.class), any());
         verify(aiModelMapper).updateById(model);
+    }
+
+    @Test
+    void shouldRejectDeletingDefaultChatModel() {
+        AiModelEntity model = new AiModelEntity();
+        model.setId(13L);
+        model.setModelName("通义千问 Max");
+        model.setIsDefaultChatModel(Boolean.TRUE);
+
+        when(aiModelMapper.selectById(13L)).thenReturn(model);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> modelService.delete(13L)
+        );
+
+        assertEquals("DEFAULT_CHAT_MODEL_DELETE_FORBIDDEN", exception.getCode());
     }
 
     @Test

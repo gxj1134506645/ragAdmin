@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS ai_model (
     model_type          VARCHAR(32) NOT NULL,
     max_tokens          INTEGER,
     temperature_default NUMERIC(6, 3),
+    -- 默认聊天模型只能由后台模型管理手动维护，运行时只允许存在一条。
     is_default_chat_model BOOLEAN NOT NULL DEFAULT FALSE,
     status              VARCHAR(16) NOT NULL DEFAULT 'ENABLED',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

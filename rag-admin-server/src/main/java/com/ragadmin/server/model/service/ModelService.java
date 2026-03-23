@@ -176,6 +176,7 @@ public class ModelService {
         List<String> capabilityTypes = validateCapabilityTypes(request.getModelType(), request.getCapabilityTypes());
         ensureModelCodeUnique(modelId, request.getProviderId(), request.getModelCode());
         validateCapabilityReferenceChange(modelId, capabilityTypes);
+        validateDefaultChatModelMutation(entity, request.getModelType(), request.getStatus(), capabilityTypes);
         Integer normalizedMaxTokens = normalizeMaxTokens(request.getModelType(), request.getMaxTokens());
         BigDecimal normalizedTemperatureDefault = normalizeTemperatureDefault(request.getModelType(), request.getTemperatureDefault());
 
@@ -186,9 +187,6 @@ public class ModelService {
         entity.setMaxTokens(normalizedMaxTokens);
         entity.setTemperatureDefault(normalizedTemperatureDefault);
         entity.setStatus(request.getStatus());
-        if (!isEligibleAsDefaultChatModel(entity, capabilityTypes)) {
-            entity.setIsDefaultChatModel(Boolean.FALSE);
-        }
         aiModelMapper.updateById(entity);
         replaceCapabilities(modelId, capabilityTypes);
 
@@ -228,6 +226,9 @@ public class ModelService {
     @Transactional
     public void delete(Long modelId) {
         AiModelEntity model = requireModel(modelId);
+        if (Boolean.TRUE.equals(model.getIsDefaultChatModel())) {
+            throw new BusinessException("DEFAULT_CHAT_MODEL_DELETE_FORBIDDEN", "默认聊天模型不能直接删除，请先切换新的默认聊天模型", HttpStatus.BAD_REQUEST);
+        }
         validateDeleteReference(modelId, model.getModelName());
         aiModelCapabilityMapper.delete(new LambdaQueryWrapper<AiModelCapabilityEntity>()
                 .eq(AiModelCapabilityEntity::getModelId, modelId));
@@ -451,6 +452,25 @@ public class ModelService {
         }
     }
 
+    private void validateDefaultChatModelMutation(
+            AiModelEntity entity,
+            String targetModelType,
+            String targetStatus,
+            List<String> capabilityTypes
+    ) {
+        if (!Boolean.TRUE.equals(entity.getIsDefaultChatModel())) {
+            return;
+        }
+        if (isEligibleAsDefaultChatModel(targetModelType, targetStatus, capabilityTypes)) {
+            return;
+        }
+        throw new BusinessException(
+                "DEFAULT_CHAT_MODEL_CHANGE_FORBIDDEN",
+                "当前模型已是默认聊天模型，请先切换新的默认聊天模型后再修改状态或用途",
+                HttpStatus.BAD_REQUEST
+        );
+    }
+
     private void validateDeleteReference(Long modelId, String modelName) {
         Long kbRefCount = knowledgeBaseMapper.selectCount(new LambdaQueryWrapper<KnowledgeBaseEntity>()
                 .and(wrapper -> wrapper.eq(KnowledgeBaseEntity::getEmbeddingModelId, modelId)
@@ -485,50 +505,36 @@ public class ModelService {
     }
 
     private ChatModelDescriptor resolveDefaultChatModelDescriptor() {
-        ChatModelDescriptor databaseDefault = findSystemDefaultChatModelDescriptor();
-        if (databaseDefault != null) {
-            return databaseDefault;
-        }
-        return resolveConfiguredDefaultChatModelDescriptor();
-    }
-
-    private ChatModelDescriptor resolveConfiguredDefaultChatModelDescriptor() {
-        String providerCode = resolveDefaultProviderCode();
-        if ("BAILIAN".equalsIgnoreCase(providerCode)) {
-            return requireChatDescriptorByProviderAndCode(providerCode, bailianProperties.getDefaultChatModel());
-        }
-        if ("OLLAMA".equalsIgnoreCase(providerCode)) {
-            return requireChatDescriptorByProviderAndCode(providerCode, ollamaProperties.getDefaultChatModel());
-        }
-        throw new BusinessException("DEFAULT_CHAT_MODEL_UNSUPPORTED", "当前默认提供方未配置聊天默认模型", HttpStatus.SERVICE_UNAVAILABLE);
-    }
-
-    private ChatModelDescriptor findSystemDefaultChatModelDescriptor() {
         AiModelEntity defaultModel = findStoredDefaultChatModel();
         if (defaultModel == null) {
-            return null;
+            throw new BusinessException("DEFAULT_CHAT_MODEL_NOT_CONFIGURED", "请先在模型管理中设置默认聊天模型", HttpStatus.SERVICE_UNAVAILABLE);
         }
         if (!"ENABLED".equalsIgnoreCase(defaultModel.getStatus())) {
-            return null;
+            throw new BusinessException("DEFAULT_CHAT_MODEL_INVALID", "当前默认聊天模型已失效，请在模型管理中重新设置", HttpStatus.SERVICE_UNAVAILABLE);
         }
-        return requireChatModelDescriptor(defaultModel.getId());
+        try {
+            return requireChatModelDescriptor(defaultModel.getId());
+        } catch (BusinessException ex) {
+            log.warn("默认聊天模型解析失败，modelId={}, message={}", defaultModel.getId(), ex.getMessage());
+            throw new BusinessException("DEFAULT_CHAT_MODEL_INVALID", "当前默认聊天模型已失效，请在模型管理中重新设置", HttpStatus.SERVICE_UNAVAILABLE);
+        }
     }
 
     private Long resolveEffectiveDefaultChatModelId() {
         AiModelEntity storedDefault = findStoredDefaultChatModel();
-        if (storedDefault != null && "ENABLED".equalsIgnoreCase(storedDefault.getStatus())) {
-            try {
-                requireModelWithCapability(storedDefault.getId(), "TEXT_GENERATION");
-                return storedDefault.getId();
-            } catch (BusinessException ex) {
-                log.warn("已忽略无效的后台默认聊天模型，modelId={}, message={}", storedDefault.getId(), ex.getMessage());
-            }
+        if (storedDefault == null) {
+            return null;
+        }
+        if (!"ENABLED".equalsIgnoreCase(storedDefault.getStatus())) {
+            log.warn("已忽略无效的后台默认聊天模型，modelId={}, message={}", storedDefault.getId(), "默认聊天模型未启用");
+            return null;
         }
 
         try {
-            return resolveConfiguredDefaultChatModelDescriptor().modelId();
+            requireModelWithCapability(storedDefault.getId(), "TEXT_GENERATION");
+            return storedDefault.getId();
         } catch (BusinessException ex) {
-            log.warn("配置文件默认聊天模型未生效，message={}", ex.getMessage());
+            log.warn("已忽略无效的后台默认聊天模型，modelId={}, message={}", storedDefault.getId(), ex.getMessage());
             return null;
         }
     }
@@ -544,9 +550,9 @@ public class ModelService {
         return candidates.getFirst();
     }
 
-    private boolean isEligibleAsDefaultChatModel(AiModelEntity model, List<String> capabilityTypes) {
-        return "ENABLED".equalsIgnoreCase(model.getStatus())
-                && "CHAT".equalsIgnoreCase(model.getModelType())
+    private boolean isEligibleAsDefaultChatModel(String modelType, String status, List<String> capabilityTypes) {
+        return "ENABLED".equalsIgnoreCase(status)
+                && "CHAT".equalsIgnoreCase(modelType)
                 && capabilityTypes.contains("TEXT_GENERATION");
     }
 
@@ -554,12 +560,6 @@ public class ModelService {
         AiProviderEntity provider = requireProviderByCode(providerCode);
         AiModelEntity model = requireModelByProviderAndCapability(provider.getId(), modelCode, "EMBEDDING");
         return toEmbeddingDescriptor(model, provider);
-    }
-
-    private ChatModelDescriptor requireChatDescriptorByProviderAndCode(String providerCode, String modelCode) {
-        AiProviderEntity provider = requireProviderByCode(providerCode);
-        AiModelEntity model = requireModelByProviderAndCapability(provider.getId(), modelCode, "TEXT_GENERATION");
-        return new ChatModelDescriptor(model.getId(), model.getModelCode(), provider.getProviderCode(), provider.getProviderName());
     }
 
     private String resolveDefaultProviderCode() {

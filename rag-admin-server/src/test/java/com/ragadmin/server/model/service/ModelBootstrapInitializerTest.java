@@ -38,7 +38,6 @@ class ModelBootstrapInitializerTest {
     void shouldBootstrapConfiguredDefaultEmbeddingModelWhenItDiffersFromBaseline() throws Exception {
         BailianProperties bailianProperties = new BailianProperties();
         bailianProperties.setEnabled(true);
-        bailianProperties.setDefaultChatModel("qwen-max");
         bailianProperties.setDefaultEmbeddingModel("text-embedding-v2");
 
         OllamaProperties ollamaProperties = new OllamaProperties();

@@ -50,16 +50,7 @@ public class ModelBootstrapInitializer implements ApplicationRunner {
             AiProviderEntity bailian = ensureProvider("BAILIAN", "阿里百炼", "https://dashscope.aliyuncs.com");
             ensureModel(bailian, "qwen-max", "通义千问 Max", "CHAT", List.of("TEXT_GENERATION"), 8000, new BigDecimal("0.7"));
             ensureModel(bailian, "text-embedding-v3", "通义文本向量", "EMBEDDING", List.of("EMBEDDING"), null, null);
-            // 配置文件里的兜底默认模型也必须落库，避免知识库未显式绑定模型时回退到一个数据库中不存在的模型编码。
-            ensureConfiguredDefaultModel(
-                    bailian,
-                    bailianProperties.getDefaultChatModel(),
-                    "qwen-max",
-                    "CHAT",
-                    List.of("TEXT_GENERATION"),
-                    8000,
-                    new BigDecimal("0.7")
-            );
+            // Embedding 默认值仍可能来自配置文件，这里继续保证对应模型定义已落库。
             ensureConfiguredDefaultModel(
                     bailian,
                     bailianProperties.getDefaultEmbeddingModel(),
@@ -74,15 +65,6 @@ public class ModelBootstrapInitializer implements ApplicationRunner {
             AiProviderEntity ollama = ensureProvider("OLLAMA", "Ollama", "http://127.0.0.1:11434");
             ensureModel(ollama, "qwen2.5:7b", "Ollama Qwen2.5 7B", "CHAT", List.of("TEXT_GENERATION"), 4096, new BigDecimal("0.7"));
             ensureModel(ollama, "nomic-embed-text", "Ollama Nomic Embed Text", "EMBEDDING", List.of("EMBEDDING"), null, null);
-            ensureConfiguredDefaultModel(
-                    ollama,
-                    ollamaProperties.getDefaultChatModel(),
-                    "qwen2.5:7b",
-                    "CHAT",
-                    List.of("TEXT_GENERATION"),
-                    4096,
-                    new BigDecimal("0.7")
-            );
             ensureConfiguredDefaultModel(
                     ollama,
                     ollamaProperties.getDefaultEmbeddingModel(),

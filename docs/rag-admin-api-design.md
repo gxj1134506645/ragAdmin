@@ -303,6 +303,16 @@
 
 - `PUT /api/admin/models/{modelId}`
 
+### 4.5.1 设置默认聊天模型
+
+- `POST /api/admin/models/{modelId}/default-chat-model`
+
+说明：
+
+- 只允许将启用中的聊天模型设为默认聊天模型
+- 全局默认聊天模型只能且必须有一个
+- 运行时只读取后台模型管理中手动设置的默认聊天模型，不再回退 `application.yml` 的聊天默认配置
+
 ### 4.6 模型能力探活
 
 - `POST /api/admin/models/{modelId}/health-check`
@@ -349,7 +359,7 @@
 
 - `chatModelId` 与 `embeddingModelId` 必须来自后台模型管理中已入库的模型数据
 - 管理台模型下拉数据源应来自 `GET /api/admin/models` 或等价后台接口，不直接读取配置文件
-- 若知识库未显式绑定模型，后端可按“后台系统默认模型 > 配置文件平台兜底默认模型”做兜底解析
+- 若知识库未显式绑定聊天模型，后端只回退到后台模型管理中设置的默认聊天模型，不再读取配置文件聊天默认值
 
 请求体：
 
@@ -607,7 +617,7 @@
 说明：
 
 - 前台会话名称、显式聊天模型和联网开关统一在该接口内更新
-- `chatModelId=null` 表示清空显式模型，回退到系统默认模型或知识库默认聊天模型
+- `chatModelId=null` 表示清空显式模型，回退到知识库显式聊天模型或后台默认聊天模型
 - 前台工作台切换模型或联网开关后，会使用该接口即时持久化当前会话偏好
 
 ### 7.5 前台更新会话知识库集合
@@ -642,7 +652,7 @@
 说明：
 
 - `selectedKbIds` 为空时，走纯模型问答
-- `chatModelId` 为运行时模型选择，优先级高于知识库默认聊天模型
+- `chatModelId` 为运行时模型选择，优先级高于知识库默认聊天模型；最终兜底为后台模型管理中设置的默认聊天模型
 - `webSearchEnabled=true` 时，由后端按 `WebSearchProvider` 配置决定是否补充联网搜索上下文
 - 控制器直接返回 `Flux<ChatStreamEventResponse>`，仍通过 `text/event-stream` 传输；前端按响应体中的 `eventType` 判断事件语义，不再依赖额外的 `event:` / `id:` SSE 包装字段
 - 流式 `DELTA` 事件只承载正文增量；`COMPLETE` 事件除 `messageId`、`answer`、`references`、`usage` 外，还会补充 `metadata`

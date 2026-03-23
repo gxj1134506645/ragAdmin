@@ -86,6 +86,7 @@ describe('streamChatMessage', () => {
       eventType: 'DELTA',
       delta: '第一段回答',
       messageId: 88,
+      answerContentType: 'text/markdown',
     })
   })
 
@@ -151,6 +152,7 @@ describe('streamChatMessage', () => {
       delta: null,
       messageId: 103,
       answer: '完整回答',
+      answerContentType: 'text/markdown',
       references: [],
       usage: null,
       errorMessage: null,

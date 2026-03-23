@@ -414,6 +414,7 @@ class AppChatServiceTest {
         )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
                 1001L,
                 "建议先处理高优先级事项。",
+                "text/markdown",
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(80, 20),
                 new com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse("LOW", false, false)
@@ -482,6 +483,7 @@ class AppChatServiceTest {
         )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
                 1002L,
                 "可以重点关注智能体应用落地。",
+                "text/markdown",
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(96, 26),
                 null
@@ -572,6 +574,7 @@ class AppChatServiceTest {
         )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
                 1003L,
                 "建议优先选择高频低风险场景，并关注近期行业落地案例。",
+                "text/markdown",
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(120, 40),
                 null
@@ -641,6 +644,7 @@ class AppChatServiceTest {
         )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
                 3001L,
                 "先给出结论。",
+                "text/markdown",
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(30, 18),
                 null

@@ -254,6 +254,7 @@ class ChatServiceTest {
         )).thenReturn(new ChatResponse(
                 901L,
                 "制度要求按时提交周报。",
+                "text/markdown",
                 List.of(new com.ragadmin.server.chat.dto.ChatReferenceResponse(
                         401L,
                         701L,
@@ -337,6 +338,7 @@ class ChatServiceTest {
         )).thenReturn(new ChatResponse(
                 902L,
                 "当前无法从知识库确认答案。",
+                "text/markdown",
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(64, 18),
                 null
@@ -415,6 +417,7 @@ class ChatServiceTest {
         )).thenReturn(new ChatResponse(
                 903L,
                 "制度要求按时提交周报。",
+                "text/markdown",
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(100, 20),
                 null
@@ -510,6 +513,7 @@ class ChatServiceTest {
         )).thenReturn(new ChatResponse(
                 904L,
                 "制度要求按时提交周报。",
+                "text/markdown",
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(100, 20),
                 new com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse("MEDIUM", true, false)
@@ -565,6 +569,7 @@ class ChatServiceTest {
         )).thenReturn(new ChatResponse(
                 2002L,
                 "先看制度要求。",
+                "text/markdown",
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(12, 16),
                 null

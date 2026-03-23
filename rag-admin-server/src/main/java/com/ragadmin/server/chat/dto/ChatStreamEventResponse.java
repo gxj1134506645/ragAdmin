@@ -7,6 +7,7 @@ public record ChatStreamEventResponse(
         String delta,
         Long messageId,
         String answer,
+        String answerContentType,
         List<ChatReferenceResponse> references,
         ChatUsageResponse usage,
         ChatAnswerMetadataResponse metadata,
@@ -14,7 +15,7 @@ public record ChatStreamEventResponse(
 ) {
 
     public static ChatStreamEventResponse delta(String delta) {
-        return new ChatStreamEventResponse("DELTA", delta, null, null, null, null, null, null);
+        return new ChatStreamEventResponse("DELTA", delta, null, null, null, null, null, null, null);
     }
 
     public static ChatStreamEventResponse complete(ChatResponse response) {
@@ -23,6 +24,7 @@ public record ChatStreamEventResponse(
                 null,
                 response.messageId(),
                 response.answer(),
+                response.answerContentType(),
                 response.references(),
                 response.usage(),
                 response.metadata(),
@@ -31,6 +33,6 @@ public record ChatStreamEventResponse(
     }
 
     public static ChatStreamEventResponse error(String errorMessage) {
-        return new ChatStreamEventResponse("ERROR", null, null, null, null, null, null, errorMessage);
+        return new ChatStreamEventResponse("ERROR", null, null, null, null, null, null, null, errorMessage);
     }
 }

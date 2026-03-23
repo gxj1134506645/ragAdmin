@@ -6,6 +6,7 @@ public record ChatMessageResponse(
         Long messageId,
         String question,
         String answer,
+        String answerContentType,
         List<ChatReferenceResponse> references,
         ChatAnswerMetadataResponse metadata,
         String feedbackType,

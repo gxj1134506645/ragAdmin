@@ -83,6 +83,7 @@ class ChatExchangePersistenceServiceTest {
         verify(chatAnswerReferenceMapper, never()).insert(any(ChatAnswerReferenceEntity.class));
 
         assertEquals(801L, response.messageId());
+        assertEquals("text/markdown", response.answerContentType());
         assertNotNull(response.metadata());
         ChatAnswerMetadataResponse metadata = response.metadata();
         assertEquals("HIGH", metadata.confidence());
@@ -118,6 +119,7 @@ class ChatExchangePersistenceServiceTest {
         );
 
         assertEquals(802L, response.messageId());
+        assertEquals("text/markdown", response.answerContentType());
         assertEquals(null, response.metadata());
     }
 }

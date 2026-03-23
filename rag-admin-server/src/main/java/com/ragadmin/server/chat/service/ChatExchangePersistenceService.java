@@ -1,5 +1,6 @@
 package com.ragadmin.server.chat.service;
 
+import com.ragadmin.server.chat.ChatContentTypes;
 import com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse;
 import com.ragadmin.server.chat.dto.ChatReferenceResponse;
 import com.ragadmin.server.chat.dto.ChatResponse;
@@ -93,6 +94,7 @@ public class ChatExchangePersistenceService {
         return new ChatResponse(
                 message.getId(),
                 answer,
+                ChatContentTypes.MARKDOWN,
                 references,
                 new ChatUsageResponse(promptTokens, completionTokens),
                 toMetadataResponse(answerMetadata)

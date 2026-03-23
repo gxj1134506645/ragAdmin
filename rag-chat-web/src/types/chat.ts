@@ -2,6 +2,8 @@ export type ChatSceneType = 'GENERAL' | 'KNOWLEDGE_BASE'
 
 export type ChatFeedbackType = 'LIKE' | 'DISLIKE'
 
+export type ChatContentType = 'text/plain' | 'text/markdown'
+
 export interface ChatReference {
   kbId: number | null
   documentId: number | null
@@ -21,6 +23,7 @@ export interface ChatExchange {
   id: number
   questionText: string
   answerText: string
+  answerContentType: ChatContentType
   references: ChatReference[]
   feedbackType: ChatFeedbackType | null
   feedbackComment: string | null
@@ -67,6 +70,7 @@ export interface ChatRequest {
 export interface ChatResponse {
   messageId: number
   answer: string
+  answerContentType: ChatContentType
   references: ChatReference[]
   usage: ChatUsage | null
 }
@@ -76,6 +80,7 @@ export interface ChatStreamEvent {
   delta: string | null
   messageId: number | null
   answer: string | null
+  answerContentType: ChatContentType | null
   references: ChatReference[] | null
   usage: ChatUsage | null
   errorMessage: string | null

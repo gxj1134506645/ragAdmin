@@ -332,6 +332,7 @@ class AppApiWebMvcTest {
                         101L,
                         "今天有哪些待办？",
                         "今天需要完成接口联调。",
+                        "text/markdown",
                         List.of(),
                         new ChatAnswerMetadataResponse("LOW", false, true),
                         null,
@@ -345,6 +346,7 @@ class AppApiWebMvcTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data[0].messageId").value(101))
                 .andExpect(jsonPath("$.data[0].answer").value("今天需要完成接口联调。"))
+                .andExpect(jsonPath("$.data[0].answerContentType").value("text/markdown"))
                 .andExpect(jsonPath("$.data[0].metadata.confidence").value("LOW"))
                 .andExpect(jsonPath("$.data[0].metadata.needFollowUp").value(true));
     }
@@ -425,6 +427,7 @@ class AppApiWebMvcTest {
         when(appChatService.chat(eq(22L), any(), any())).thenReturn(new ChatResponse(
                 102L,
                 "根据已选知识库，发布前需要完成回归测试。",
+                "text/markdown",
                 List.of(),
                 new ChatUsageResponse(180, 42),
                 null
@@ -442,6 +445,7 @@ class AppApiWebMvcTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.messageId").value(102))
+                .andExpect(jsonPath("$.data.answerContentType").value("text/markdown"))
                 .andExpect(jsonPath("$.data.usage.promptTokens").value(180));
     }
 
@@ -453,6 +457,7 @@ class AppApiWebMvcTest {
                 ChatStreamEventResponse.complete(new ChatResponse(
                         103L,
                         "再确认知识库引用是否命中。",
+                        "text/markdown",
                         List.of(),
                         new ChatUsageResponse(156, 38),
                         null
@@ -477,6 +482,7 @@ class AppApiWebMvcTest {
                 .andExpect(content().string(containsString("\"eventType\":\"DELTA\"")))
                 .andExpect(content().string(containsString("\"eventType\":\"COMPLETE\"")))
                 .andExpect(content().string(containsString("\"messageId\":103")))
+                .andExpect(content().string(containsString("\"answerContentType\":\"text/markdown\"")))
                 .andExpect(content().string(containsString("\"promptTokens\":156")))
                 .andReturn();
 

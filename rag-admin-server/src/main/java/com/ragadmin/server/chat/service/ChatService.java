@@ -3,6 +3,7 @@ package com.ragadmin.server.chat.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
+import com.ragadmin.server.chat.ChatContentTypes;
 import com.ragadmin.server.chat.ChatSceneTypes;
 import com.ragadmin.server.chat.dto.ChatMessageResponse;
 import com.ragadmin.server.chat.dto.ChatReferenceResponse;
@@ -183,6 +184,7 @@ public class ChatService {
                             message.getId(),
                             message.getQuestionText(),
                             message.getAnswerText(),
+                            ChatContentTypes.MARKDOWN,
                             refsByMessageId.getOrDefault(message.getId(), List.of()).stream()
                                     .map(ref -> toReferenceResponse(ref, chunkMap.get(ref.getChunkId()), documentNameMap))
                                     .toList(),
@@ -334,11 +336,27 @@ public class ChatService {
     }
 
     private String buildKnowledgeBaseSystemPrompt() {
-        return "你是企业知识库问答助手。只能基于提供的知识片段回答，无法确认时要明确说明。";
+        return """
+                你是企业知识库问答助手。
+                你只能基于提供的知识片段回答；无法确认时要明确说明，不要编造。
+                回答正文默认使用受控 Markdown 子集，便于前端安全渲染。
+                允许使用：段落、标题、无序列表、有序列表、粗体、引用、行内代码、代码块、普通链接。
+                禁止输出：原始 HTML、表格、图片、Mermaid、LaTeX、XML、JSON 包裹对象、脚本、样式标签。
+                不要为了排版输出孤立的 *、** 或其他无意义 Markdown 符号；列表请使用 - 或 1. 这种正常写法。
+                除非用户明确要求，否则不要输出代码块。
+                """;
     }
 
     private String buildGeneralSystemPrompt() {
-        return "你是企业智能助手。优先给出直接、准确、可执行的回答；如果信息不充分，要明确说明你的判断边界。";
+        return """
+                你是企业智能助手。
+                优先给出直接、准确、可执行的回答；如果信息不充分，要明确说明你的判断边界。
+                回答正文默认使用受控 Markdown 子集，便于前端安全渲染。
+                允许使用：段落、标题、无序列表、有序列表、粗体、引用、行内代码、代码块、普通链接。
+                禁止输出：原始 HTML、表格、图片、Mermaid、LaTeX、XML、JSON 包裹对象、脚本、样式标签。
+                不要为了排版输出孤立的 *、** 或其他无意义 Markdown 符号；列表请使用 - 或 1. 这种正常写法。
+                除非用户明确要求，否则不要输出代码块。
+                """;
     }
 
     private String buildKnowledgeBaseUserPrompt(String question, String context) {

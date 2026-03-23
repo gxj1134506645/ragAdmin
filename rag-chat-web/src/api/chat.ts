@@ -3,6 +3,7 @@ import { http, resolveErrorMessage, unwrapResponse } from '@/api/http'
 import { parseStreamEventData } from '@/api/stream'
 import type { PageResponse } from '@/types/api'
 import type {
+  ChatContentType,
   ChatExchange,
   ChatFeedbackRequest,
   ChatRequest,
@@ -31,6 +32,7 @@ interface ChatMessagePayload {
   messageId: number
   question: string
   answer: string
+  answerContentType?: ChatContentType | string | null
   references: ChatExchange['references']
   feedbackType?: ChatExchange['feedbackType']
   feedbackComment?: string | null
@@ -39,6 +41,10 @@ interface ChatMessagePayload {
 interface StreamChatOptions {
   onEvent: (event: ChatStreamEvent) => void
   onError?: (error: unknown) => void
+}
+
+function normalizeAnswerContentType(value?: string | null): ChatContentType {
+  return value === 'text/plain' ? 'text/plain' : 'text/markdown'
 }
 
 export async function createChatSession(payload: CreateChatSessionRequest): Promise<ChatSession> {
@@ -64,6 +70,7 @@ export async function listChatMessages(sessionId: number): Promise<ChatExchange[
     id: item.messageId,
     questionText: item.question,
     answerText: item.answer,
+    answerContentType: normalizeAnswerContentType(item.answerContentType),
     references: item.references ?? [],
     feedbackType: item.feedbackType ?? null,
     feedbackComment: item.feedbackComment ?? null,
@@ -93,7 +100,11 @@ export async function updateSessionKnowledgeBases(
 
 export async function chat(sessionId: number, payload: ChatRequest): Promise<ChatResponse> {
   const response = await http.post(`/app/chat/sessions/${sessionId}/messages`, payload)
-  return unwrapResponse(response.data)
+  const result = unwrapResponse<ChatResponse & { answerContentType?: string | null }>(response.data)
+  return {
+    ...result,
+    answerContentType: normalizeAnswerContentType(result.answerContentType),
+  }
 }
 
 export async function submitChatFeedback(
@@ -143,6 +154,7 @@ export function streamChatMessage(
       if (!event) {
         return
       }
+      event.answerContentType = normalizeAnswerContentType(event.answerContentType)
       if (event.eventType === 'COMPLETE' || event.eventType === 'ERROR') {
         completed = true
       }

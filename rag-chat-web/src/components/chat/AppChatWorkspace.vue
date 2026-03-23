@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowDown, ChatDotRound, MoreFilled, Plus, RefreshRight, SwitchButton } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import ChatMarkdownContent from '@/components/chat/ChatMarkdownContent.vue'
 import {
   createChatSession,
   deleteChatSession,
@@ -19,7 +20,15 @@ import { resolveErrorMessage } from '@/api/http'
 import { listKnowledgeBases } from '@/api/knowledge-base'
 import { listModels } from '@/api/model'
 import { useAuthStore } from '@/stores/auth'
-import type { ChatExchange, ChatFeedbackType, ChatReference, ChatSceneType, ChatSession, ChatStreamEvent } from '@/types/chat'
+import type {
+  ChatContentType,
+  ChatExchange,
+  ChatFeedbackType,
+  ChatReference,
+  ChatSceneType,
+  ChatSession,
+  ChatStreamEvent,
+} from '@/types/chat'
 import type { KnowledgeBaseSummary } from '@/types/knowledge-base'
 import type { ModelSummary } from '@/types/model'
 
@@ -34,6 +43,7 @@ interface Props {
 interface PendingExchange {
   question: string
   answer: string
+  answerContentType: ChatContentType
   errorMessage: string | null
 }
 
@@ -662,6 +672,7 @@ function applyStreamComplete(question: string, event: ChatStreamEvent): void {
       id: event.messageId ?? Date.now(),
       questionText: question,
       answerText: event.answer ?? pendingExchange.value?.answer ?? '',
+      answerContentType: event.answerContentType ?? pendingExchange.value?.answerContentType ?? 'text/markdown',
       references: event.references ?? [],
       feedbackType: null,
       feedbackComment: null,
@@ -696,6 +707,7 @@ async function handleSendQuestion(questionOverride?: string): Promise<void> {
   pendingExchange.value = {
     question,
     answer: '',
+    answerContentType: 'text/markdown',
     errorMessage: null,
   }
   streaming.value = true
@@ -1387,7 +1399,10 @@ onUnmounted(() => {
             <article class="message-row is-assistant">
               <div class="message-card is-assistant">
                 <span class="message-role">助手</span>
-                <p>{{ message.answerText || '模型没有返回内容' }}</p>
+                <ChatMarkdownContent
+                  :content="message.answerText || '模型没有返回内容'"
+                  :content-type="message.answerContentType"
+                />
 
                 <div class="assistant-actions">
                   <button
@@ -1464,7 +1479,10 @@ onUnmounted(() => {
             <article class="message-row is-assistant">
               <div class="message-card is-assistant" :class="{ 'is-error': pendingExchange.errorMessage }">
                 <span class="message-role">助手</span>
-                <p>{{ pendingExchange.answer || '正在生成回答...' }}</p>
+                <ChatMarkdownContent
+                  :content="pendingExchange.answer || '正在生成回答...'"
+                  :content-type="pendingExchange.answerContentType"
+                />
                 <p v-if="pendingExchange.errorMessage" class="pending-error">{{ pendingExchange.errorMessage }}</p>
                 <div
                   v-if="pendingStreamRecoveryNotice"

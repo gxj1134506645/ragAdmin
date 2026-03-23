@@ -17,8 +17,11 @@ import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingExecutionMode;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.mapper.KnowledgeBaseMapper;
+import com.ragadmin.server.model.dto.BatchDeleteModelsRequest;
 import com.ragadmin.server.model.dto.CreateModelRequest;
 import com.ragadmin.server.model.dto.ModelCapabilityHealthResponse;
+import com.ragadmin.server.model.dto.ModelBatchDeleteFailureResponse;
+import com.ragadmin.server.model.dto.ModelBatchDeleteResponse;
 import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
 import com.ragadmin.server.model.dto.ModelResponse;
 import com.ragadmin.server.model.dto.UpdateModelRequest;
@@ -34,9 +37,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +80,9 @@ public class ModelService {
 
     @Autowired
     private EmbeddingClientRegistry embeddingClientRegistry;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     public PageResponse<ModelResponse> list(String providerCode, String capabilityType, String status, long pageNo, long pageSize) {
         LambdaQueryWrapper<AiModelEntity> wrapper = new LambdaQueryWrapper<AiModelEntity>()
@@ -216,14 +224,49 @@ public class ModelService {
 
     @Transactional
     public void delete(Long modelId) {
-        AiModelEntity model = requireModel(modelId);
-        if (Boolean.TRUE.equals(model.getIsDefaultChatModel())) {
-            throw new BusinessException("DEFAULT_CHAT_MODEL_DELETE_FORBIDDEN", "默认聊天模型不能直接删除，请先切换新的默认聊天模型", HttpStatus.BAD_REQUEST);
+        deleteInternal(modelId);
+    }
+
+    public ModelBatchDeleteResponse batchDelete(BatchDeleteModelsRequest request) {
+        List<Long> requestedModelIds = request.getModelIds().stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (requestedModelIds.isEmpty()) {
+            throw new BusinessException("MODEL_BATCH_DELETE_EMPTY", "请至少选择一个模型", HttpStatus.BAD_REQUEST);
         }
-        validateDeleteReference(modelId, model.getModelName());
-        aiModelCapabilityMapper.delete(new LambdaQueryWrapper<AiModelCapabilityEntity>()
-                .eq(AiModelCapabilityEntity::getModelId, modelId));
-        aiModelMapper.deleteById(modelId);
+
+        List<Long> deletedIds = new ArrayList<>();
+        List<ModelBatchDeleteFailureResponse> failedItems = new ArrayList<>();
+
+        for (Long modelId : requestedModelIds) {
+            String modelName = resolveModelNameForBatchDelete(modelId);
+            try {
+                transactionTemplate.executeWithoutResult(status -> deleteInternal(modelId));
+                deletedIds.add(modelId);
+            } catch (BusinessException ex) {
+                failedItems.add(new ModelBatchDeleteFailureResponse(
+                        modelId,
+                        modelName,
+                        ex.getMessage()
+                ));
+            } catch (Exception ex) {
+                log.warn("批量删除模型失败，modelId={}, modelName={}, message={}", modelId, modelName, ex.getMessage(), ex);
+                failedItems.add(new ModelBatchDeleteFailureResponse(
+                        modelId,
+                        modelName,
+                        "删除失败，请稍后重试"
+                ));
+            }
+        }
+
+        return new ModelBatchDeleteResponse(
+                requestedModelIds.size(),
+                deletedIds.size(),
+                failedItems.size(),
+                deletedIds,
+                failedItems
+        );
     }
 
     public AiModelEntity requireModelWithCapability(Long modelId, String capabilityType) {
@@ -519,6 +562,25 @@ public class ModelService {
         if (messageRefCount != null && messageRefCount > 0) {
             throw new BusinessException("MODEL_IN_USE", "模型 " + modelName + " 已存在历史对话记录引用，不能删除", HttpStatus.BAD_REQUEST);
         }
+    }
+
+    private void deleteInternal(Long modelId) {
+        AiModelEntity model = requireModel(modelId);
+        if (Boolean.TRUE.equals(model.getIsDefaultChatModel())) {
+            throw new BusinessException("DEFAULT_CHAT_MODEL_DELETE_FORBIDDEN", "默认聊天模型不能直接删除，请先切换新的默认聊天模型", HttpStatus.BAD_REQUEST);
+        }
+        validateDeleteReference(modelId, model.getModelName());
+        aiModelCapabilityMapper.delete(new LambdaQueryWrapper<AiModelCapabilityEntity>()
+                .eq(AiModelCapabilityEntity::getModelId, modelId));
+        aiModelMapper.deleteById(modelId);
+    }
+
+    private String resolveModelNameForBatchDelete(Long modelId) {
+        AiModelEntity model = aiModelMapper.selectById(modelId);
+        if (model == null || !StringUtils.hasText(model.getModelName())) {
+            return "模型#" + modelId;
+        }
+        return model.getModelName();
     }
 
     private ChatModelDescriptor resolveDefaultChatModelDescriptor() {

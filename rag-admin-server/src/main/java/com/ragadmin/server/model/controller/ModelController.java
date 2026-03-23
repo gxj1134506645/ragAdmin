@@ -4,7 +4,9 @@ import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.common.model.PageResponse;
+import com.ragadmin.server.model.dto.BatchDeleteModelsRequest;
 import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
+import com.ragadmin.server.model.dto.ModelBatchDeleteResponse;
 import com.ragadmin.server.model.dto.ModelResponse;
 import com.ragadmin.server.model.dto.CreateModelRequest;
 import com.ragadmin.server.model.dto.UpdateModelRequest;
@@ -60,6 +62,11 @@ public class ModelController {
     public ApiResponse<Void> delete(@PathVariable Long modelId) {
         modelService.delete(modelId);
         return ApiResponse.success(null);
+    }
+
+    @PostMapping("/batch-delete")
+    public ApiResponse<ModelBatchDeleteResponse> batchDelete(@Valid @RequestBody BatchDeleteModelsRequest request) {
+        return ApiResponse.success(modelService.batchDelete(request));
     }
 
     @PostMapping("/{modelId}/health-check")

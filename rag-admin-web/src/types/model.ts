@@ -52,6 +52,24 @@ export interface UpdateModelRequest {
   status: string
 }
 
+export interface BatchDeleteModelsRequest {
+  modelIds: number[]
+}
+
+export interface ModelBatchDeleteFailure {
+  modelId: number
+  modelName: string
+  message: string
+}
+
+export interface ModelBatchDeleteResult {
+  requestedCount: number
+  successCount: number
+  failedCount: number
+  deletedIds: number[]
+  failedItems: ModelBatchDeleteFailure[]
+}
+
 export interface ModelCapabilityHealthCheck {
   capabilityType: string
   status: string

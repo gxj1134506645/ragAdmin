@@ -10,7 +10,9 @@ import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingExecutionMode;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
 import com.ragadmin.server.knowledge.mapper.KnowledgeBaseMapper;
+import com.ragadmin.server.model.dto.BatchDeleteModelsRequest;
 import com.ragadmin.server.model.dto.CreateModelRequest;
+import com.ragadmin.server.model.dto.ModelBatchDeleteResponse;
 import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
 import com.ragadmin.server.model.dto.ModelResponse;
 import com.ragadmin.server.model.dto.UpdateModelRequest;
@@ -28,6 +30,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -37,7 +41,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -72,6 +78,9 @@ class ModelServiceTest {
     @Mock
     private EmbeddingClientRegistry embeddingClientRegistry;
 
+    @Mock
+    private TransactionTemplate transactionTemplate;
+
     private ModelService modelService;
 
     @BeforeEach
@@ -86,6 +95,13 @@ class ModelServiceTest {
         ReflectionTestUtils.setField(modelService, "modelProviderService", modelProviderService);
         ReflectionTestUtils.setField(modelService, "conversationChatClient", conversationChatClient);
         ReflectionTestUtils.setField(modelService, "embeddingClientRegistry", embeddingClientRegistry);
+        ReflectionTestUtils.setField(modelService, "transactionTemplate", transactionTemplate);
+
+        lenient().doAnswer(invocation -> {
+            java.util.function.Consumer<TransactionStatus> action = invocation.getArgument(0);
+            action.accept(null);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
     }
 
     @Test
@@ -450,6 +466,59 @@ class ModelServiceTest {
         );
 
         assertEquals("DEFAULT_CHAT_MODEL_DELETE_FORBIDDEN", exception.getCode());
+    }
+
+    @Test
+    void shouldBatchDeleteModelsAndReturnFailureSummary() {
+        AiModelEntity deletableModel = new AiModelEntity();
+        deletableModel.setId(21L);
+        deletableModel.setModelName("可删除模型");
+        deletableModel.setIsDefaultChatModel(Boolean.FALSE);
+
+        AiModelEntity defaultChatModel = new AiModelEntity();
+        defaultChatModel.setId(22L);
+        defaultChatModel.setModelName("默认聊天模型");
+        defaultChatModel.setIsDefaultChatModel(Boolean.TRUE);
+
+        BatchDeleteModelsRequest request = new BatchDeleteModelsRequest();
+        request.setModelIds(List.of(21L, 22L));
+
+        when(aiModelMapper.selectById(21L)).thenReturn(deletableModel);
+        when(aiModelMapper.selectById(22L)).thenReturn(defaultChatModel);
+
+        ModelBatchDeleteResponse response = modelService.batchDelete(request);
+
+        assertEquals(2, response.requestedCount());
+        assertEquals(1, response.successCount());
+        assertEquals(1, response.failedCount());
+        assertEquals(List.of(21L), response.deletedIds());
+        assertEquals(1, response.failedItems().size());
+        assertEquals(22L, response.failedItems().getFirst().modelId());
+        assertTrue(response.failedItems().getFirst().message().contains("默认聊天模型"));
+        verify(aiModelCapabilityMapper, times(1)).delete(any());
+        verify(aiModelMapper).deleteById(21L);
+    }
+
+    @Test
+    void shouldMarkFailureWhenBatchDeleteModelIsInUse() {
+        AiModelEntity model = new AiModelEntity();
+        model.setId(23L);
+        model.setModelName("引用中模型");
+        model.setIsDefaultChatModel(Boolean.FALSE);
+
+        BatchDeleteModelsRequest request = new BatchDeleteModelsRequest();
+        request.setModelIds(List.of(23L));
+
+        when(aiModelMapper.selectById(23L)).thenReturn(model);
+        when(knowledgeBaseMapper.selectCount(any())).thenReturn(1L);
+
+        ModelBatchDeleteResponse response = modelService.batchDelete(request);
+
+        assertEquals(0, response.successCount());
+        assertEquals(1, response.failedCount());
+        assertEquals("引用中模型", response.failedItems().getFirst().modelName());
+        assertTrue(response.failedItems().getFirst().message().contains("知识库引用"));
+        verify(aiModelMapper, never()).deleteById(23L);
     }
 
     @Test

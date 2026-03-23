@@ -1,6 +1,8 @@
 import type { ApiResponse, PageResponse } from '@/types/api'
 import type {
+  BatchDeleteModelsRequest,
   ModelCreateRequest,
+  ModelBatchDeleteResult,
   ModelDefinition,
   ModelHealthCheck,
   ModelProvider,
@@ -60,6 +62,11 @@ export async function setDefaultChatModel(modelId: number): Promise<ModelDefinit
 export async function deleteModel(modelId: number): Promise<void> {
   const response = await http.delete<ApiResponse<null>>(`/admin/models/${modelId}`)
   unwrapResponse(response.data)
+}
+
+export async function batchDeleteModels(payload: BatchDeleteModelsRequest): Promise<ModelBatchDeleteResult> {
+  const response = await http.post<ApiResponse<ModelBatchDeleteResult>>('/admin/models/batch-delete', payload)
+  return unwrapResponse(response.data)
 }
 
 export async function healthCheckModel(modelId: number): Promise<ModelHealthCheck> {

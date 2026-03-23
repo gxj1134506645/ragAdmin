@@ -1,6 +1,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type {
+  ModelBatchDeleteResult,
   ModelCreateRequest,
   ModelDefinition,
   ModelHealthCheck,
@@ -10,6 +11,7 @@ import type {
   UpdateModelRequest,
 } from '@/types/model'
 import {
+  batchDeleteModels,
   createModel,
   createModelProvider,
   deleteModel,
@@ -311,40 +313,36 @@ export function useModelManagement() {
     }
 
     batchDeleteSubmitting.value = true
-    let successCount = 0
-    let failedCount = 0
     const targetModels = [...selectedModels.value]
+    const selectedIds = targetModels.map((item) => item.id)
 
     try {
-      for (const model of targetModels) {
-        try {
-          if (model.isDefaultChatModel) {
-            failedCount += 1
-            continue
-          }
-          await deleteModel(model.id)
-          if (activeModelHealthId.value === model.id) {
-            activeModelHealthId.value = null
-            modelHealthResult.value = null
-          }
-          successCount += 1
-        } catch {
-          failedCount += 1
-        }
+      const response = await batchDeleteModels({
+        modelIds: selectedIds,
+      })
+
+      if (
+        response.successCount > 0
+        && response.successCount === targetModels.length
+        && targetModels.length === models.value.length
+        && pagination.pageNo > 1
+      ) {
+        pagination.pageNo -= 1
       }
 
-      if (successCount > 0 && successCount === models.value.length && pagination.pageNo > 1) {
-        pagination.pageNo -= 1
+      if (activeModelHealthId.value != null && response.deletedIds.includes(activeModelHealthId.value)) {
+        activeModelHealthId.value = null
+        modelHealthResult.value = null
       }
 
       await loadModels()
 
-      if (failedCount === 0) {
-        ElMessage.success(`已删除 ${successCount} 个模型`)
+      if (response.failedCount === 0) {
+        ElMessage.success(`已删除 ${response.successCount} 个模型`)
         return
       }
 
-      ElMessage.warning(`批量删除完成，成功 ${successCount} 个，失败 ${failedCount} 个`)
+      ElMessage.warning(buildBatchDeleteSummary(response))
     } finally {
       batchDeleteSubmitting.value = false
     }
@@ -447,4 +445,15 @@ export function useModelManagement() {
     handleCurrentChange,
     handleSizeChange,
   }
+}
+
+function buildBatchDeleteSummary(result: ModelBatchDeleteResult): string {
+  if (result.failedCount === 0) {
+    return `已删除 ${result.successCount} 个模型`
+  }
+  const detail = result.failedItems
+    .slice(0, 2)
+    .map((item) => `${item.modelName}：${item.message}`)
+    .join('；')
+  return `批量删除完成，成功 ${result.successCount} 个，失败 ${result.failedCount} 个${detail ? `。${detail}` : ''}`
 }

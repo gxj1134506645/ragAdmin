@@ -46,13 +46,16 @@ public class BailianModelFactory implements ProviderModelFactory {
 
     @Override
     public EmbeddingModel createEmbeddingModel(String modelCode) {
+        String resolvedModelCode = SpringAiModelSupport.requireSupportedDashScopeTextEmbeddingModel(modelCode);
         DashScopeApi dashScopeApi = DashScopeApi.builder()
                 .baseUrl(SpringAiModelSupport.normalizeDashScopeBaseUrl(bailianProperties.getBaseUrl()))
                 .apiKey(SpringAiModelSupport.requireApiKey(bailianProperties.getApiKey()))
                 .restClientBuilder(SpringAiModelSupport.createRestClientBuilder(bailianProperties.getTimeoutSeconds()))
                 .build();
         DashScopeEmbeddingOptions options = DashScopeEmbeddingOptions.builder()
-                .model(modelCode)
+                .model(resolvedModelCode)
+                // 文档解析与检索走的是知识片段向量化，显式固定为 document，避免请求体遗漏默认值。
+                .textType(DashScopeApi.DEFAULT_EMBEDDING_TEXT_TYPE)
                 .build();
         return DashScopeEmbeddingModel.builder()
                 .dashScopeApi(dashScopeApi)

@@ -17,8 +17,20 @@ import org.springframework.web.client.RestClient;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public final class SpringAiModelSupport {
+
+    private static final String DEFAULT_DASHSCOPE_BASE_URL = "https://dashscope.aliyuncs.com";
+
+    /**
+     * 当前项目默认向量维度按 1024 设计，因此百炼文本向量模型先收口到 v3 / v4，
+     * 避免误配到视觉向量模型或 1536 维历史模型后让文档链路与存储设计发生漂移。
+     */
+    private static final Set<String> SUPPORTED_DASHSCOPE_TEXT_EMBEDDING_MODELS = Set.of(
+            "text-embedding-v3",
+            "text-embedding-v4"
+    );
 
     private SpringAiModelSupport() {
     }
@@ -39,9 +51,20 @@ public final class SpringAiModelSupport {
 
     public static String normalizeDashScopeBaseUrl(String baseUrl) {
         if (!StringUtils.hasText(baseUrl)) {
-            return "https://dashscope.aliyuncs.com";
+            return DEFAULT_DASHSCOPE_BASE_URL;
         }
-        return baseUrl.trim();
+        String resolved = stripTrailingSlash(baseUrl.trim());
+
+        // DashScope Java SDK 这里需要的是网关根地址，不能直接把 compatible-mode 或具体服务路径拼进来，
+        // 否则后续再叠加 `/api/v1/services/**` 时会命中错误的接口。
+        for (String marker : List.of("/compatible-mode/", "/api/v1/services/", "/api/v1", "/services/")) {
+            int markerIndex = resolved.indexOf(marker);
+            if (markerIndex > 0) {
+                resolved = resolved.substring(0, markerIndex);
+                break;
+            }
+        }
+        return stripTrailingSlash(resolved);
     }
 
     /**
@@ -52,17 +75,14 @@ public final class SpringAiModelSupport {
         if (!StringUtils.hasText(modelCode)) {
             throw new BusinessException("EMBEDDING_MODEL_INVALID", "Embedding 模型编码不能为空", HttpStatus.BAD_REQUEST);
         }
-        String resolvedModelCode = modelCode.trim();
-        String normalizedModelCode = resolvedModelCode.toLowerCase();
-        if (normalizedModelCode.contains("vl-embedding") || normalizedModelCode.contains("multimodal-embedding")) {
-            throw new BusinessException(
-                    "EMBEDDING_MODEL_UNSUPPORTED",
-                    "当前文档解析与检索链路仅支持文本 Embedding 模型，请改用 text-embedding-v3 或 text-embedding-v4；当前模型 "
-                            + resolvedModelCode + " 属于多模态向量模型，需要 input.contents/url 输入。",
-                    HttpStatus.BAD_REQUEST
-            );
+        String normalizedModelCode = modelCode.trim().toLowerCase();
+        if (!SUPPORTED_DASHSCOPE_TEXT_EMBEDDING_MODELS.contains(normalizedModelCode)) {
+            String message = "当前文档解析与检索链路仅支持百炼文本 Embedding 模型 text-embedding-v3 或 text-embedding-v4；当前模型 "
+                    + modelCode.trim()
+                    + " 不受支持。若该模型属于多模态向量模型，则会要求 input.url 或 input.contents 输入。";
+            throw new BusinessException("EMBEDDING_MODEL_UNSUPPORTED", message, HttpStatus.BAD_REQUEST);
         }
-        return resolvedModelCode;
+        return normalizedModelCode;
     }
 
     public static String normalizeOllamaOpenAiBaseUrl(String baseUrl) {
@@ -108,5 +128,9 @@ public final class SpringAiModelSupport {
             result.add(value);
         }
         return result;
+    }
+
+    private static String stripTrailingSlash(String value) {
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 }

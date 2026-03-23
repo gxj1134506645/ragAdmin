@@ -36,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -227,6 +228,32 @@ class ModelServiceTest {
 
         assertEquals("EMBEDDING_MODEL_UNSUPPORTED", exception.getCode());
         assertTrue(exception.getMessage().contains("text-embedding-v3"));
+    }
+
+    @Test
+    void shouldRejectDashScopeVisionEmbeddingModelWhenCreating() {
+        AiProviderEntity provider = new AiProviderEntity();
+        provider.setId(71L);
+        provider.setProviderCode("BAILIAN");
+        provider.setProviderName("百炼");
+
+        CreateModelRequest request = new CreateModelRequest();
+        request.setProviderId(71L);
+        request.setModelCode("tongyi-embedding-vision-plus");
+        request.setModelName("通义视觉向量");
+        request.setCapabilityTypes(List.of("EMBEDDING"));
+        request.setModelType("EMBEDDING");
+        request.setStatus("ENABLED");
+
+        when(modelProviderService.requireProvider(71L)).thenReturn(provider);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> modelService.create(request)
+        );
+
+        assertEquals("EMBEDDING_MODEL_UNSUPPORTED", exception.getCode());
+        verify(aiModelMapper, never()).insert(any(AiModelEntity.class));
     }
 
     @Test

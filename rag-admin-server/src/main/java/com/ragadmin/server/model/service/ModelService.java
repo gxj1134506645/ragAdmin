@@ -138,13 +138,14 @@ public class ModelService {
     public ModelResponse create(CreateModelRequest request) {
         AiProviderEntity provider = modelProviderService.requireProvider(request.getProviderId());
         List<String> capabilityTypes = validateCapabilityTypes(request.getModelType(), request.getCapabilityTypes());
-        ensureModelCodeUnique(null, request.getProviderId(), request.getModelCode());
+        String normalizedModelCode = normalizeModelCode(provider, request.getModelType(), request.getModelCode());
+        ensureModelCodeUnique(null, request.getProviderId(), normalizedModelCode);
         Integer normalizedMaxTokens = normalizeMaxTokens(request.getModelType(), request.getMaxTokens());
         BigDecimal normalizedTemperatureDefault = normalizeTemperatureDefault(request.getModelType(), request.getTemperatureDefault());
 
         AiModelEntity entity = new AiModelEntity();
         entity.setProviderId(request.getProviderId());
-        entity.setModelCode(request.getModelCode());
+        entity.setModelCode(normalizedModelCode);
         entity.setModelName(request.getModelName());
         entity.setModelType(request.getModelType());
         entity.setMaxTokens(normalizedMaxTokens);
@@ -162,14 +163,15 @@ public class ModelService {
         AiModelEntity entity = requireModel(modelId);
         AiProviderEntity provider = modelProviderService.requireProvider(request.getProviderId());
         List<String> capabilityTypes = validateCapabilityTypes(request.getModelType(), request.getCapabilityTypes());
-        ensureModelCodeUnique(modelId, request.getProviderId(), request.getModelCode());
+        String normalizedModelCode = normalizeModelCode(provider, request.getModelType(), request.getModelCode());
+        ensureModelCodeUnique(modelId, request.getProviderId(), normalizedModelCode);
         validateCapabilityReferenceChange(modelId, capabilityTypes);
         validateDefaultChatModelMutation(entity, request.getModelType(), request.getStatus(), capabilityTypes);
         Integer normalizedMaxTokens = normalizeMaxTokens(request.getModelType(), request.getMaxTokens());
         BigDecimal normalizedTemperatureDefault = normalizeTemperatureDefault(request.getModelType(), request.getTemperatureDefault());
 
         entity.setProviderId(request.getProviderId());
-        entity.setModelCode(request.getModelCode());
+        entity.setModelCode(normalizedModelCode);
         entity.setModelName(request.getModelName());
         entity.setModelType(request.getModelType());
         entity.setMaxTokens(normalizedMaxTokens);
@@ -417,6 +419,20 @@ public class ModelService {
      */
     private BigDecimal normalizeTemperatureDefault(String modelType, BigDecimal temperatureDefault) {
         return "EMBEDDING".equalsIgnoreCase(modelType) ? null : temperatureDefault;
+    }
+
+    /**
+     * 模型编码在保存阶段就统一裁剪并做提供方约束，避免错误模型写入数据库后把运行期异常延后到任务执行阶段。
+     */
+    private String normalizeModelCode(AiProviderEntity provider, String modelType, String modelCode) {
+        if (!StringUtils.hasText(modelCode)) {
+            throw new BusinessException("MODEL_CODE_INVALID", "模型编码不能为空", HttpStatus.BAD_REQUEST);
+        }
+        String resolvedModelCode = modelCode.trim();
+        if ("EMBEDDING".equalsIgnoreCase(modelType) && "BAILIAN".equalsIgnoreCase(provider.getProviderCode())) {
+            return SpringAiModelSupport.requireSupportedDashScopeTextEmbeddingModel(resolvedModelCode);
+        }
+        return resolvedModelCode;
     }
 
     private void validateCapabilityReferenceChange(Long modelId, List<String> capabilityTypes) {

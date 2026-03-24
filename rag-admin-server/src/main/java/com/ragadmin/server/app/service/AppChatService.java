@@ -47,6 +47,7 @@ import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryRefreshDispatcher;
+import com.ragadmin.server.infra.ai.chat.PromptTemplateService;
 import com.ragadmin.server.infra.ai.AiProviderExceptionSupport;
 import com.ragadmin.server.infra.search.NoopWebSearchProvider;
 import com.ragadmin.server.infra.search.WebSearchProperties;
@@ -59,16 +60,23 @@ import com.ragadmin.server.retrieval.service.RetrievalService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -81,6 +89,9 @@ import java.util.stream.Collectors;
 public class AppChatService {
 
     private static final Logger log = LoggerFactory.getLogger(AppChatService.class);
+    private static final ZoneId APP_ZONE_ID = ZoneId.of("Asia/Shanghai");
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC+8'");
 
     @Autowired
     private ChatSessionMapper chatSessionMapper;
@@ -136,6 +147,9 @@ public class AppChatService {
     @Autowired
     private ConversationIdCodec conversationIdCodec;
 
+    @Autowired
+    private PromptTemplateService promptTemplateService;
+
     /**
      * 联网搜索当前仍属于可选能力，没有真实 provider 时自动回退为空实现，避免应用启动失败。
      */
@@ -144,6 +158,36 @@ public class AppChatService {
 
     @Autowired(required = false)
     private WebSearchProperties webSearchProperties = new WebSearchProperties();
+
+    /**
+     * 问答链路中的相对时间解释统一按北京时间处理，避免“今天/明天”在模型侧被误判成语义不明确。
+     */
+    @Autowired(required = false)
+    private Clock clock = Clock.system(APP_ZONE_ID);
+
+    @Value("classpath:prompts/ai/chat/app-knowledge-system.st")
+    private Resource knowledgeBaseSystemPromptTemplate;
+
+    @Value("classpath:prompts/ai/chat/app-general-system.st")
+    private Resource generalSystemPromptTemplate;
+
+    @Value("classpath:prompts/ai/chat/app-knowledge-user-context-with-web.st")
+    private Resource knowledgeBaseUserContextWithWebPromptTemplate;
+
+    @Value("classpath:prompts/ai/chat/app-knowledge-user-context-only.st")
+    private Resource knowledgeBaseUserContextOnlyPromptTemplate;
+
+    @Value("classpath:prompts/ai/chat/app-knowledge-user-web-only.st")
+    private Resource knowledgeBaseUserWebOnlyPromptTemplate;
+
+    @Value("classpath:prompts/ai/chat/app-knowledge-user-no-context.st")
+    private Resource knowledgeBaseUserNoContextPromptTemplate;
+
+    @Value("classpath:prompts/ai/chat/app-general-user-with-web.st")
+    private Resource generalUserWithWebPromptTemplate;
+
+    @Value("classpath:prompts/ai/chat/app-general-user-plain.st")
+    private Resource generalUserPlainPromptTemplate;
 
     @Transactional
     public AppChatSessionResponse createSession(AppCreateChatSessionRequest request, AuthenticatedUser user) {
@@ -559,68 +603,51 @@ public class AppChatService {
     }
 
     private String buildKnowledgeBaseSystemPrompt() {
-        return """
-                你是企业知识库问答助手。
-                你只能基于提供的知识片段回答；无法确认时要明确说明，不要编造。
-                回答正文默认使用受控 Markdown 子集，便于前端安全渲染。
-                允许使用：段落、标题、无序列表、有序列表、粗体、引用、行内代码、代码块、普通链接。
-                禁止输出：原始 HTML、表格、图片、Mermaid、LaTeX、XML、JSON 包裹对象、脚本、样式标签。
-                不要为了排版输出孤立的 *、** 或其他无意义 Markdown 符号；列表请使用 - 或 1. 这种正常写法。
-                除非用户明确要求，否则不要输出代码块。
-                """;
+        return promptTemplateService.load(knowledgeBaseSystemPromptTemplate);
     }
 
     private String buildGeneralSystemPrompt() {
-        return """
-                你是企业智能助手。
-                优先给出直接、准确、可执行的回答；如果信息不充分，要明确说明你的判断边界。
-                回答正文默认使用受控 Markdown 子集，便于前端安全渲染。
-                允许使用：段落、标题、无序列表、有序列表、粗体、引用、行内代码、代码块、普通链接。
-                禁止输出：原始 HTML、表格、图片、Mermaid、LaTeX、XML、JSON 包裹对象、脚本、样式标签。
-                不要为了排版输出孤立的 *、** 或其他无意义 Markdown 符号；列表请使用 - 或 1. 这种正常写法。
-                除非用户明确要求，否则不要输出代码块。
-                """;
+        return promptTemplateService.load(generalSystemPromptTemplate);
     }
 
     private String buildKnowledgeBaseUserPrompt(String question, String context, String webSearchContext) {
-        StringBuilder prompt = new StringBuilder();
-        if (StringUtils.hasText(context)) {
-            prompt.append("知识片段：\n").append(context).append("\n\n");
-        } else {
-            prompt.append("当前没有命中知识片段。\n\n");
+        boolean hasContext = StringUtils.hasText(context);
+        boolean hasWebSearchContext = StringUtils.hasText(webSearchContext);
+        Map<String, String> variables = Map.of(
+                "temporal_context_block", buildTemporalContextBlock(question, hasWebSearchContext),
+                "knowledge_context", defaultText(context),
+                "web_search_context", defaultText(webSearchContext),
+                "question", defaultText(question)
+        );
+        if (hasContext && hasWebSearchContext) {
+            return promptTemplateService.render(knowledgeBaseUserContextWithWebPromptTemplate, variables);
         }
-        if (StringUtils.hasText(webSearchContext)) {
-            prompt.append("联网搜索摘要：\n").append(webSearchContext).append("\n\n");
+        if (hasContext) {
+            return promptTemplateService.render(knowledgeBaseUserContextOnlyPromptTemplate, variables);
         }
-        prompt.append("问题：\n").append(question).append("\n\n");
-
-        if (StringUtils.hasText(context)) {
-            if (StringUtils.hasText(webSearchContext)) {
-                prompt.append("请优先基于知识片段回答，联网摘要仅作补充；若两者冲突，以知识片段为准。");
-            } else {
-                prompt.append("请基于知识片段回答，并尽量简洁。");
-            }
-            return prompt.toString();
+        if (hasWebSearchContext) {
+            return promptTemplateService.render(knowledgeBaseUserWebOnlyPromptTemplate, variables);
         }
-
-        if (StringUtils.hasText(webSearchContext)) {
-            prompt.append("当前没有命中知识片段，你可以参考联网摘要回答，并明确说明这部分信息来自联网搜索结果。");
-            return prompt.toString();
-        }
-
-        prompt.append("请明确说明无法从知识库确认答案。");
-        return prompt.toString();
+        return promptTemplateService.render(knowledgeBaseUserNoContextPromptTemplate, variables);
     }
 
     private String buildGeneralUserPrompt(String question, String webSearchContext) {
+        String temporalContext = buildTemporalContext(question, StringUtils.hasText(webSearchContext));
+        String temporalContextBlock = withTrailingBlankLine(temporalContext);
         if (!StringUtils.hasText(webSearchContext)) {
-            return question;
+            if (!StringUtils.hasText(temporalContext)) {
+                return question;
+            }
+            return promptTemplateService.render(generalUserPlainPromptTemplate, Map.of(
+                    "temporal_context_block", temporalContextBlock,
+                    "question", defaultText(question)
+            ));
         }
-        return "联网搜索摘要：\n"
-                + webSearchContext
-                + "\n\n问题：\n"
-                + question
-                + "\n\n请优先结合联网摘要回答；如果摘要不足以支撑结论，要明确说明。";
+        return promptTemplateService.render(generalUserWithWebPromptTemplate, Map.of(
+                "temporal_context_block", temporalContextBlock,
+                "web_search_context", defaultText(webSearchContext),
+                "question", defaultText(question)
+        ));
     }
 
     private String buildWebSearchContext(List<WebSearchSnippet> snippets) {
@@ -646,7 +673,7 @@ public class AppChatService {
                 sectionBuilder.append("链接：").append(snippet.url()).append("\n");
             }
             if (snippet.publishedAt() != null) {
-                sectionBuilder.append("时间：").append(snippet.publishedAt()).append("\n");
+                sectionBuilder.append("时间：").append(formatPublishedAt(snippet.publishedAt())).append("\n");
             }
             sectionBuilder.append("\n");
             String section = sectionBuilder.toString();
@@ -958,15 +985,17 @@ public class AppChatService {
         if (!webSearchEnabled || !StringUtils.hasText(question)) {
             return List.of();
         }
+        String resolvedQuery = normalizeWebSearchQuery(question);
         int resolvedTopK = resolveWebSearchTopK();
         long startNanos = System.nanoTime();
         try {
-            List<WebSearchSnippet> snippets = webSearchProvider.search(question, resolvedTopK);
+            List<WebSearchSnippet> snippets = webSearchProvider.search(resolvedQuery, resolvedTopK);
             List<WebSearchSnippet> safeSnippets = snippets == null ? List.of() : snippets.stream().filter(Objects::nonNull).toList();
             log.info(
-                    "前台联网搜索摘要已加载，query={}, queryLength={}, topK={}, resultCount={}, latencyMs={}",
+                    "前台联网搜索摘要已加载，query={}, resolvedQuery={}, queryLength={}, topK={}, resultCount={}, latencyMs={}",
                     abbreviateForLog(question),
-                    question.trim().length(),
+                    abbreviateForLog(resolvedQuery),
+                    resolvedQuery.length(),
                     resolvedTopK,
                     safeSnippets.size(),
                     (System.nanoTime() - startNanos) / 1_000_000
@@ -974,9 +1003,10 @@ public class AppChatService {
             return safeSnippets;
         } catch (Exception ex) {
             log.warn(
-                    "前台联网搜索已降级为空结果，query={}, queryLength={}, topK={}, reason={}",
+                    "前台联网搜索已降级为空结果，query={}, resolvedQuery={}, queryLength={}, topK={}, reason={}",
                     abbreviateForLog(question),
-                    question.trim().length(),
+                    abbreviateForLog(resolvedQuery),
+                    resolvedQuery.length(),
                     resolvedTopK,
                     ex.getClass().getSimpleName(),
                     ex
@@ -1040,6 +1070,82 @@ public class AppChatService {
             return normalized.substring(0, maxChars);
         }
         return normalized.substring(0, maxChars - 3) + "...";
+    }
+
+    private String buildTemporalContext(String question, boolean hasWebSearchContext) {
+        if (!hasWebSearchContext && !containsRelativeDateExpression(question)) {
+            return "";
+        }
+        Clock appClock = clock.withZone(APP_ZONE_ID);
+        LocalDate today = LocalDate.now(appClock);
+        LocalDate yesterday = today.minusDays(1);
+        LocalDate tomorrow = today.plusDays(1);
+        LocalDateTime now = LocalDateTime.now(appClock);
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("时间上下文（北京时间）：\n")
+                .append("- 当前日期：").append(today.format(DATE_FORMATTER)).append("\n")
+                .append("- 当前时间：").append(now.format(DATE_TIME_FORMATTER)).append("\n");
+        if (containsRelativeDateExpression(question)) {
+            builder.append("- 本轮问题中的“今天”默认指：").append(today.format(DATE_FORMATTER)).append("\n")
+                    .append("- 本轮问题中的“昨天”默认指：").append(yesterday.format(DATE_FORMATTER)).append("\n")
+                    .append("- 本轮问题中的“明天”默认指：").append(tomorrow.format(DATE_FORMATTER)).append("\n");
+        }
+        if (hasWebSearchContext) {
+            builder.append("- 如果联网摘要包含多天信息，优先回答与上述日期最匹配的一天；只有在证据明显冲突时，才说明冲突。");
+        }
+        return builder.toString();
+    }
+
+    private boolean containsRelativeDateExpression(String text) {
+        if (!StringUtils.hasText(text)) {
+            return false;
+        }
+        return text.contains("今天")
+                || text.contains("今日")
+                || text.contains("明天")
+                || text.contains("明日")
+                || text.contains("昨天")
+                || text.contains("昨日");
+    }
+
+    private String normalizeWebSearchQuery(String query) {
+        if (!StringUtils.hasText(query)) {
+            return "";
+        }
+        Clock appClock = clock.withZone(APP_ZONE_ID);
+        LocalDate today = LocalDate.now(appClock);
+        String normalized = query.trim();
+        normalized = replaceRelativeDateKeyword(normalized, "今天", today);
+        normalized = replaceRelativeDateKeyword(normalized, "今日", today);
+        normalized = replaceRelativeDateKeyword(normalized, "明天", today.plusDays(1));
+        normalized = replaceRelativeDateKeyword(normalized, "明日", today.plusDays(1));
+        normalized = replaceRelativeDateKeyword(normalized, "昨天", today.minusDays(1));
+        normalized = replaceRelativeDateKeyword(normalized, "昨日", today.minusDays(1));
+        return normalized.replaceAll("\\s+", " ").trim();
+    }
+
+    private String replaceRelativeDateKeyword(String query, String keyword, LocalDate date) {
+        if (!StringUtils.hasText(query) || !query.contains(keyword)) {
+            return query;
+        }
+        return query.replace(keyword, " " + date.format(DATE_FORMATTER) + " ");
+    }
+
+    private String formatPublishedAt(Instant publishedAt) {
+        return DATE_TIME_FORMATTER.withZone(APP_ZONE_ID).format(publishedAt);
+    }
+
+    private String buildTemporalContextBlock(String question, boolean hasWebSearchContext) {
+        return withTrailingBlankLine(buildTemporalContext(question, hasWebSearchContext));
+    }
+
+    private String withTrailingBlankLine(String text) {
+        return StringUtils.hasText(text) ? text + "\n\n" : "";
+    }
+
+    private String defaultText(String text) {
+        return StringUtils.hasText(text) ? text.trim() : "";
     }
 
     private record PreparedChatExecution(

@@ -3,10 +3,13 @@ package com.ragadmin.server.infra.ai.chat;
 import com.ragadmin.server.infra.ai.AiProviderExceptionSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 基于结构化输出的问答前置规划器。
@@ -17,24 +20,26 @@ public class DefaultChatExecutionPlanningService implements ChatExecutionPlannin
 
     private static final Logger log = LoggerFactory.getLogger(DefaultChatExecutionPlanningService.class);
 
-    private static final String PLANNING_SYSTEM_PROMPT = """
-            你是问答编排规划助手。
-            你的任务不是直接回答用户问题，而是为后续问答链路生成稳定、保守、可执行的规划结果。
-            请严格根据当前输入判断是否需要知识库检索、是否需要联网搜索，并在需要时给出更适合检索/搜索的查询改写。
-            如果某项能力当前不可用，必须返回 false，且对应 query 留空。
-            如果无法明确判断，优先返回保守方案，避免无意义的检索和联网调用。
-            """;
-
     private final ConversationChatClient conversationChatClient;
 
     private final ChatExecutionPlanningProperties planningProperties;
 
+    private final PromptTemplateService promptTemplateService;
+
+    @Value("classpath:prompts/ai/chat/execution-planning-system.st")
+    private Resource planningSystemPromptTemplate;
+
+    @Value("classpath:prompts/ai/chat/execution-planning-user.st")
+    private Resource planningUserPromptTemplate;
+
     public DefaultChatExecutionPlanningService(
             ConversationChatClient conversationChatClient,
-            ChatExecutionPlanningProperties planningProperties
+            ChatExecutionPlanningProperties planningProperties,
+            PromptTemplateService promptTemplateService
     ) {
         this.conversationChatClient = conversationChatClient;
         this.planningProperties = planningProperties;
+        this.promptTemplateService = promptTemplateService;
     }
 
     @Override
@@ -94,31 +99,15 @@ public class DefaultChatExecutionPlanningService implements ChatExecutionPlannin
     }
 
     private List<ChatPromptMessage> buildPromptMessages(ChatExecutionPlanningRequest request) {
-        String userPrompt = """
-                当前问题：%s
-                
-                当前场景：
-                - knowledgeBaseScene=%s
-                - selectedKnowledgeBaseCount=%d
-                - retrievalAvailable=%s
-                - webSearchAvailable=%s
-                
-                规划要求：
-                1. intent 使用简洁稳定的枚举风格命名
-                2. 如果 needRetrieval=true，则 retrievalQuery 必须是适合向量检索的短查询
-                3. 如果 needWebSearch=true，则 webSearchQuery 必须是适合联网搜索的短查询
-                4. 如果某项能力不需要或不可用，对应 query 返回空字符串
-                5. 不要直接回答用户问题
-                """.formatted(
-                request.question(),
-                request.knowledgeBaseScene(),
-                request.selectedKnowledgeBaseCount(),
-                request.retrievalAvailable(),
-                request.webSearchAvailable()
-        );
         return List.of(
-                new ChatPromptMessage("system", PLANNING_SYSTEM_PROMPT),
-                new ChatPromptMessage("user", userPrompt)
+                new ChatPromptMessage("system", promptTemplateService.load(planningSystemPromptTemplate)),
+                new ChatPromptMessage("user", promptTemplateService.render(planningUserPromptTemplate, Map.of(
+                        "question", defaultText(request.question()),
+                        "knowledge_base_scene", String.valueOf(request.knowledgeBaseScene()),
+                        "selected_knowledge_base_count", String.valueOf(request.selectedKnowledgeBaseCount()),
+                        "retrieval_available", String.valueOf(request.retrievalAvailable()),
+                        "web_search_available", String.valueOf(request.webSearchAvailable())
+                )))
         );
     }
 
@@ -233,5 +222,9 @@ public class DefaultChatExecutionPlanningService implements ChatExecutionPlannin
 
     private int safeLength(String text) {
         return StringUtils.hasText(text) ? text.trim().length() : 0;
+    }
+
+    private String defaultText(String text) {
+        return StringUtils.hasText(text) ? text.trim() : "";
     }
 }

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -25,11 +27,16 @@ class DefaultChatExecutionPlanningServiceTest {
 
     private DefaultChatExecutionPlanningService planningService;
 
+    private PromptTemplateService promptTemplateService;
+
     @BeforeEach
     void setUp() {
         planningProperties = new ChatExecutionPlanningProperties();
         planningProperties.setLogPlan(false);
-        planningService = new DefaultChatExecutionPlanningService(conversationChatClient, planningProperties);
+        promptTemplateService = new PromptTemplateService();
+        planningService = new DefaultChatExecutionPlanningService(conversationChatClient, planningProperties, promptTemplateService);
+        ReflectionTestUtils.setField(planningService, "planningSystemPromptTemplate", new ClassPathResource("prompts/ai/chat/execution-planning-system.st"));
+        ReflectionTestUtils.setField(planningService, "planningUserPromptTemplate", new ClassPathResource("prompts/ai/chat/execution-planning-user.st"));
     }
 
     @Test

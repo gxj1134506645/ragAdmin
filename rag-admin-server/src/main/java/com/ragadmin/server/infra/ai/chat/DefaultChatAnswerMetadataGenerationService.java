@@ -2,11 +2,14 @@ package com.ragadmin.server.infra.ai.chat;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * 基于结构化输出的回答后处理元数据生成器。
@@ -16,17 +19,6 @@ import java.util.Locale;
 public class DefaultChatAnswerMetadataGenerationService implements ChatAnswerMetadataGenerationService {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultChatAnswerMetadataGenerationService.class);
-
-    private static final String METADATA_SYSTEM_PROMPT = """
-            你是问答质量标注助手。
-            你的任务不是重写回答，而是为已经生成完成的回答补充稳定、保守、可机读的元数据。
-            请只返回结构化字段，不要重复回答正文。
-            约束如下：
-            1. confidence 只能是 HIGH、MEDIUM、LOW
-            2. hasKnowledgeBaseEvidence 表示当前回答是否有知识库证据支撑
-            3. needFollowUp 表示是否建议继续追问、人工复核或补充核验
-            4. 如果无法明确判断，优先保守输出
-            """;
 
     private static final List<String> FOLLOW_UP_HINTS = List.of(
             "无法确认",
@@ -43,12 +35,22 @@ public class DefaultChatAnswerMetadataGenerationService implements ChatAnswerMet
 
     private final ChatAnswerMetadataProperties properties;
 
+    private final PromptTemplateService promptTemplateService;
+
+    @Value("classpath:prompts/ai/chat/answer-metadata-system.st")
+    private Resource metadataSystemPromptTemplate;
+
+    @Value("classpath:prompts/ai/chat/answer-metadata-user.st")
+    private Resource metadataUserPromptTemplate;
+
     public DefaultChatAnswerMetadataGenerationService(
             ConversationChatClient conversationChatClient,
-            ChatAnswerMetadataProperties properties
+            ChatAnswerMetadataProperties properties,
+            PromptTemplateService promptTemplateService
     ) {
         this.conversationChatClient = conversationChatClient;
         this.properties = properties;
+        this.promptTemplateService = promptTemplateService;
     }
 
     @Override
@@ -93,27 +95,13 @@ public class DefaultChatAnswerMetadataGenerationService implements ChatAnswerMet
     }
 
     private List<ChatPromptMessage> buildPromptMessages(ChatAnswerMetadataGenerationRequest request) {
-        String userPrompt = """
-                用户问题：%s
-                
-                当前回答：%s
-                
-                当前上下文：
-                - referenceCount=%d
-                
-                输出要求：
-                1. confidence 只能是 HIGH、MEDIUM、LOW
-                2. 如果 referenceCount=0，hasKnowledgeBaseEvidence 通常应为 false
-                3. 仅当回答存在不确定性、明显不足或建议继续核验时，needFollowUp 才为 true
-                4. 不要输出正文解释
-                """.formatted(
-                defaultText(request.question()),
-                request.answer(),
-                request.referenceCount()
-        );
         return List.of(
-                new ChatPromptMessage("system", METADATA_SYSTEM_PROMPT),
-                new ChatPromptMessage("user", userPrompt)
+                new ChatPromptMessage("system", promptTemplateService.load(metadataSystemPromptTemplate)),
+                new ChatPromptMessage("user", promptTemplateService.render(metadataUserPromptTemplate, Map.of(
+                        "question", defaultText(request.question()),
+                        "answer", defaultText(request.answer()),
+                        "reference_count", String.valueOf(request.referenceCount())
+                )))
         );
     }
 

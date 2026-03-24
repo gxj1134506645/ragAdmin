@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -24,11 +26,16 @@ class DefaultChatAnswerMetadataGenerationServiceTest {
 
     private DefaultChatAnswerMetadataGenerationService service;
 
+    private PromptTemplateService promptTemplateService;
+
     @BeforeEach
     void setUp() {
         properties = new ChatAnswerMetadataProperties();
         properties.setLogMetadata(false);
-        service = new DefaultChatAnswerMetadataGenerationService(conversationChatClient, properties);
+        promptTemplateService = new PromptTemplateService();
+        service = new DefaultChatAnswerMetadataGenerationService(conversationChatClient, properties, promptTemplateService);
+        ReflectionTestUtils.setField(service, "metadataSystemPromptTemplate", new ClassPathResource("prompts/ai/chat/answer-metadata-system.st"));
+        ReflectionTestUtils.setField(service, "metadataUserPromptTemplate", new ClassPathResource("prompts/ai/chat/answer-metadata-user.st"));
     }
 
     @Test

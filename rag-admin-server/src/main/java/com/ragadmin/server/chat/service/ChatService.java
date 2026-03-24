@@ -37,12 +37,15 @@ import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryRefreshDispatcher;
+import com.ragadmin.server.infra.ai.chat.PromptTemplateService;
 import com.ragadmin.server.infra.ai.AiProviderExceptionSupport;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.service.ModelService;
 import com.ragadmin.server.retrieval.service.RetrievalService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -107,6 +110,21 @@ public class ChatService {
 
     @Autowired
     private ConversationIdCodec conversationIdCodec;
+
+    @Autowired
+    private PromptTemplateService promptTemplateService;
+
+    @Value("classpath:prompts/ai/chat/admin-knowledge-system.st")
+    private Resource knowledgeBaseSystemPromptTemplate;
+
+    @Value("classpath:prompts/ai/chat/admin-general-system.st")
+    private Resource generalSystemPromptTemplate;
+
+    @Value("classpath:prompts/ai/chat/admin-knowledge-user-context.st")
+    private Resource knowledgeBaseUserContextPromptTemplate;
+
+    @Value("classpath:prompts/ai/chat/admin-knowledge-user-no-context.st")
+    private Resource knowledgeBaseUserNoContextPromptTemplate;
 
     public ChatSessionResponse createSession(CreateChatSessionRequest request, AuthenticatedUser user) {
         String sceneType = normalizeSceneType(request.getSceneType());
@@ -344,34 +362,23 @@ public class ChatService {
     }
 
     private String buildKnowledgeBaseSystemPrompt() {
-        return """
-                你是企业知识库问答助手。
-                你只能基于提供的知识片段回答；无法确认时要明确说明，不要编造。
-                回答正文默认使用受控 Markdown 子集，便于前端安全渲染。
-                允许使用：段落、标题、无序列表、有序列表、粗体、引用、行内代码、代码块、普通链接。
-                禁止输出：原始 HTML、表格、图片、Mermaid、LaTeX、XML、JSON 包裹对象、脚本、样式标签。
-                不要为了排版输出孤立的 *、** 或其他无意义 Markdown 符号；列表请使用 - 或 1. 这种正常写法。
-                除非用户明确要求，否则不要输出代码块。
-                """;
+        return promptTemplateService.load(knowledgeBaseSystemPromptTemplate);
     }
 
     private String buildGeneralSystemPrompt() {
-        return """
-                你是企业智能助手。
-                优先给出直接、准确、可执行的回答；如果信息不充分，要明确说明你的判断边界。
-                回答正文默认使用受控 Markdown 子集，便于前端安全渲染。
-                允许使用：段落、标题、无序列表、有序列表、粗体、引用、行内代码、代码块、普通链接。
-                禁止输出：原始 HTML、表格、图片、Mermaid、LaTeX、XML、JSON 包裹对象、脚本、样式标签。
-                不要为了排版输出孤立的 *、** 或其他无意义 Markdown 符号；列表请使用 - 或 1. 这种正常写法。
-                除非用户明确要求，否则不要输出代码块。
-                """;
+        return promptTemplateService.load(generalSystemPromptTemplate);
     }
 
     private String buildKnowledgeBaseUserPrompt(String question, String context) {
         if (context == null || context.isBlank()) {
-            return "问题：\n" + question + "\n\n当前没有命中知识片段，请明确说明无法从知识库确认答案。";
+            return promptTemplateService.render(knowledgeBaseUserNoContextPromptTemplate, Map.of(
+                    "question", defaultText(question)
+            ));
         }
-        return "知识片段：\n" + context + "\n\n问题：\n" + question + "\n\n请基于知识片段回答，并尽量简洁。";
+        return promptTemplateService.render(knowledgeBaseUserContextPromptTemplate, Map.of(
+                "knowledge_context", defaultText(context),
+                "question", defaultText(question)
+        ));
     }
 
     /**
@@ -521,6 +528,10 @@ public class ChatService {
         if (request.getKbId() != null) {
             throw new BusinessException("CHAT_SCENE_INVALID", "首页通用会话不允许绑定知识库", HttpStatus.BAD_REQUEST);
         }
+    }
+
+    private String defaultText(String text) {
+        return StringUtils.hasText(text) ? text.trim() : "";
     }
 
     private record PreparedChatExecution(

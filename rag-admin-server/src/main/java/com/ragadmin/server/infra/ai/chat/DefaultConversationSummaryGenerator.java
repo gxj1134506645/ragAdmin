@@ -2,6 +2,8 @@ package com.ragadmin.server.infra.ai.chat;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -21,24 +23,25 @@ public class DefaultConversationSummaryGenerator implements ConversationSummaryG
 
     private static final Logger log = LoggerFactory.getLogger(DefaultConversationSummaryGenerator.class);
 
-    private static final String SUMMARY_SYSTEM_PROMPT = """
-            你是会话摘要助手。
-            请基于给定的对话内容生成简洁摘要，保留关键事实、约束、待办和结论。
-            输出纯文本，不要使用 markdown，不要编造不存在的信息。
-            """;
-
     private static final String EMPTY_SUMMARY = "暂无可摘要的会话内容。";
 
     private final ConversationChatClient conversationChatClient;
 
     private final ChatMemoryProperties chatMemoryProperties;
 
+    private final PromptTemplateService promptTemplateService;
+
+    @Value("classpath:prompts/ai/chat/conversation-summary-system.st")
+    private Resource summarySystemPromptTemplate;
+
     public DefaultConversationSummaryGenerator(
             ConversationChatClient conversationChatClient,
-            ChatMemoryProperties chatMemoryProperties
+            ChatMemoryProperties chatMemoryProperties,
+            PromptTemplateService promptTemplateService
     ) {
         this.conversationChatClient = conversationChatClient;
         this.chatMemoryProperties = chatMemoryProperties;
+        this.promptTemplateService = promptTemplateService;
     }
 
     @Override
@@ -82,7 +85,7 @@ public class DefaultConversationSummaryGenerator implements ConversationSummaryG
             int maxLength
     ) {
         List<ChatPromptMessage> promptMessages = new ArrayList<>();
-        promptMessages.add(new ChatPromptMessage("system", SUMMARY_SYSTEM_PROMPT));
+        promptMessages.add(new ChatPromptMessage("system", promptTemplateService.load(summarySystemPromptTemplate)));
         promptMessages.add(new ChatPromptMessage("user", buildConversationText(messages)));
         ConversationSummaryStructuredOutput structuredOutput = conversationChatClient.chatEntity(
                 request.providerCode(),

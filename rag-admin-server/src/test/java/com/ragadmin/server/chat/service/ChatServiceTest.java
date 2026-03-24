@@ -28,6 +28,7 @@ import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryRefreshDispatcher;
+import com.ragadmin.server.infra.ai.chat.PromptTemplateService;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.service.ModelService;
@@ -44,6 +45,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -107,6 +110,9 @@ class ChatServiceTest {
     private ChatExchangePersistenceService chatExchangePersistenceService;
 
     @Spy
+    private PromptTemplateService promptTemplateService = new PromptTemplateService();
+
+    @Spy
     private ConversationIdCodec conversationIdCodec = new ConversationIdCodec();
 
     @InjectMocks
@@ -114,6 +120,7 @@ class ChatServiceTest {
 
     @BeforeEach
     void setUp() {
+        configurePromptTemplates();
         lenient().doAnswer(invocation -> {
             ChatExecutionPlanningRequest planningRequest = invocation.getArgument(0);
             return new ChatExecutionPlan(
@@ -128,6 +135,17 @@ class ChatServiceTest {
         }).when(chatExecutionPlanningService).plan(any());
         lenient().when(chatAnswerMetadataGenerationService.generate(any()))
                 .thenReturn(new ChatAnswerMetadata("LOW", false, false));
+    }
+
+    private void configurePromptTemplates() {
+        setTemplate("knowledgeBaseSystemPromptTemplate", "prompts/ai/chat/admin-knowledge-system.st");
+        setTemplate("generalSystemPromptTemplate", "prompts/ai/chat/admin-general-system.st");
+        setTemplate("knowledgeBaseUserContextPromptTemplate", "prompts/ai/chat/admin-knowledge-user-context.st");
+        setTemplate("knowledgeBaseUserNoContextPromptTemplate", "prompts/ai/chat/admin-knowledge-user-no-context.st");
+    }
+
+    private void setTemplate(String fieldName, String classpathLocation) {
+        ReflectionTestUtils.setField(chatService, fieldName, new ClassPathResource(classpathLocation));
     }
 
     @Test

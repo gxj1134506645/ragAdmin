@@ -1,0 +1,6 @@
+${temporal_context_block}当前没有命中知识片段。
+
+问题：
+${question}
+
+请明确说明无法从知识库确认答案。

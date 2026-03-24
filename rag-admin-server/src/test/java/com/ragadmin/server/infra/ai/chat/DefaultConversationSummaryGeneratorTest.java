@@ -6,6 +6,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -26,11 +28,15 @@ class DefaultConversationSummaryGeneratorTest {
 
     private DefaultConversationSummaryGenerator generator;
 
+    private PromptTemplateService promptTemplateService;
+
     @BeforeEach
     void setUp() {
         ChatMemoryProperties chatMemoryProperties = new ChatMemoryProperties();
         chatMemoryProperties.setSummaryMaxLength(50);
-        generator = new DefaultConversationSummaryGenerator(conversationChatClient, chatMemoryProperties);
+        promptTemplateService = new PromptTemplateService();
+        generator = new DefaultConversationSummaryGenerator(conversationChatClient, chatMemoryProperties, promptTemplateService);
+        ReflectionTestUtils.setField(generator, "summarySystemPromptTemplate", new ClassPathResource("prompts/ai/chat/conversation-summary-system.st"));
     }
 
     @Test

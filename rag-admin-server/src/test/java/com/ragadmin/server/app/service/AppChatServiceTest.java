@@ -36,6 +36,7 @@ import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryRefreshDispatcher;
+import com.ragadmin.server.infra.ai.chat.PromptTemplateService;
 import com.ragadmin.server.infra.search.NoopWebSearchProvider;
 import com.ragadmin.server.infra.search.WebSearchProperties;
 import com.ragadmin.server.infra.search.WebSearchProvider;
@@ -52,10 +53,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.List;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -132,6 +136,9 @@ class AppChatServiceTest {
     private WebSearchProvider webSearchProvider;
 
     @Spy
+    private PromptTemplateService promptTemplateService = new PromptTemplateService();
+
+    @Spy
     private ConversationIdCodec conversationIdCodec = new ConversationIdCodec();
 
     @InjectMocks
@@ -139,6 +146,12 @@ class AppChatServiceTest {
 
     @BeforeEach
     void setUp() {
+        configurePromptTemplates();
+        ReflectionTestUtils.setField(
+                appChatService,
+                "clock",
+                Clock.fixed(Instant.parse("2026-03-24T02:38:00Z"), ZoneId.of("Asia/Shanghai"))
+        );
         lenient().when(webSearchProvider.isAvailable()).thenReturn(true);
         lenient().doAnswer(invocation -> {
             ChatExecutionPlanningRequest planningRequest = invocation.getArgument(0);
@@ -157,6 +170,21 @@ class AppChatServiceTest {
         }).when(chatExecutionPlanningService).plan(any());
         lenient().when(chatAnswerMetadataGenerationService.generate(any()))
                 .thenReturn(new ChatAnswerMetadata("LOW", false, false));
+    }
+
+    private void configurePromptTemplates() {
+        setTemplate("knowledgeBaseSystemPromptTemplate", "prompts/ai/chat/app-knowledge-system.st");
+        setTemplate("generalSystemPromptTemplate", "prompts/ai/chat/app-general-system.st");
+        setTemplate("knowledgeBaseUserContextWithWebPromptTemplate", "prompts/ai/chat/app-knowledge-user-context-with-web.st");
+        setTemplate("knowledgeBaseUserContextOnlyPromptTemplate", "prompts/ai/chat/app-knowledge-user-context-only.st");
+        setTemplate("knowledgeBaseUserWebOnlyPromptTemplate", "prompts/ai/chat/app-knowledge-user-web-only.st");
+        setTemplate("knowledgeBaseUserNoContextPromptTemplate", "prompts/ai/chat/app-knowledge-user-no-context.st");
+        setTemplate("generalUserWithWebPromptTemplate", "prompts/ai/chat/app-general-user-with-web.st");
+        setTemplate("generalUserPlainPromptTemplate", "prompts/ai/chat/app-general-user-plain.st");
+    }
+
+    private void setTemplate(String fieldName, String classpathLocation) {
+        ReflectionTestUtils.setField(appChatService, fieldName, new ClassPathResource(classpathLocation));
     }
 
     @Test
@@ -412,7 +440,7 @@ class AppChatServiceTest {
 
         when(chatSessionMapper.selectById(501L)).thenReturn(session);
         when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of());
-        when(webSearchProvider.search("今天适合安排哪些工作？", 5)).thenThrow(new RuntimeException("search down"));
+        when(webSearchProvider.search("2026-03-24 适合安排哪些工作？", 5)).thenThrow(new RuntimeException("search down"));
         when(modelService.resolveChatModelDescriptor(901L)).thenReturn(modelDescriptor);
         when(conversationChatClient.chat(eq("BAILIAN"), eq("qwen-plus"), any(), any(), any()))
                 .thenReturn(new ChatCompletionResult("建议先处理高优先级事项。", 80, 20));
@@ -446,7 +474,9 @@ class AppChatServiceTest {
         verify(conversationChatClient).chat(eq("BAILIAN"), eq("qwen-plus"), any(), promptCaptor.capture(), any());
         List<ChatPromptMessage> promptMessages = promptCaptor.getValue();
         assertEquals(2, promptMessages.size());
-        assertEquals("今天适合安排哪些工作？", promptMessages.get(1).content());
+        assertTrue(promptMessages.get(1).content().contains("当前日期：2026-03-24"));
+        assertTrue(promptMessages.get(1).content().contains("问题中的“今天”默认指：2026-03-24"));
+        assertTrue(promptMessages.get(1).content().contains("今天适合安排哪些工作？"));
         verify(modelService).resolveChatModelDescriptor(901L);
         verify(conversationMemoryRefreshDispatcher).dispatchRefresh("chat-terminal-app-scene-general-user-6001-session-501");
         assertEquals("建议先处理高优先级事项。", response.answer());
@@ -478,7 +508,7 @@ class AppChatServiceTest {
 
         when(chatSessionMapper.selectById(502L)).thenReturn(session);
         when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of());
-        when(webSearchProvider.search("今天有什么行业动态？", 5)).thenReturn(List.of(
+        when(webSearchProvider.search("2026-03-24 有什么行业动态？", 5)).thenReturn(List.of(
                 new WebSearchSnippet(
                         "行业快讯",
                         "多家企业正在推进智能体应用落地。",
@@ -520,6 +550,8 @@ class AppChatServiceTest {
         assertTrue(promptMessages.get(1).content().contains("联网搜索摘要"));
         assertTrue(promptMessages.get(1).content().contains("行业快讯"));
         assertTrue(promptMessages.get(1).content().contains("https://example.com/news"));
+        assertTrue(promptMessages.get(1).content().contains("当前日期：2026-03-24"));
+        assertTrue(promptMessages.get(1).content().contains("时间：2026-03-20 18:00 UTC+8"));
     }
 
     @Test
@@ -551,7 +583,7 @@ class AppChatServiceTest {
         when(chatSessionMapper.selectById(521L)).thenReturn(session);
         when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of());
         when(modelService.resolveChatModelDescriptor(921L)).thenReturn(modelDescriptor);
-        when(webSearchProvider.search("帮我看看今天有哪些重要动态", 2)).thenReturn(List.of(
+        when(webSearchProvider.search("帮我看看 2026-03-24 有哪些重要动态", 2)).thenReturn(List.of(
                 new WebSearchSnippet(
                         "结果一",
                         "这是一段很长很长的联网摘要，用来验证 prompt 在进入模型前会被裁剪，不会无限膨胀。",
@@ -594,10 +626,11 @@ class AppChatServiceTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ChatPromptMessage>> promptCaptor = ArgumentCaptor.forClass(List.class);
         verify(conversationChatClient).chat(eq("BAILIAN"), eq("qwen-plus"), any(), promptCaptor.capture(), any());
-        verify(webSearchProvider).search("帮我看看今天有哪些重要动态", 2);
+        verify(webSearchProvider).search("帮我看看 2026-03-24 有哪些重要动态", 2);
         String userPrompt = promptCaptor.getValue().get(1).content();
         assertTrue(userPrompt.contains("联网搜索摘要"));
         assertTrue(userPrompt.contains("结果一"));
+        assertTrue(userPrompt.contains("当前日期：2026-03-24"));
     }
 
     @Test

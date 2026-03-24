@@ -511,6 +511,9 @@ flowchart LR
 - `MCP` 体系只负责企业内部业务系统工具接入
 - OCR 仍然归属于文档解析链路
 - 不引入 `stdio`
+- 默认由系统在文档上传后自动完成 OCR 与后续入库，不把人工先跑 `MinerU` 等工具作为标准前置流程
+- 当前若采用 `Tesseract` CLI 适配，本地开发可使用 Windows 路径，生产部署到 Linux 时必须切换为 Linux 命令或内部 OCR 服务
+- 如果后续需要更强的复杂版式解析能力，可把 `MinerU` 等能力作为解析链路增强节点接入，但仍保持在 `Knowledge Pipeline` 内部
 
 ## 13. 一期实现范围
 

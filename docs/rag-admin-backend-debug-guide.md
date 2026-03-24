@@ -63,6 +63,14 @@
 - Ollama：`127.0.0.1:11434`
 - Milvus：`127.0.0.1:19530`
 
+OCR 配置补充说明：
+
+- `application-local.yml` 中的 Windows `tesseract.exe` 路径仅用于本地开发示例
+- Linux 服务器部署时，应改为 `tesseract` 或 Linux 绝对路径，不再沿用 Windows `exe`
+- `rag.document.ocr.data-path` 指向的是 `tessdata` 语言包目录，不是 OCR 程序路径
+- 默认流程是上传原始图片或扫描版 `PDF` 后由系统内部自动 OCR，不要求人工先借助 `MinerU` 导出文本再上传
+- 如后续接入 `MinerU` 等增强型解析器，也应纳入系统解析流水线，而不是变成默认人工预处理环节
+
 ### 3.2 ChatClient 日志 advisor 说明
 
 当前问答链路已经接入 Spring AI `SimpleLoggerAdvisor`，但不同环境的日志可见范围不同。
@@ -384,6 +392,8 @@ GET /api/admin/system/health
 - Tika 依赖是否正确加载
 - 若是图片或扫描 PDF，检查 `rag.document.ocr.enabled` 是否启用
 - 检查运行机是否已安装 `tesseract` 且语言包可用
+- 若当前环境是 Linux，检查配置中是否仍误用了 Windows `tesseract.exe` 路径
+- 若使用容器部署，检查镜像内是否已安装 `tesseract` 与所需语言包，而不是只在宿主机上安装
 
 ### 7.4 向量化失败
 

@@ -159,6 +159,19 @@ mvn -q -pl rag-admin-server spring-boot:run -Dspring-boot.run.profiles=dev
 - `application-local.yml`：本机 Docker 容器环境
 - `application-dev.yml`：内网共享开发环境示例
 
+### 4.1 OCR 配置说明
+
+当前 OCR 默认集成在知识库文档解析流水线内部，用于图片文件和扫描版 `PDF` 的兜底文本抽取。
+
+- `application-local.yml` 中的 `C:/Program Files/Tesseract-OCR/tesseract.exe` 只是 Windows 本地开发示例
+- 生产部署到 Linux 时，不再使用 Windows `exe`，应改为 `tesseract` 或 Linux 绝对路径，例如 `/usr/bin/tesseract`
+- `data-path` 表示 `tessdata` 语言包目录，不是 OCR 程序本体路径；如果 Linux 环境已按系统默认目录安装语言包，可不显式配置
+- 如使用 Docker 部署，应在镜像内安装 `tesseract` 和所需语言包，而不是依赖宿主机临时手工安装
+
+当前推荐流程是“上传原始文档，由系统异步完成解析、OCR、切片、Embedding 和索引构建”，而不是要求运营人员先手工借助 `MinerU` 之类工具做前置 OCR，再把产物上传到知识库。
+
+对于排版复杂、表格密集、公式较多或普通 OCR 效果不稳定的文档，后续可以在解析流水线内增加 `MinerU`、`PaddleOCR` 或其他更强解析器，作为增强型解析通道；但这类能力仍应由系统内部统一编排，而不是默认变成用户手工前置步骤。
+
 如需本地拉起 PostgreSQL、Milvus、Ollama 以及 Milvus 依赖，可先准备：
 
 ```bash

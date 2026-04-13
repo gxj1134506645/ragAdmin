@@ -1,6 +1,6 @@
 spring:
   config:
-    # dev 环境复用本地未跟踪的敏感配置，避免将密钥提交到仓库。
+    # 本地敏感配置通过未跟踪文件覆盖，避免提交到仓库。
     import: optional:classpath:application-local-secret.yml
   datasource:
     url: jdbc:postgresql://127.0.0.1:5432/rag_admin?sslmode=disable
@@ -9,9 +9,9 @@ spring:
     driver-class-name: org.postgresql.Driver
   data:
     redis:
-      host: 192.168.0.11
+      host: 127.0.0.1
       port: 6379
-      password: zhonghe_2h3b4bv57d3b
+      password: ragadmin123
       database: 0
   threads:
     virtual:
@@ -19,7 +19,7 @@ spring:
 
 rag:
   auth:
-    jwt-secret: rag-admin-dev-secret-key-change-me
+    jwt-secret: rag-admin-local-secret-key-change-me
     bootstrap:
       admin-username: admin
       admin-display-name: 系统管理员
@@ -43,18 +43,25 @@ rag:
       timeout-seconds: 180
   storage:
     minio:
-      endpoint: 192.168.0.11
+      endpoint: 127.0.0.1
       port: 9000
       use-ssl: false
-      access-key: root
-      secret-key: zh123456
+      access-key: minioadmin
+      secret-key: minioadmin123
       bucket-name: ragadmin
-      public-url: http://192.168.0.11:9000
+      public-url: http://127.0.0.1:9000
   vector:
     milvus:
       base-url: http://127.0.0.1:19530
       token: root:Milvus
       enabled: true
+  document:
+    ocr:
+      enabled: true
+      tesseract-command: C:/Program Files/Tesseract-OCR/tesseract.exe
+      data-path: .ocr-data/tessdata
+      language: chi_sim+eng
+      max-pdf-pages: 5
 
 logging:
   level:

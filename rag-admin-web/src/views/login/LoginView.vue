@@ -44,22 +44,10 @@ async function submit(): Promise<void> {
 <template>
   <div class="login-page">
     <section class="hero-copy">
-      <p class="eyebrow">RAG ADMIN</p>
-      <h1>把知识库、模型与文档流程放进同一张控制台。</h1>
-      <p class="description">
-        在同一界面完成知识库、模型、文档与任务的日常管理，保持统一的操作入口和视觉语言。
-      </p>
-      <div class="feature-grid">
-        <article class="feature-card soft-panel">
-          <span>01</span>
-          <strong>统一登录态</strong>
-          <p>双 Token 会话续期，避免页面层到处写鉴权分支。</p>
-        </article>
-        <article class="feature-card soft-panel">
-          <span>02</span>
-          <strong>统一管理入口</strong>
-          <p>登录后可直接进入知识库、模型、文档和任务等核心页面。</p>
-        </article>
+      <div class="hero-copy-top">
+        <p class="eyebrow">RAG ADMIN</p>
+        <h1>知识库后台管理</h1>
+        <p class="description">统一进入知识库、模型、文档与任务管理入口。</p>
       </div>
     </section>
 
@@ -87,7 +75,7 @@ async function submit(): Promise<void> {
           />
         </el-form-item>
         <el-button class="submit-button" type="primary" :loading="submitting" @click="submit">
-          登录并进入控制台
+          登录并进入后台
         </el-button>
       </el-form>
       <div class="hint-block">
@@ -111,8 +99,15 @@ async function submit(): Promise<void> {
 .hero-copy {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
   padding: 28px 18px;
+}
+
+.hero-copy-top {
+  display: flex;
+  flex-direction: column;
+  max-width: 720px;
+  margin: 0 auto;
 }
 
 .eyebrow {
@@ -131,38 +126,9 @@ async function submit(): Promise<void> {
 }
 
 .description {
-  max-width: 680px;
-  margin: 22px 0 0;
+  margin: 18px 0 0;
   color: #6d5948;
   font-size: 17px;
-}
-
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 32px;
-}
-
-.feature-card {
-  padding: 22px;
-}
-
-.feature-card span {
-  color: #d37829;
-  font-size: 12px;
-  letter-spacing: 0.22em;
-}
-
-.feature-card strong {
-  display: block;
-  margin-top: 12px;
-  font-size: 20px;
-}
-
-.feature-card p {
-  margin: 10px 0 0;
-  color: #6d5948;
 }
 
 .login-card {
@@ -212,7 +178,12 @@ async function submit(): Promise<void> {
   }
 
   .hero-copy {
+    justify-content: flex-start;
     padding: 10px 8px 0;
+  }
+
+  .hero-copy-top {
+    margin: 0;
   }
 }
 

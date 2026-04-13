@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
@@ -73,6 +74,56 @@ class ModelBootstrapInitializerTest {
 
         assertTrue(modelCaptor.getAllValues().stream()
                 .anyMatch(model -> "text-embedding-v3".equals(model.getModelCode())));
+        assertEquals(2, modelCaptor.getAllValues().size());
+    }
+
+    @Test
+    void shouldBootstrapConfiguredOllamaModelsWhenOllamaEnabled() throws Exception {
+        BailianProperties bailianProperties = new BailianProperties();
+        bailianProperties.setEnabled(false);
+
+        OllamaProperties ollamaProperties = new OllamaProperties();
+        ollamaProperties.setEnabled(true);
+        ollamaProperties.setBaseUrl("http://127.0.0.1:11434");
+        ollamaProperties.setDefaultChatModel("qwen2.5:14b");
+        ollamaProperties.setDefaultEmbeddingModel("bge-m3");
+
+        AiProviderEntity provider = new AiProviderEntity();
+        provider.setId(2L);
+        provider.setProviderCode("OLLAMA");
+        provider.setProviderName("Ollama");
+
+        when(aiProviderMapper.selectOne(any())).thenReturn(provider);
+        when(aiModelMapper.selectOne(any())).thenReturn(null);
+
+        AtomicLong idGenerator = new AtomicLong(200L);
+        doAnswer(invocation -> {
+            AiModelEntity entity = invocation.getArgument(0);
+            entity.setId(idGenerator.getAndIncrement());
+            return 1;
+        }).when(aiModelMapper).insert(any(AiModelEntity.class));
+
+        ModelBootstrapInitializer initializer = new ModelBootstrapInitializer(
+                aiProviderMapper,
+                aiModelMapper,
+                aiModelCapabilityMapper,
+                bailianProperties,
+                ollamaProperties
+        );
+
+        initializer.run(null);
+
+        ArgumentCaptor<AiModelEntity> modelCaptor = ArgumentCaptor.forClass(AiModelEntity.class);
+        verify(aiModelMapper, atLeastOnce()).insert(modelCaptor.capture());
+
+        assertTrue(modelCaptor.getAllValues().stream()
+                .anyMatch(model -> "qwen2.5:14b".equals(model.getModelCode())));
+        assertTrue(modelCaptor.getAllValues().stream()
+                .anyMatch(model -> "bge-m3".equals(model.getModelCode())));
+        assertFalse(modelCaptor.getAllValues().stream()
+                .anyMatch(model -> "qwen2.5:7b".equals(model.getModelCode())));
+        assertFalse(modelCaptor.getAllValues().stream()
+                .anyMatch(model -> "nomic-embed-text".equals(model.getModelCode())));
         assertEquals(2, modelCaptor.getAllValues().size());
     }
 }

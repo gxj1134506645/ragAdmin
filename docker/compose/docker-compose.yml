@@ -112,7 +112,7 @@ services:
       retries: 15
 
   ollama:
-    image: ollama/ollama:0.6.2
+    image: ollama/ollama:0.20.6
     container_name: rag-admin-ollama
     restart: unless-stopped
     ports:
@@ -135,8 +135,8 @@ services:
     restart: "no"
     entrypoint: >
       /bin/sh -c "
-      curl -fsS http://ollama:11434/api/pull -d '{\"name\":\"qwen2.5:7b\"}' &&
-      curl -fsS http://ollama:11434/api/pull -d '{\"name\":\"nomic-embed-text\"}'
+      curl -fsS http://ollama:11434/api/pull -d '{\"name\":\"gemma4:e4b\"}' &&
+      curl -fsS http://ollama:11434/api/pull -d '{\"name\":\"quentinz/bge-small-zh-v1.5\"}'
       "
 
 volumes:

@@ -8,6 +8,8 @@ public class OllamaProperties {
     private boolean enabled = false;
     private String baseUrl;
     private int timeoutSeconds = 30;
+    private String defaultChatModel = "qwen2.5:7b";
+    private String defaultEmbeddingModel = "nomic-embed-text";
 
     public boolean isEnabled() {
         return enabled;
@@ -31,5 +33,21 @@ public class OllamaProperties {
 
     public void setTimeoutSeconds(int timeoutSeconds) {
         this.timeoutSeconds = timeoutSeconds;
+    }
+
+    public String getDefaultChatModel() {
+        return defaultChatModel;
+    }
+
+    public void setDefaultChatModel(String defaultChatModel) {
+        this.defaultChatModel = defaultChatModel;
+    }
+
+    public String getDefaultEmbeddingModel() {
+        return defaultEmbeddingModel;
+    }
+
+    public void setDefaultEmbeddingModel(String defaultEmbeddingModel) {
+        this.defaultEmbeddingModel = defaultEmbeddingModel;
     }
 }

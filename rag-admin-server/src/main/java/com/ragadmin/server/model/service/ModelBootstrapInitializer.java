@@ -53,8 +53,25 @@ public class ModelBootstrapInitializer implements ApplicationRunner {
 
         if (ollamaProperties.isEnabled()) {
             AiProviderEntity ollama = ensureProvider("OLLAMA", "Ollama", "http://127.0.0.1:11434");
-            ensureModel(ollama, "qwen2.5:7b", "Ollama Qwen2.5 7B", "CHAT", List.of("TEXT_GENERATION"), 4096, new BigDecimal("0.7"));
-            ensureModel(ollama, "nomic-embed-text", "Ollama Nomic Embed Text", "EMBEDDING", List.of("EMBEDDING"), null, null);
+            // 启动初始化优先使用本地配置声明的默认模型，避免每次切换 Ollama 模型都需要改代码。
+            ensureModel(
+                    ollama,
+                    ollamaProperties.getDefaultChatModel(),
+                    "Ollama Chat Model",
+                    "CHAT",
+                    List.of("TEXT_GENERATION"),
+                    4096,
+                    new BigDecimal("0.7")
+            );
+            ensureModel(
+                    ollama,
+                    ollamaProperties.getDefaultEmbeddingModel(),
+                    "Ollama Embedding Model",
+                    "EMBEDDING",
+                    List.of("EMBEDDING"),
+                    null,
+                    null
+            );
         }
 
         log.info("已完成默认模型提供方与模型定义初始化");

@@ -41,6 +41,10 @@ rag:
       enabled: false
       base-url: http://127.0.0.1:11434
       timeout-seconds: 180
+    zhipu:
+      enabled: false
+      base-url: https://open.bigmodel.cn/api/paas
+      timeout-seconds: 60
   storage:
     minio:
       endpoint: 127.0.0.1

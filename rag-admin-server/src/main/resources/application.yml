@@ -88,6 +88,10 @@ rag:
     ollama:
       enabled: false
       timeout-seconds: 30
+    zhipu:
+      enabled: false
+      api-key:
+      timeout-seconds: 60
   storage:
     minio:
       port: 9000

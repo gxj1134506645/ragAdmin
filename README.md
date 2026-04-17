@@ -250,6 +250,6 @@ docker compose --env-file docker/compose/.env -f docker/compose/docker-compose.y
 - 实施计划：[docs/plans/rag-admin-implementation-plan.md](docs/plans/rag-admin-implementation-plan.md)
 - 后端联调说明：[docs/tasks/rag-admin-backend-debug-guide.md](docs/tasks/rag-admin-backend-debug-guide.md)
 - API 验收脚本说明：[docs/tasks/rag-admin-api-acceptance.md](docs/tasks/rag-admin-api-acceptance.md)
-- 前台架构设计：[docs/plans/2026-03-19-app-chat-frontend-architecture-design.md](docs/plans/2026-03-19-app-chat-frontend-architecture-design.md)
-- 前台实施计划：[docs/plans/2026-03-19-app-chat-frontend-implementation-plan.md](docs/plans/2026-03-19-app-chat-frontend-implementation-plan.md)
+- 访问边界计划：[docs/plans/access-boundary-plan.md](docs/plans/access-boundary-plan.md)
+- 前台聊天演进计划：[docs/plans/app-chat-evolution-plan.md](docs/plans/app-chat-evolution-plan.md)
 - 项目协作规则：[AGENTS.md](AGENTS.md)

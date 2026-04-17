@@ -14,7 +14,7 @@
 
 本轮预期涉及以下文件：
 
-- 新增：`docs/plans/2026-03-20-chat-memory-hybrid-implementation-plan.md`
+- 新增：`docs/plans/chat-memory-hybrid-implementation-plan.md`
 - 新增：`rag-admin-server/src/main/resources/db/migration/V8__add_chat_memory_summary.sql`
 - 新增：`rag-admin-server/src/main/java/com/ragadmin/server/chat/entity/ChatSessionMemorySummaryEntity.java`
 - 新增：`rag-admin-server/src/main/java/com/ragadmin/server/chat/mapper/ChatSessionMemorySummaryMapper.java`

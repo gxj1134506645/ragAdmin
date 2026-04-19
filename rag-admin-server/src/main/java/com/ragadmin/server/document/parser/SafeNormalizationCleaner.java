@@ -1,6 +1,7 @@
 package com.ragadmin.server.document.parser;
 
 import org.springframework.ai.document.Document;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
+@Order(10)
 public class SafeNormalizationCleaner implements DocumentCleanerStep {
 
     private static final String CLEAN_VERSION = "v1";

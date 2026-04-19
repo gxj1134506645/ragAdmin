@@ -1,11 +1,13 @@
 package com.ragadmin.server.document.parser;
 
 import org.springframework.ai.document.Document;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
+@Order(30)
 public class SemanticPreservingCleaner implements DocumentCleanerStep {
 
     @Override

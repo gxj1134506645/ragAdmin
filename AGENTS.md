@@ -186,13 +186,13 @@ Git 规范：
 <claude-mem-context>
 # Memory Context
 
-# [ragAdmin] recent context, 2026-04-19 8:50pm GMT+8
+# [ragAdmin] recent context, 2026-04-19 9:09pm GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 15 obs (5,735t read) | 0t work
+Stats: 21 obs (7,941t read) | 0t work
 
 ### Apr 19, 2026
 101 7:46p 🔵 Spring Boot application startup successful with service integrations
@@ -210,4 +210,10 @@ Stats: 15 obs (5,735t read) | 0t work
 121 " 🔴 Test failure revealed Spring AI Document constructor rejects null metadata values
 122 8:42p 🔴 Test fixed to work around Spring AI Document constructor null validation
 124 " 🔴 Test suite validates DocumentMetadataFactory null filtering with all tests passing
+126 8:56p 🔵 PDF metadata null cause traced to missing TOC in ParagraphPdfDocumentReader
+127 " ⚖️ PDF parsing fallback strategy mandates automatic reader degradation
+128 " 🔴 PDF paragraph extraction quality-based fallback implemented
+130 9:08p 🔵 Document cleaning architecture requires layered policy-based approach
+131 " 🔵 PDF paragraph reading requires automatic fallback to page-level reading
+132 " ⚖️ Document cleaning must use rule-driven selective cleaner execution
 </claude-mem-context>

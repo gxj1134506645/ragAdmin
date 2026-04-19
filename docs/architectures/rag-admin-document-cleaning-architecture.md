@@ -87,6 +87,7 @@ public interface DocumentCleaner {
 
 - 根据文档类型、解析模式和内容特征决定启用哪些 cleaner
 - 约束语义敏感清洗的启用条件
+- 控制 cleaner 的执行顺序与启用子集，避免“把所有 cleaner 全跑一遍”的副作用叠加
 
 推荐接口：
 
@@ -108,6 +109,34 @@ public interface CleanerPolicyResolver {
 - `headerFooterCleanEnabled`
 - `lineMergeEnabled`
 - `ocrNoiseCleanEnabled`
+
+### 4.3 特征分析层
+
+清洗策略不能只看 `docType` 和 `parseMode`，还应结合内容特征做判断。
+
+推荐增加特征分析层，用于把 reader 输出转换成一组可用于决策的信号：
+
+```java
+public interface DocumentSignalAnalyzer {
+
+    DocumentSignals analyze(List<Document> documents, DocumentCleanContext context);
+}
+```
+
+推荐的 `DocumentSignals` 至少覆盖以下维度：
+
+- `repeatedHeaderDetected`
+- `repeatedFooterDetected`
+- `tooManyBlankLines`
+- `weakParagraphStructure`
+- `ocrNoiseDetected`
+- `symbolDensityHigh`
+- `tocOutlineMissing`
+
+约束：
+
+- 特征分析层只负责判断，不直接改写文本
+- 清洗层消费的是“信号 + 策略”，不是直接穷举所有 cleaner
 
 ## 5. 清洗规则
 
@@ -206,6 +235,26 @@ public interface CleanerPolicyResolver {
 - 特殊符号占比异常高，才考虑进入特殊符号分析
 - `MinerU` / OCR 返回结果噪声模式明显，才启用噪声清理
 - 存在稳定章节分隔符，才把对应符号作为候选边界
+
+### 5.4 清洗执行原则
+
+清洗不应采用“有多少 cleaner 就都跑一遍”的方式。
+
+原因如下：
+
+- cleaner 之间会相互影响输入
+- 页眉页脚清理、断行合并、符号预处理都可能改变后续 cleaner 的判断依据
+- 暴力穷举会导致副作用叠加，最终破坏文本结构
+
+因此当前推荐执行模型为：
+
+1. 先执行低风险、安全清洗
+2. 再结合 `docType + parseMode + DocumentSignals` 生成策略
+3. 最后只执行一个有序的 cleaner 子集
+
+一句话：
+
+`规则驱动的有序选择` 优先于 `工具穷举试错`。
 
 ## 6. 特殊符号处理原则
 

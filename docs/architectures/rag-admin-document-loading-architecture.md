@@ -169,11 +169,15 @@ public interface DocumentReaderRouter {
 
 - `ParagraphPdfDocumentReader` 优先用于质量较高、内部结构较完整的电子版 `PDF`
 - `PagePdfDocumentReader` 用于段落抽取质量差时的回退，或需要稳定页码定位时
+- 如果 `ParagraphPdfDocumentReader` 因缺少 TOC / outline 抛出异常，必须直接降级到 `PagePdfDocumentReader`
+- 即使未抛异常，只要段落抽取结果明显偏弱，例如总文本过短、单段文本过短或结构明显不完整，也应降级到 `PagePdfDocumentReader`
 
 结论：
 
 - RAG 场景默认优先段落 reader
 - 若段落抽取质量不稳定，则回退为按页读取后再统一进入清洗与切片阶段
+- 简历、合同、导出报告等无目录 PDF 不应因为段落 reader 失败而终止整条解析任务
+- 段落 reader 的“伪成功”同样需要识别；不能只在抛异常时才考虑按页降级
 
 ### 5.5 扫描型 PDF
 

@@ -186,14 +186,28 @@ Git 规范：
 <claude-mem-context>
 # Memory Context
 
-# [ragAdmin] recent context, 2026-04-19 7:58pm GMT+8
+# [ragAdmin] recent context, 2026-04-19 8:50pm GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 1 obs (283t read) | 0t work
+Stats: 15 obs (5,735t read) | 0t work
 
 ### Apr 19, 2026
 101 7:46p 🔵 Spring Boot application startup successful with service integrations
+102 8:06p 🔵 MinerU document parsing service failure investigation
+104 8:07p 🔵 MinerU parsing exception source code identified
+105 " 🔵 Document parsing workflow and error handling flow identified
+107 8:25p 🔵 PDF parsing fails on documents without table of contents
+108 8:26p 🔴 PDF parsing now gracefully falls back to page reader on TOC errors
+111 " 🔴 PDF reader fallback to page mode validated by unit tests
+113 8:29p ✅ Documented PDF reader fallback pattern in project knowledge base
+115 8:37p 🟣 PDF paragraph reader now validates extraction quality before accepting results
+118 8:40p 🔴 PDF reader quality-based fallback validated by test suite
+119 " 🔴 DocumentMetadataFactory now filters null keys and values during metadata enrichment
+120 8:41p 🔴 Test suite enhanced to validate metadata null filtering
+121 " 🔴 Test failure revealed Spring AI Document constructor rejects null metadata values
+122 8:42p 🔴 Test fixed to work around Spring AI Document constructor null validation
+124 " 🔴 Test suite validates DocumentMetadataFactory null filtering with all tests passing
 </claude-mem-context>

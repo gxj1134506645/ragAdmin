@@ -2,6 +2,7 @@ package com.ragadmin.server.document.parser;
 
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -26,7 +27,11 @@ public class DocumentMetadataFactory {
         List<Document> enrichedDocuments = new ArrayList<>();
         for (Document document : documents) {
             Map<String, Object> metadata = baseMetadata(request, readerType, parseMode);
-            metadata.putAll(document.getMetadata());
+            document.getMetadata().forEach((key, value) -> {
+                if (StringUtils.hasText(key) && value != null) {
+                    metadata.put(key, value);
+                }
+            });
             enrichedDocuments.add(new Document(document.getId(), document.getText(), metadata));
         }
         return enrichedDocuments;

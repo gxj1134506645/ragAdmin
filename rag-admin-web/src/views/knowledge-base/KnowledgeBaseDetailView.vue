@@ -850,14 +850,8 @@ onUnmounted(() => {
     </section>
 
     <template v-else-if="knowledgeBase">
-      <header class="detail-head">
-        <div class="detail-head-main">
-          <p class="detail-eyebrow">知识库详情</p>
-          <h1 class="page-title">{{ knowledgeBase.kbName }}</h1>
-          <p class="page-subtitle">
-            {{ knowledgeBase.description || '当前知识库暂无补充说明，可继续通过编辑页完善描述。' }}
-          </p>
-        </div>
+      <header class="detail-head soft-panel">
+        <h1 class="page-title">{{ knowledgeBase.kbName }}</h1>
         <div class="head-actions">
           <el-button type="primary" plain @click="handleOpenUploadDialog">上传文档</el-button>
           <el-button @click="loadDetail">刷新详情</el-button>
@@ -873,7 +867,6 @@ onUnmounted(() => {
             <el-tag size="small" effect="plain" type="info">核心标识</el-tag>
           </div>
           <strong class="overview-card-value">{{ knowledgeBase.kbCode }}</strong>
-          <p>用于接口、路由和治理关联。</p>
         </article>
         <article class="overview-card soft-panel">
           <div class="overview-card-head">
@@ -881,7 +874,6 @@ onUnmounted(() => {
             <el-tag size="small" effect="plain" type="warning">问答生成</el-tag>
           </div>
           <strong class="overview-card-value">平台默认聊天模型</strong>
-          <p>知识库不再单独配置聊天模型；前台会话或单次提问可显式覆盖。</p>
         </article>
         <article class="overview-card soft-panel">
           <div class="overview-card-head">
@@ -889,16 +881,12 @@ onUnmounted(() => {
             <el-tag size="small" effect="plain" type="success">检索构建</el-tag>
           </div>
           <strong class="overview-card-value">{{ embeddingModelLabel(knowledgeBase.embeddingModelName) }}</strong>
-          <p>用于文本切片向量化和检索。</p>
         </article>
       </section>
 
       <section class="detail-panel soft-panel">
         <div class="section-head">
-          <div>
-            <h2>知识库配置</h2>
-            <p>这里保留当前知识库的关键运行参数，避免首屏信息过重。</p>
-          </div>
+          <h2>知识库配置</h2>
         </div>
 
         <div class="detail-matrix">
@@ -929,10 +917,7 @@ onUnmounted(() => {
 
       <section class="document-panel soft-panel">
         <div class="section-head">
-          <div>
-            <h2>知识库文档</h2>
-            <p>知识库创建后默认没有文档，需要先上传原始文件；上传成功后可自动进入解析队列。</p>
-          </div>
+          <h2>知识库文档</h2>
         </div>
 
         <el-alert
@@ -1260,28 +1245,15 @@ onUnmounted(() => {
 .detail-error,
 .detail-panel,
 .document-panel {
-  padding: 22px;
+  padding: 14px 18px;
 }
 
 .detail-head {
   display: flex;
   justify-content: space-between;
   gap: 18px;
-  align-items: flex-end;
-  padding-bottom: 6px;
-}
-
-.detail-head-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.detail-eyebrow {
-  margin: 0 0 6px;
-  color: #9b7755;
-  font-size: 12px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
+  align-items: center;
+  padding: 10px 18px;
 }
 
 .head-actions {
@@ -1379,7 +1351,7 @@ onUnmounted(() => {
 }
 
 .overview-card {
-  padding: 16px 18px;
+  padding: 12px 14px;
   min-height: 0;
 }
 
@@ -1401,33 +1373,26 @@ onUnmounted(() => {
 .overview-card-value,
 .detail-item-value {
   display: block;
-  margin-top: 10px;
+  margin-top: 6px;
   font-family: "Noto Serif SC", serif;
-  font-size: 22px;
+  font-size: 18px;
   line-height: 1.25;
   color: #2f241d;
   word-break: break-word;
-}
-
-.overview-card p {
-  margin: 8px 0 0;
-  color: #6d5948;
-  font-size: 13px;
-  line-height: 1.6;
 }
 
 .section-head {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  align-items: flex-start;
-  margin-bottom: 14px;
+  align-items: center;
+  margin-bottom: 10px;
 }
 
 .section-head h2 {
   margin: 0;
   font-family: "Noto Serif SC", serif;
-  font-size: 22px;
+  font-size: 18px;
 }
 
 .section-head p {

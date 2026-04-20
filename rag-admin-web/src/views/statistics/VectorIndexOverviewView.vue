@@ -178,38 +178,15 @@ onMounted(async () => {
 
 <template>
   <section class="vector-page">
-    <header class="vector-head">
-      <div>
-        <h1 class="page-title">向量索引</h1>
-        <p class="page-subtitle">
-          这里展示当前知识库正在使用的向量模型、分块与向量引用数量，以及 Milvus 集合是否已可用于检索。
-        </p>
+    <header class="vector-head soft-panel">
+      <div class="head-stats">
+        <span class="stat"><em>{{ summary.totalKnowledgeBaseCount }}</em>知识库总数</span>
+        <span class="stat is-success"><em>{{ summary.indexedKnowledgeBaseCount }}</em>已建索引</span>
+        <span class="stat"><em>{{ summary.totalVectorCount }}</em>向量总数</span>
+        <span class="stat is-warning"><em>{{ summary.issueKnowledgeBaseCount }}</em>待处理</span>
       </div>
-      <el-button @click="handleRefresh">刷新概览</el-button>
+      <el-button size="small" @click="handleRefresh">刷新</el-button>
     </header>
-
-    <section class="summary-grid">
-      <article class="summary-card soft-panel">
-        <span>知识库总数</span>
-        <strong>{{ summary.totalKnowledgeBaseCount }}</strong>
-        <p>当前筛选结果中的知识库数量</p>
-      </article>
-      <article class="summary-card soft-panel">
-        <span>已建索引</span>
-        <strong>{{ summary.indexedKnowledgeBaseCount }}</strong>
-        <p>至少已有一条向量引用的知识库</p>
-      </article>
-      <article class="summary-card soft-panel">
-        <span>向量总数</span>
-        <strong>{{ summary.totalVectorCount }}</strong>
-        <p>已写入并建立业务引用的向量条数</p>
-      </article>
-      <article class="summary-card soft-panel is-warning">
-        <span>待处理问题</span>
-        <strong>{{ summary.issueKnowledgeBaseCount }}</strong>
-        <p>包含未加载、异常或覆盖不完整的知识库</p>
-      </article>
-    </section>
 
     <section class="filter-panel soft-panel">
       <div class="filter-grid">
@@ -355,55 +332,47 @@ onMounted(async () => {
 .vector-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 }
 
 .vector-head {
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 20px;
+  background:
+    radial-gradient(circle at right top, rgba(198, 107, 34, 0.12), transparent 32%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.96), rgba(255, 248, 241, 0.9));
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+.head-stats {
+  display: flex;
+  gap: 18px;
+  margin-left: auto;
 }
 
-.summary-card,
+.head-stats .stat {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  color: #8f7159;
+  font-size: 13px;
+}
+
+.head-stats .stat em {
+  font-style: normal;
+  font-weight: 700;
+  color: #2f241d;
+  font-size: 16px;
+  margin-right: 2px;
+}
+
+.head-stats .is-success em { color: #529b2e; }
+.head-stats .is-warning em { color: #b88230; }
+
 .filter-panel,
 .table-panel {
-  padding: 20px;
-}
-
-.summary-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.summary-card span {
-  color: #9d7a58;
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.summary-card strong {
-  font-family: "Noto Serif SC", serif;
-  font-size: 34px;
-  line-height: 1;
-}
-
-.summary-card p {
-  margin: 0;
-  color: #6d5948;
-  line-height: 1.6;
-}
-
-.summary-card.is-warning {
-  background: linear-gradient(180deg, rgba(255, 244, 230, 0.92), rgba(255, 250, 243, 0.88));
+  padding: 14px 20px;
 }
 
 .filter-grid {
@@ -416,7 +385,7 @@ onMounted(async () => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  margin-top: 18px;
+  margin-top: 14px;
 }
 
 .table-error {
@@ -456,28 +425,25 @@ onMounted(async () => {
   color: #8a715e;
 }
 
-@media (max-width: 1200px) {
-  .summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 960px) {
   .vector-head {
-    flex-direction: column;
+    flex-wrap: wrap;
   }
 
-  .filter-grid,
-  .summary-grid {
+  .head-stats {
+    gap: 12px;
+    margin-left: 0;
+  }
+
+  .filter-grid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 640px) {
-  .summary-card,
   .filter-panel,
   .table-panel {
-    padding: 18px;
+    padding: 14px;
   }
 
   .filter-actions {

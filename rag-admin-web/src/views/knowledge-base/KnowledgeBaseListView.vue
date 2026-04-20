@@ -144,13 +144,7 @@ onMounted(async () => {
 
 <template>
   <section class="kb-page">
-    <header class="kb-head">
-      <div>
-        <h1 class="page-title">知识库管理</h1>
-        <p class="page-subtitle">
-          支持知识库列表浏览、创建、编辑和详情查看。
-        </p>
-      </div>
+    <header class="kb-head soft-panel">
       <div class="head-actions">
         <el-button @click="loadList">刷新列表</el-button>
         <el-button type="primary" @click="handleCreate">新建知识库</el-button>
@@ -220,9 +214,9 @@ onMounted(async () => {
 
 .kb-head {
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 10px 20px;
 }
 
 .head-actions {
@@ -231,7 +225,7 @@ onMounted(async () => {
 }
 
 .table-panel {
-  padding: 18px;
+  padding: 14px 18px;
 }
 
 .table-footer {

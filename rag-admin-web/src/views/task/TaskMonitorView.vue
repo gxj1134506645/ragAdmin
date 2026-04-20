@@ -228,12 +228,6 @@ onUnmounted(() => {
 <template>
   <section class="task-page">
     <header class="task-head">
-      <div>
-        <h1 class="page-title">任务监控</h1>
-        <p class="page-subtitle">
-          用于观察文档解析等异步任务的当前状态，本轮先提供基础筛选、分页和错误摘要。
-        </p>
-      </div>
       <el-button @click="handleRefresh">刷新任务</el-button>
     </header>
 
@@ -371,14 +365,14 @@ onUnmounted(() => {
 
 .task-head {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .filter-panel,
 .table-panel {
-  padding: 20px;
+  padding: 16px;
 }
 
 .filter-grid {
@@ -433,7 +427,7 @@ onUnmounted(() => {
 @media (max-width: 640px) {
   .filter-panel,
   .table-panel {
-    padding: 18px;
+    padding: 14px;
   }
 
   .filter-actions {

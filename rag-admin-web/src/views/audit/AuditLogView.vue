@@ -167,78 +167,50 @@ onMounted(async () => {
 <template>
   <section class="audit-page">
     <header class="audit-head soft-panel">
-      <div>
-        <p class="audit-eyebrow">治理</p>
-        <h1 class="page-title">审计日志</h1>
-        <p class="page-subtitle">
-          这里集中查看管理台操作轨迹，当前已支持将问答反馈单独归类为 <code>CHAT_FEEDBACK</code>。
-        </p>
+      <div class="head-stats">
+        <span class="stat"><em>{{ summary.totalCount }}</em>总记录</span>
+        <span class="stat is-success"><em>{{ summary.successCount }}</em>成功</span>
+        <span class="stat is-danger"><em>{{ summary.failureCount }}</em>失败</span>
+        <span class="stat is-warm"><em>{{ summary.feedbackCount }}</em>反馈</span>
       </div>
-      <el-button @click="handleRefresh">刷新日志</el-button>
+      <el-button size="small" @click="handleRefresh">刷新</el-button>
     </header>
 
-    <section class="summary-grid">
-      <article class="summary-card soft-panel">
-        <span>当前页日志</span>
-        <strong>{{ summary.totalCount }}</strong>
-        <p>本页筛选结果中的审计记录数</p>
-      </article>
-      <article class="summary-card soft-panel">
-        <span>成功请求</span>
-        <strong>{{ summary.successCount }}</strong>
-        <p>接口执行成功且响应码小于 400</p>
-      </article>
-      <article class="summary-card soft-panel is-danger">
-        <span>失败请求</span>
-        <strong>{{ summary.failureCount }}</strong>
-        <p>接口执行失败或响应码为错误状态</p>
-      </article>
-      <article class="summary-card soft-panel is-warm">
-        <span>问答反馈</span>
-        <strong>{{ summary.feedbackCount }}</strong>
-        <p>当前页中被归类为 CHAT_FEEDBACK 的操作数</p>
-      </article>
-    </section>
-
     <section class="filter-panel soft-panel">
-      <div class="filter-grid">
-        <el-input
-          v-model="query.operator"
-          placeholder="操作人用户名"
-          clearable
-          @keyup.enter="handleSearch"
-        />
-        <el-select v-model="query.bizType" placeholder="业务类型">
-          <el-option
-            v-for="item in bizTypeOptions"
-            :key="item.value"
-            :label="item.label"
-            :value="item.value"
+      <div class="filter-row">
+        <div class="filter-grid">
+          <el-input
+            v-model="query.operator"
+            placeholder="操作人用户名"
+            clearable
+            @keyup.enter="handleSearch"
           />
-        </el-select>
-        <el-date-picker
-          v-model="timeRange"
-          type="datetimerange"
-          range-separator="至"
-          start-placeholder="开始时间"
-          end-placeholder="结束时间"
-          clearable
-        />
-      </div>
-      <div class="filter-actions">
-        <el-button @click="handleReset">重置</el-button>
-        <el-button @click="handleRefresh">刷新</el-button>
-        <el-button type="primary" @click="handleSearch">查询</el-button>
+          <el-select v-model="query.bizType" placeholder="业务类型">
+            <el-option
+              v-for="item in bizTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+          <el-date-picker
+            v-model="timeRange"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            clearable
+          />
+        </div>
+        <div class="filter-actions">
+          <el-button @click="handleReset">重置</el-button>
+          <el-button @click="handleRefresh">刷新</el-button>
+          <el-button type="primary" @click="handleSearch">查询</el-button>
+        </div>
       </div>
     </section>
 
     <section class="table-panel soft-panel">
-      <div class="section-head">
-        <div>
-          <h2>操作记录</h2>
-          <p>默认按最新时间倒序展示，便于快速追踪最近发生的治理动作。</p>
-        </div>
-      </div>
 
       <section v-if="loadError" class="table-error">
         <el-empty description="审计日志加载失败">
@@ -319,96 +291,67 @@ onMounted(async () => {
 .audit-page {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 14px;
 }
 
 .audit-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 28px 32px;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 20px;
   background:
     radial-gradient(circle at right top, rgba(198, 107, 34, 0.12), transparent 32%),
     linear-gradient(180deg, rgba(255, 251, 246, 0.96), rgba(255, 248, 241, 0.9));
 }
 
-.audit-eyebrow,
-.summary-card span {
-  margin: 0 0 10px;
-  color: #9d7a58;
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.head-stats {
+  display: flex;
   gap: 18px;
+  margin-left: auto;
 }
 
-.summary-card {
-  padding: 22px;
+.head-stats .stat {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  color: #8f7159;
+  font-size: 13px;
 }
 
-.summary-card strong {
-  display: block;
-  margin-top: 12px;
+.head-stats .stat em {
+  font-style: normal;
+  font-weight: 700;
   color: #2f241d;
-  font-family: "Noto Serif SC", serif;
-  font-size: 30px;
+  font-size: 16px;
+  margin-right: 2px;
 }
 
-.summary-card p {
-  margin: 12px 0 0;
-  color: #6d5948;
-  line-height: 1.7;
-}
-
-.summary-card.is-danger {
-  background: linear-gradient(180deg, rgba(255, 245, 242, 0.96), rgba(255, 250, 247, 0.9));
-}
-
-.summary-card.is-warm {
-  background: linear-gradient(180deg, rgba(255, 248, 238, 0.96), rgba(255, 252, 247, 0.9));
-}
+.head-stats .is-success em { color: #529b2e; }
+.head-stats .is-danger em { color: #c45656; }
+.head-stats .is-warm em { color: #b88230; }
 
 .filter-panel,
 .table-panel {
-  padding: 24px;
+  padding: 14px 20px;
+}
+
+.filter-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
 }
 
 .filter-grid {
+  flex: 1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: 1fr 1fr 2fr;
+  gap: 12px;
 }
 
 .filter-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 18px;
-}
-
-.section-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
-  margin-bottom: 18px;
-}
-
-.section-head h2 {
-  margin: 0;
-  font-family: "Noto Serif SC", serif;
-  font-size: 24px;
-}
-
-.section-head p {
-  margin: 8px 0 0;
-  color: #6d5948;
+  flex-shrink: 0;
+  gap: 8px;
 }
 
 .table-error {
@@ -458,7 +401,7 @@ onMounted(async () => {
 .table-footer {
   display: flex;
   justify-content: flex-end;
-  padding-top: 18px;
+  padding-top: 14px;
 }
 
 .error-text {
@@ -467,22 +410,36 @@ onMounted(async () => {
 }
 
 @media (max-width: 1080px) {
-  .summary-grid,
+  .filter-row {
+    flex-wrap: wrap;
+  }
+
   .filter-grid {
     grid-template-columns: 1fr 1fr;
   }
 }
 
 @media (max-width: 760px) {
-  .audit-head,
-  .filter-actions {
-    flex-direction: column;
-    align-items: flex-start;
+  .audit-head {
+    flex-wrap: wrap;
   }
 
-  .summary-grid,
+  .head-stats {
+    margin-left: 0;
+    gap: 12px;
+  }
+
+  .filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .filter-grid {
     grid-template-columns: 1fr;
+  }
+
+  .filter-actions {
+    justify-content: flex-end;
   }
 }
 </style>

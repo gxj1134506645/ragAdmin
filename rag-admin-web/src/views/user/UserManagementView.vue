@@ -554,12 +554,9 @@ onMounted(async () => {
 <template>
   <section class="user-page">
     <header class="user-head soft-panel">
-      <div>
-        <p class="user-eyebrow">治理</p>
-        <h1 class="page-title">用户管理</h1>
-        <p class="page-subtitle">
-          后台统一维护组织用户。`APP_USER` 用于聊天前台白名单，`ADMIN`、`KB_ADMIN`、`AUDITOR` 用于后台治理入口。
-        </p>
+      <div class="filter-actions">
+        <el-button @click="handleRefresh">刷新列表</el-button>
+        <el-button type="primary" plain @click="openCreateDialog">新增用户</el-button>
       </div>
     </header>
 
@@ -938,25 +935,14 @@ onMounted(async () => {
 
 .user-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 16px;
-  padding: 28px 32px;
-  background:
-    radial-gradient(circle at right top, rgba(198, 107, 34, 0.12), transparent 32%),
-    linear-gradient(180deg, rgba(255, 251, 246, 0.96), rgba(255, 248, 241, 0.9));
+  align-items: center;
+  justify-content: flex-end;
+  padding: 10px 20px;
 }
 
-.user-eyebrow {
-  margin: 0 0 10px;
-  color: #9d7a58;
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
 
 .table-panel {
-  padding: 24px;
+  padding: 14px 20px;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -1165,7 +1151,10 @@ onMounted(async () => {
 }
 
 @media (max-width: 900px) {
-  .user-head,
+  .user-head {
+    justify-content: flex-start;
+  }
+
   .filter-actions {
     flex-direction: column;
     align-items: flex-start;

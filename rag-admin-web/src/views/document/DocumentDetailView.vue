@@ -496,11 +496,7 @@ onUnmounted(() => {
     <template v-else-if="detail">
       <header class="detail-head">
         <div>
-          <p class="detail-eyebrow">文档详情</p>
           <h1 class="page-title">{{ detail.docName }}</h1>
-          <p class="page-subtitle">
-            查看文档基础信息、版本记录和切片内容，便于检查解析结果。
-          </p>
         </div>
         <div class="head-actions">
           <el-button @click="loadDetail">刷新详情</el-button>
@@ -550,7 +546,6 @@ onUnmounted(() => {
         <div class="section-head">
           <div>
             <h2>版本列表</h2>
-            <p>支持浏览版本、切换生效版本以及上传新的文档版本。</p>
           </div>
           <div class="version-actions">
             <el-button :loading="versionLoading" @click="handleRetryVersions">刷新版本列表</el-button>
@@ -620,7 +615,6 @@ onUnmounted(() => {
         <div class="section-head">
           <div>
             <h2>切片浏览</h2>
-            <p>切片区支持分页、刷新和行内展开，可直接观察解析与切片质量。</p>
           </div>
           <el-button :loading="chunkLoading" @click="handleRetryChunks">刷新切片</el-button>
         </div>

@@ -79,11 +79,7 @@ async function goTo(path: string): Promise<void> {
   <section class="dashboard-page">
     <header class="dashboard-head soft-panel">
       <div>
-        <p class="dashboard-eyebrow">快捷入口</p>
-        <h1 class="page-title">从这里直接进入常用操作</h1>
-        <p class="page-subtitle">
-          首页只保留高频入口，减少跳转前的阅读成本。
-        </p>
+        <h1 class="page-title">概览</h1>
       </div>
     </header>
 
@@ -122,10 +118,7 @@ async function goTo(path: string): Promise<void> {
 .dashboard-head {
   position: relative;
   overflow: hidden;
-  padding: 30px 34px;
-  background:
-    radial-gradient(circle at right top, rgba(211, 120, 41, 0.12), transparent 30%),
-    linear-gradient(180deg, rgba(255, 251, 246, 0.95), rgba(255, 248, 241, 0.9));
+  padding: 12px 20px;
 }
 
 .dashboard-eyebrow,
@@ -152,8 +145,8 @@ async function goTo(path: string): Promise<void> {
   flex-direction: column;
   grid-column: span 6;
   gap: 20px;
-  min-height: 250px;
-  padding: 28px;
+  min-height: 0;
+  padding: 16px 20px;
   border: 1px solid rgba(179, 139, 96, 0.12);
   text-align: left;
   cursor: pointer;
@@ -187,7 +180,7 @@ async function goTo(path: string): Promise<void> {
 
 .entry-card:nth-child(1),
 .entry-card:nth-child(2) {
-  min-height: 280px;
+  min-height: 0;
 }
 
 .entry-top {
@@ -245,7 +238,7 @@ async function goTo(path: string): Promise<void> {
 @media (max-width: 640px) {
   .dashboard-head,
   .entry-card {
-    padding: 20px;
+    padding: 12px 16px;
   }
 }
 </style>

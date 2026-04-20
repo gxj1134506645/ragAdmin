@@ -508,100 +508,41 @@ onUnmounted(() => {
         </div>
       </header>
 
-      <section class="overview-grid">
-        <article class="overview-card soft-panel">
-          <span>文档编号</span>
-          <strong>{{ detail.documentId }}</strong>
-          <p>当前文档的唯一业务标识。</p>
-        </article>
-        <article class="overview-card soft-panel">
-          <span>解析状态</span>
-          <strong>
-            <el-tag :type="parseStatusType(detail.parseStatus)">{{ formatDocumentParseStatus(detail.parseStatus) }}</el-tag>
-          </strong>
-          <p>解析链路当前状态以后台任务执行结果为准。</p>
-        </article>
-        <article class="overview-card soft-panel">
-          <span>所属知识库</span>
-          <strong>{{ detail.kbName || detail.kbId || '暂无' }}</strong>
-          <p>文档当前所属的知识库上下文信息。</p>
-        </article>
-      </section>
-
-      <section class="progress-panel soft-panel">
-        <div class="section-head">
-          <div>
-            <h2>解析进度</h2>
-            <p>后台异步执行时，页面会实时接收阶段更新；完成后自动刷新详情、版本和切片。</p>
-          </div>
-        </div>
-
-        <div class="progress-summary">
-          <article class="progress-card">
-            <span>当前阶段</span>
+      <section class="info-panel soft-panel">
+        <div class="info-summary">
+          <article class="info-item">
+            <span>文档编号</span>
+            <strong>{{ detail.documentId }}</strong>
+          </article>
+          <article class="info-item">
+            <span>解析状态</span>
+            <strong><el-tag :type="parseStatusType(detail.parseStatus)">{{ formatDocumentParseStatus(detail.parseStatus) }}</el-tag></strong>
+          </article>
+          <article class="info-item">
+            <span>所属知识库</span>
+            <strong>{{ detail.kbName || detail.kbId || '暂无' }}</strong>
+          </article>
+          <article class="info-item info-progress">
+            <span>解析进度</span>
             <strong>{{ parseProgressState.stageLabel }}</strong>
-            <p>{{ parseProgressState.message }}</p>
-          </article>
-          <article class="progress-card">
-            <span>当前进度</span>
-            <strong>{{ parseProgressState.percent }}%</strong>
-            <el-progress
-              :percentage="parseProgressState.percent"
-              :status="parseProgressState.status"
-              :stroke-width="10"
-            />
+            <el-progress :percentage="parseProgressState.percent" :status="parseProgressState.status" :stroke-width="8" />
           </article>
         </div>
-      </section>
 
-      <section class="detail-panel soft-panel">
-        <div class="section-head">
-          <div>
-            <h2>文档信息</h2>
-            <p>这里展示文档基础信息、存储位置和当前解析状态。</p>
+        <div class="info-meta">
+          <div class="meta-row">
+            <span class="meta-label">类型</span><span class="meta-value">{{ detail.docType }}</span>
+            <span class="meta-label">启停</span><span class="meta-value">{{ detail.enabled ? '启用' : '禁用' }}</span>
+            <span class="meta-label">版本</span><span class="meta-value">{{ detail.currentVersion ?? '暂无' }}</span>
+            <span class="meta-label">大小</span><span class="meta-value">{{ detail.fileSize ? `${(detail.fileSize / 1024).toFixed(1)} KB` : '暂无' }}</span>
+            <span class="meta-label">创建</span><span class="meta-value">{{ formatTime(detail.createdAt) }}</span>
+            <span class="meta-label">更新</span><span class="meta-value">{{ formatTime(detail.updatedAt) }}</span>
           </div>
-        </div>
-
-        <div class="detail-matrix">
-          <article class="detail-item">
-            <span>文档类型</span>
-            <strong>{{ detail.docType }}</strong>
-          </article>
-          <article class="detail-item">
-            <span>启停状态</span>
-            <strong>{{ detail.enabled ? formatResourceStatus('ENABLED') : formatResourceStatus('DISABLED') }}</strong>
-          </article>
-          <article class="detail-item">
-            <span>创建时间</span>
-            <strong>{{ formatTime(detail.createdAt) }}</strong>
-          </article>
-          <article class="detail-item">
-            <span>更新时间</span>
-            <strong>{{ formatTime(detail.updatedAt) }}</strong>
-          </article>
-          <article class="detail-item">
-            <span>当前版本</span>
-            <strong>{{ detail.currentVersion ?? '暂无' }}</strong>
-          </article>
-          <article class="detail-item">
-            <span>文件大小</span>
-            <strong>{{ detail.fileSize ? `${(detail.fileSize / 1024).toFixed(1)} KB` : '暂无' }}</strong>
-          </article>
-        </div>
-
-        <div class="storage-panel">
-          <article class="storage-item">
-            <span>存储桶</span>
-            <strong>{{ detail.storageBucket || '暂无' }}</strong>
-          </article>
-          <article class="storage-item">
-            <span>对象键</span>
-            <strong>{{ detail.storageObjectKey || '暂无' }}</strong>
-          </article>
-          <article class="storage-item">
-            <span>内容哈希</span>
-            <strong>{{ detail.contentHash || '暂无' }}</strong>
-          </article>
+          <div class="meta-row" v-if="detail.storageBucket || detail.storageObjectKey">
+            <span class="meta-label">存储桶</span><span class="meta-value">{{ detail.storageBucket || '暂无' }}</span>
+            <span class="meta-label">对象键</span><span class="meta-value">{{ detail.storageObjectKey || '暂无' }}</span>
+            <span class="meta-label">哈希</span><span class="meta-value">{{ detail.contentHash || '暂无' }}</span>
+          </div>
         </div>
       </section>
 
@@ -845,10 +786,12 @@ onUnmounted(() => {
 
 .detail-loading,
 .detail-error,
-.detail-panel,
-.progress-panel,
 .version-panel {
   padding: 24px;
+}
+
+.info-panel {
+  padding: 20px 24px;
 }
 
 .chunk-panel {
@@ -880,38 +823,67 @@ onUnmounted(() => {
   gap: 12px;
 }
 
-.overview-grid {
+.info-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
 
-.overview-card {
-  padding: 22px;
+.info-item {
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: rgba(255, 250, 242, 0.72);
 }
 
-.overview-card span,
-.detail-item span,
-.storage-item span {
+.info-item span {
   color: #9d7a58;
-  font-size: 12px;
-  letter-spacing: 0.16em;
+  font-size: 11px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
-.overview-card strong,
-.detail-item strong,
-.storage-item strong {
+.info-item strong {
   display: block;
-  margin-top: 12px;
+  margin-top: 6px;
   font-family: "Noto Serif SC", serif;
-  font-size: 22px;
+  font-size: 18px;
   word-break: break-word;
 }
 
-.overview-card p {
-  margin: 12px 0 0;
-  color: #6d5948;
+.info-progress .el-progress {
+  margin-top: 8px;
+}
+
+.info-meta {
+  margin-top: 14px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: rgba(255, 250, 242, 0.72);
+}
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  line-height: 2;
+}
+
+.meta-row + .meta-row {
+  border-top: 1px dashed rgba(157, 122, 88, 0.2);
+  margin-top: 6px;
+  padding-top: 6px;
+}
+
+.meta-label {
+  color: #9d7a58;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+.meta-value {
+  color: #2f241d;
+  font-size: 13px;
+  word-break: break-all;
 }
 
 .section-head {
@@ -931,57 +903,6 @@ onUnmounted(() => {
 .section-head p {
   margin: 8px 0 0;
   color: #6d5948;
-}
-
-.detail-matrix {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.detail-item,
-.storage-item {
-  padding: 18px;
-  border-radius: 18px;
-  background: rgba(255, 250, 242, 0.72);
-}
-
-.progress-summary {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.progress-card {
-  padding: 18px;
-  border-radius: 18px;
-  background: rgba(255, 250, 242, 0.72);
-}
-
-.progress-card span {
-  color: #9d7a58;
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.progress-card strong {
-  display: block;
-  margin-top: 12px;
-  font-family: "Noto Serif SC", serif;
-  font-size: 28px;
-}
-
-.progress-card p {
-  margin: 12px 0 0;
-  color: #6d5948;
-}
-
-.storage-panel {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  margin-top: 18px;
 }
 
 .version-error {
@@ -1096,11 +1017,8 @@ onUnmounted(() => {
   }
 
   .version-actions,
-  .overview-grid,
-  .progress-summary,
-  .detail-matrix,
-  .storage-panel {
-    grid-template-columns: 1fr;
+  .info-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .upload-meta {
@@ -1111,11 +1029,14 @@ onUnmounted(() => {
 @media (max-width: 640px) {
   .detail-loading,
   .detail-error,
-  .detail-panel,
-  .progress-panel,
+  .info-panel,
   .version-panel,
   .chunk-panel {
     padding: 20px;
+  }
+
+  .info-summary {
+    grid-template-columns: 1fr;
   }
 
   .head-actions,

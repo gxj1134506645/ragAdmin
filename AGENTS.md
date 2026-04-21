@@ -186,13 +186,13 @@ Git 规范：
 <claude-mem-context>
 # Memory Context
 
-# [ragAdmin] recent context, 2026-04-20 8:59am GMT+8
+# [ragAdmin] recent context, 2026-04-21 9:52pm GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 22 obs (8,430t read) | 0t work
+Stats: 35 obs (14,711t read) | 0t work
 
 ### Apr 19, 2026
 101 7:46p 🔵 Spring Boot application startup successful with service integrations
@@ -217,4 +217,18 @@ Stats: 22 obs (8,430t read) | 0t work
 131 " 🔵 PDF paragraph reading requires automatic fallback to page-level reading
 132 " ⚖️ Document cleaning must use rule-driven selective cleaner execution
 137 9:11p 🟣 PDF header/footer cleaner implementation committed to version control
+### Apr 21, 2026
+295 9:01a ✅ Comprehensive interview preparation document created for 太湖慧云 Java R&D Manager position
+297 9:19a ✅ Mock interview Q&A section added to interview preparation guide
+298 9:23a ✅ Advanced memory architecture and rapid-review sections added to interview prep guide
+299 12:41p 🔵 Interview reveals RAG agent quality metrics and fallback design gaps
+301 12:44p 🔵 Interview reveals RAG agent quality metrics and fallback design gaps
+302 12:45p ✅ Interview prep document restructured to emphasize RAG/Agent quality metrics and fallback design
+305 12:46p ✅ Interview prep document partially restructured with AI-first focus
+307 12:48p ✅ Interview prep document successfully restructured to AI-first priority format
+309 12:50p ✅ Interview prep document restructured with RAG/Agent quality and fallback content
+311 12:51p ✅ Interview prep "High-frequency 20 Questions" completely rewritten for RAG/Agent focus
+312 9:24p 🟣 Elasticsearch container added to docker-compose infrastructure
+313 9:25p 🟣 Kibana visualization layer added to Elasticsearch stack
+315 9:44p 🔵 Elasticsearch and Kibana containers verified operational for ragAdmin
 </claude-mem-context>

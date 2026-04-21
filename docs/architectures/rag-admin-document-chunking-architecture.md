@@ -265,20 +265,24 @@ rag:
 
 ### 9.1 当前实现
 
-- `RecursiveFallbackStrategy` 作为兜底策略，段落聚合 + 边界感知重叠
+- `MarkdownChunkStrategy`（@Order 10）：按标题层级切分，代码块/表格保持完整
+- `HtmlChunkStrategy`（@Order 12）：按段落聚合 + overlap
+- `PdfOcrChunkStrategy`（@Order 20）：弱段落后并 + 段落聚合
+- `PdfTextChunkStrategy`（@Order 22）：表格识别保持完整 + 段落聚合
+- `RecursiveFallbackStrategy`（@Order 50）：兜底策略，段落聚合 + 边界感知重叠
 - `DocumentChunkStrategyResolver` 策略选择器已实现
-- `ChunkContext` / `ChunkDraft` / `ChunkStrategyProperties` 核心类型已定义
-- 所有文档类型当前使用相同策略，尚未区分 Markdown/PDF/OCR
+- `ChunkContext` 携带 document + signals + properties + parseMode
 - 清洗阶段的 `DocumentSignals` 已传递给分块阶段的 `ChunkContext`
+- 每种策略配有独立测试类，共 30 个测试用例
 
 ### 9.2 演进步骤
 
 1. ~~**抽取接口**：将 `splitText` 重构为 `RecursiveFallbackStrategy`，作为兜底策略~~ ✅ 已完成
 2. ~~**引入 ChunkContext**：封装 `DocumentEntity` + `DocumentSignals` + `ChunkStrategyProperties`~~ ✅ 已完成
-3. **逐个实现策略**：按优先级从高到低，Markdown → HTML → PdfOcr → PdfText
-4. **接入配置**：支持按策略覆盖分块参数
-5. **验证**：每种策略补充单元测试，用真实文档验证切片质量
-6. **父子分块**：实现 `ParentChildChunkStrategy` 分层包装器
+3. ~~**逐个实现策略**：Markdown → HTML → PdfOcr → PdfText~~ ✅ 已完成
+4. ~~**验证**：每种策略补充单元测试，用真实文档验证切片质量~~ ✅ 已完成
+5. **接入配置**：支持按策略覆盖分块参数（待实施）
+6. **父子分块**：实现 `ParentChildChunkStrategy` 分层包装器（远期）
 
 ## 10. 框架分块能力对比与选型决策
 

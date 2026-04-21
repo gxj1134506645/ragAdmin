@@ -83,6 +83,52 @@ services:
       mc mb --ignore-existing local/ragadmin
       "
 
+  # Elasticsearch：当前作为可选检索/分析基础设施使用。
+  # 开发环境采用单节点模式，并关闭 xpack 安全认证，便于本地直接联调。
+  # 访问地址：
+  # - ES API: http://127.0.0.1:9200
+  # - Transport: 127.0.0.1:9300
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.3
+    container_name: rag-admin-elasticsearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    ports:
+      - "127.0.0.1:9200:9200"
+      - "127.0.0.1:9300:9300"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9200/_cluster/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+
+  # Kibana：与当前 ES 版本保持一致，用于索引、集群状态和检索结果的可视化检查。
+  # 访问地址：
+  # - Kibana UI: http://127.0.0.1:5601
+  # 启动顺序上依赖 ES 健康后再启动，避免初始化阶段反复重连。
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.17.3
+    container_name: rag-admin-kibana
+    restart: unless-stopped
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      I18N_LOCALE: zh-CN
+    ports:
+      - "127.0.0.1:5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5601/api/status >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
   milvus:
     image: milvusdb/milvus:v2.5.5
     container_name: rag-admin-milvus
@@ -145,5 +191,6 @@ volumes:
   redis-data:
   etcd-data:
   minio-data:
+  elasticsearch-data:
   milvus-data:
   ollama-data:

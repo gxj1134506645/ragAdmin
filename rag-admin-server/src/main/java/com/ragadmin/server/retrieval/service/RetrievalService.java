@@ -56,6 +56,12 @@ public class RetrievalService {
     @Autowired
     private QueryRewritingService queryRewritingService;
 
+    @Autowired
+    private RerankingService rerankingService;
+
+    @Autowired
+    private com.ragadmin.server.retrieval.config.RerankingProperties rerankingProperties;
+
     public RetrievalResult retrieve(KnowledgeBaseEntity knowledgeBase, String question) {
         QueryRewritingService.RewrittenQueries rewritten = queryRewritingService.rewrite(
                 question, knowledgeBase.getRetrievalQueryRewritingMode());
@@ -98,6 +104,10 @@ public class RetrievalService {
             default -> {
                 chunks = retrieveSemantic(knowledgeBase, question, topK);
             }
+        }
+
+        if (Boolean.TRUE.equals(knowledgeBase.getRerankEnabled()) && rerankingProperties.isEnabled()) {
+            chunks = rerankingService.rerank(question, chunks);
         }
 
         String context = buildContext(chunks);

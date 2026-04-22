@@ -47,3 +47,19 @@
 - 风险：Milvus 向量孤立（占用存储且无法被关联），ES 文档残留（全文检索命中已删除的内容）
 - 更优做法：使用 ChunkVectorizationService.deleteRefsByChunkIds() 同时清理 Milvus 向量和 PG ref，使用 ChunkSearchSyncService 清理 ES
 - 适用范围：任何涉及文档或知识库删除的代码路径
+
+## [A-007] 知识库 Response record 新增字段后忘记同步测试构造器
+
+- 日期：2026-04-22
+- 模式描述：KnowledgeBaseResponse 是 record 类型，新增字段后测试代码中的构造器调用参数数量不匹配，编译通过但运行时抛 InstantiationException
+- 风险：所有使用该 record 构造器的测试全部失败，阻塞 CI
+- 更优做法：修改 record 后立即搜索所有构造器调用点（包括测试）并更新参数列表；或改用 builder 模式
+- 适用范围：任何 record 类型的字段变更
+
+## [A-008] RetrievalService 新增依赖后忘记注入测试 Mock
+
+- 日期：2026-04-22
+- 模式描述：RetrievalService 使用 @Autowired 字段注入，新增依赖后测试中缺少对应的 @Mock 和 ReflectionTestUtils.setField()，导致 NullPointerException
+- 风险：测试 NPE 不指向真实缺失的 mock，排查需反复读堆栈
+- 更优做法：新增 @Autowired 依赖时，同步在测试类添加 @Mock 字段和 setUp() 中的 setField()，并用 lenient() 设置 pass-through 默认行为
+- 适用范围：RetrievalService 及类似使用字段注入 + 反射测试的服务类

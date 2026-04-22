@@ -58,6 +58,34 @@
 - 来源：ElasticsearchClient 和 ChunkSearchSyncService 设计
 - 适用范围：任何新增 ES 集成点
 
+## [R-010] 检索模式由 KB 实体字段驱动分发
+
+- 日期：2026-04-22
+- 规则：`RetrievalService.retrieveSingleQuery()` 按 `KnowledgeBaseEntity.retrievalMode` 分发到 SEMANTIC_ONLY/KEYWORD_ONLY/HYBRID 三条路径，不硬编码默认行为
+- 来源：混合检索实现
+- 适用范围：新增检索路径或修改检索分发逻辑
+
+## [R-011] RRF 融合必须同时传入两路结果和 topK
+
+- 日期：2026-04-22
+- 规则：`RrfFusionService.fuse()` 接收语义和关键词两路结果 + rrfK + maxResults，融合后按 topK 截断。两路结果先各自 expandedTopK 扩大召回，融合时再收窄
+- 来源：HYBRID 模式设计
+- 适用范围：任何融合算法的接口设计
+
+## [R-012] 查询改写失败时降级为原始查询
+
+- 日期：2026-04-22
+- 规则：QueryRewritingService 所有 LLM 调用失败时（模型不可用、解析失败、超时），返回原始查询的 `RewrittenQueries` 单元素列表，不抛异常阻断检索链路
+- 来源：查询改写实现和容错设计
+- 适用范围：所有涉及 LLM 调用的增强环节
+
+## [R-013] 父子分块：仅子块做向量化和 ES 索引
+
+- 日期：2026-04-22
+- 规则：语义分块产出的父子结构中，仅子块参与 embedding 向量化和 ES 全文索引。父块只存 PG，通过 `parentChunkId` 关联。检索时命中子块后由 `ParentChunkExpansionService` 扩展为父块全文
+- 来源：父子分块架构设计
+- 适用范围：分块策略新增父子层级时
+
 ## [R-006] 向量方案锁定 Milvus
 
 - 日期：2026-04-21

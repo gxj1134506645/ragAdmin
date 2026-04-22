@@ -66,3 +66,10 @@
 - 变更：自定义 agent 角色从 `.claude/subagents`（概念文档）迁移到 `.claude/agents`（可被 Agent 工具调用）
 - 原因：planner/executor/verifier 是软件工程固定角色，应注册为持久化自定义 agent
 - 影响：新建 `.claude/agents/planner.md`、`executor.md`、`verifier.md`，删除旧 `.claude/subagents/` 目录，CLAUDE.md 更新引用
+
+## 2026-04-22
+
+- 变更：RAG 检索全链路补全（ES 关键词检索 + RRF 融合 + 混合检索 + 查询改写 + Reranking + 语义分块 + 父子分块）
+- 原因：检索层仅有向量单路召回，缺少关键词检索、融合排序、查询增强和精排能力；分块层缺少语义感知
+- 影响：检索模式新增 SEMANTIC_ONLY/KEYWORD_ONLY/HYBRID 三种；新增 KeywordRetrievalStrategy、RrfFusionService、QueryRewritingService（Multi-Query + HyDE）、RerankingService、SemanticChunkStrategy、ParentChunkExpansionService；4 次 git commit，320 个测试全部通过
+- 关键提交：102e5c5（关键词+RRF+混合）、9efae8a（查询改写）、8f2438e（Reranking）、3e1816f（语义分块+父子块）

@@ -29,3 +29,23 @@
 - 纠正动作：ChunkContext 增加 `parseMode` 字段，由 DocumentParseProcessor 从文档 metadata 提取并传入
 - 后续约束：路由所需的信息必须在 ChunkContext 中显式传递
 - 适用范围：任何需要新路由字段的场景
+
+## [C-004] ChatCompletionResult 使用 content 而非 text
+
+- 日期：2026-04-22
+- 场景：QueryRewritingService 调用 LLM 获取改写结果
+- 错误表现：调用 `result.text()` 编译报错，record 字段名为 `content`
+- 根因：未查阅 ChatCompletionResult record 定义，凭经验猜测字段名
+- 纠正动作：改为 `result.content()`
+- 后续约束：使用外部 record 类型前先查看其定义
+- 适用范围：所有 LLM 调用结果的处理代码
+
+## [C-005] RetrievalService 增量编辑导致文件损坏
+
+- 日期：2026-04-22
+- 场景：多次 Edit 工具修改 RetrievalService 的 retrieveSemantic 方法
+- 错误表现：方法体被部分截断，返回语句缺失
+- 根因：连续多次 old_string/new_string 替换在长方法中产生不可预期的边界重叠
+- 纠正动作：使用 Write 工具完整重写文件
+- 后续约束：对超过 50 行的方法做多次修改时，优先使用 Write 重写整个文件而非增量 Edit
+- 适用范围：所有长文件的多轮编辑

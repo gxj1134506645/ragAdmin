@@ -53,7 +53,34 @@ public class RetrievalService {
     @Autowired
     private RrfFusionService rrfFusionService;
 
+    @Autowired
+    private QueryRewritingService queryRewritingService;
+
     public RetrievalResult retrieve(KnowledgeBaseEntity knowledgeBase, String question) {
+        QueryRewritingService.RewrittenQueries rewritten = queryRewritingService.rewrite(
+                question, knowledgeBase.getRetrievalQueryRewritingMode());
+
+        if (rewritten.queries().size() == 1) {
+            return retrieveSingleQuery(knowledgeBase, rewritten.queries().getFirst());
+        }
+
+        List<RetrievedChunk> mergedChunks = rewritten.queries().stream()
+                .flatMap(q -> retrieveSingleQuery(knowledgeBase, q).chunks().stream())
+                .sorted(Comparator.comparing(RetrievedChunk::score).reversed())
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toMap(
+                                item -> item.chunk().getId(),
+                                Function.identity(),
+                                (left, right) -> left.score() >= right.score() ? left : right,
+                                LinkedHashMap::new
+                        ),
+                        map -> map.values().stream().toList()
+                ));
+
+        return new RetrievalResult(mergedChunks, buildContext(mergedChunks));
+    }
+
+    private RetrievalResult retrieveSingleQuery(KnowledgeBaseEntity knowledgeBase, String question) {
         RetrievalMode mode = RetrievalMode.resolve(knowledgeBase.getRetrievalMode());
         int topK = resolveTopK(knowledgeBase);
         List<RetrievedChunk> chunks;

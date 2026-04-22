@@ -26,6 +26,8 @@ public class CreateKnowledgeBaseRequest {
 
     private String retrievalMode;
 
+    private String retrievalQueryRewritingMode;
+
     @NotBlank(message = "status 不能为空")
     private String status;
 }

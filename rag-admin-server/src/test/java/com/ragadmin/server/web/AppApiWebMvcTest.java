@@ -224,6 +224,7 @@ class AppApiWebMvcTest {
                         5,
                         false,
                         "SEMANTIC_ONLY",
+                        "NONE",
                         "ENABLED"
                 )),
                 1,

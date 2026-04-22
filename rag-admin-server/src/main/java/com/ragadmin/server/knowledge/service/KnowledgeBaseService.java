@@ -147,6 +147,7 @@ public class KnowledgeBaseService {
         entity.setRetrieveTopK(request.getRetrieveTopK());
         entity.setRerankEnabled(request.getRerankEnabled());
         entity.setRetrievalMode(request.getRetrievalMode());
+        entity.setRetrievalQueryRewritingMode(request.getRetrievalQueryRewritingMode());
         entity.setStatus(request.getStatus());
         entity.setCreatedBy(operatorUserId);
         knowledgeBaseMapper.insert(entity);
@@ -175,6 +176,7 @@ public class KnowledgeBaseService {
         entity.setRetrieveTopK(request.getRetrieveTopK());
         entity.setRerankEnabled(request.getRerankEnabled());
         entity.setRetrievalMode(request.getRetrievalMode());
+        entity.setRetrievalQueryRewritingMode(request.getRetrievalQueryRewritingMode());
         entity.setStatus(request.getStatus());
         knowledgeBaseMapper.updateById(entity);
         return getDetail(kbId);
@@ -284,6 +286,7 @@ public class KnowledgeBaseService {
                 entity.getRetrieveTopK(),
                 entity.getRerankEnabled(),
                 entity.getRetrievalMode(),
+                entity.getRetrievalQueryRewritingMode(),
                 entity.getStatus()
         );
     }

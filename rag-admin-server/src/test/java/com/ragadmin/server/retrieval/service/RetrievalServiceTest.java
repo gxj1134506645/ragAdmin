@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -55,6 +56,9 @@ class RetrievalServiceTest {
     @Mock
     private RrfFusionService rrfFusionService;
 
+    @Mock
+    private QueryRewritingService queryRewritingService;
+
     private RetrievalService retrievalService;
 
     @BeforeEach
@@ -67,6 +71,7 @@ class RetrievalServiceTest {
         ReflectionTestUtils.setField(retrievalService, "chunkMapper", chunkMapper);
         ReflectionTestUtils.setField(retrievalService, "keywordRetrievalStrategy", keywordRetrievalStrategy);
         ReflectionTestUtils.setField(retrievalService, "rrfFusionService", rrfFusionService);
+        ReflectionTestUtils.setField(retrievalService, "queryRewritingService", queryRewritingService);
 
         RetrievalProperties retrievalProperties = new RetrievalProperties();
         retrievalProperties.setDefaultTopK(5);
@@ -76,6 +81,13 @@ class RetrievalServiceTest {
         retrievalProperties.setRrfK(60);
         retrievalProperties.setHybridTopKMultiplier(2);
         ReflectionTestUtils.setField(retrievalService, "retrievalProperties", retrievalProperties);
+
+        // 默认 query rewriting 返回原始查询（pass-through）
+        lenient().when(queryRewritingService.rewrite(anyString(), any()))
+                .thenAnswer(invocation -> {
+                    String query = invocation.getArgument(0);
+                    return new QueryRewritingService.RewrittenQueries(List.of(query));
+                });
     }
 
     @Test

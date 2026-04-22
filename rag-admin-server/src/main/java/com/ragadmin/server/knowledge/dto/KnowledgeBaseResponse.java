@@ -10,6 +10,7 @@ public record KnowledgeBaseResponse(
         Integer retrieveTopK,
         Boolean rerankEnabled,
         String retrievalMode,
+        String retrievalQueryRewritingMode,
         String status
 ) {
 }

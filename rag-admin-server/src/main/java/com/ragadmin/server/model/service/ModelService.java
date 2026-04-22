@@ -344,6 +344,14 @@ public class ModelService {
         return modelId != null ? requireChatModelDescriptor(modelId) : resolveDefaultChatModelDescriptor();
     }
 
+    public ChatModelDescriptor findDefaultChatModelDescriptor() {
+        try {
+            return resolveDefaultChatModelDescriptor();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     public ModelHealthCheckResponse healthCheck(Long modelId) {
         AiModelEntity model = requireModel(modelId);
         AiProviderEntity provider = requireProvider(model.getProviderId());

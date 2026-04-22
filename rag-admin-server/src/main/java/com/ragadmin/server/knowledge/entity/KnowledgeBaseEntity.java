@@ -21,6 +21,7 @@ public class KnowledgeBaseEntity {
     private Integer retrieveTopK;
     private Boolean rerankEnabled;
     private String retrievalMode;
+    private String retrievalQueryRewritingMode;
     private String status;
     private Long createdBy;
     private LocalDateTime createdAt;

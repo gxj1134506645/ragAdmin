@@ -85,11 +85,15 @@ services:
 
   # Elasticsearch：当前作为可选检索/分析基础设施使用。
   # 开发环境采用单节点模式，并关闭 xpack 安全认证，便于本地直接联调。
+  # 当前通过自定义镜像在构建阶段预装 IK 中文分词器，容器重建后不会丢失。
   # 访问地址：
   # - ES API: http://127.0.0.1:9200
   # - Transport: 127.0.0.1:9300
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.3
+    build:
+      context: .
+      dockerfile: elasticsearch/Dockerfile
+    image: rag-admin-elasticsearch-ik:8.17.3
     container_name: rag-admin-elasticsearch
     restart: unless-stopped
     environment:

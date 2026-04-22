@@ -24,5 +24,7 @@ public class ChunkEntity {
     @TableField("metadata_json")
     private String metadataJson;
     private Boolean enabled;
+    private Long parentChunkId;
+    private String chunkStrategy;
     private LocalDateTime createdAt;
 }

@@ -62,6 +62,9 @@ public class RetrievalService {
     @Autowired
     private com.ragadmin.server.retrieval.config.RerankingProperties rerankingProperties;
 
+    @Autowired
+    private ParentChunkExpansionService parentChunkExpansionService;
+
     public RetrievalResult retrieve(KnowledgeBaseEntity knowledgeBase, String question) {
         QueryRewritingService.RewrittenQueries rewritten = queryRewritingService.rewrite(
                 question, knowledgeBase.getRetrievalQueryRewritingMode());
@@ -109,6 +112,8 @@ public class RetrievalService {
         if (Boolean.TRUE.equals(knowledgeBase.getRerankEnabled()) && rerankingProperties.isEnabled()) {
             chunks = rerankingService.rerank(question, chunks);
         }
+
+        chunks = parentChunkExpansionService.expandToParents(chunks);
 
         String context = buildContext(chunks);
         return new RetrievalResult(chunks, context);

@@ -59,6 +59,14 @@ class RetrievalServiceTest {
     @Mock
     private QueryRewritingService queryRewritingService;
 
+    @Mock
+    private RerankingService rerankingService;
+
+    @Mock
+    private ParentChunkExpansionService parentChunkExpansionService;
+
+    private com.ragadmin.server.retrieval.config.RerankingProperties rerankingProperties;
+
     private RetrievalService retrievalService;
 
     @BeforeEach
@@ -72,6 +80,12 @@ class RetrievalServiceTest {
         ReflectionTestUtils.setField(retrievalService, "keywordRetrievalStrategy", keywordRetrievalStrategy);
         ReflectionTestUtils.setField(retrievalService, "rrfFusionService", rrfFusionService);
         ReflectionTestUtils.setField(retrievalService, "queryRewritingService", queryRewritingService);
+        ReflectionTestUtils.setField(retrievalService, "rerankingService", rerankingService);
+        ReflectionTestUtils.setField(retrievalService, "parentChunkExpansionService", parentChunkExpansionService);
+
+        rerankingProperties = new com.ragadmin.server.retrieval.config.RerankingProperties();
+        rerankingProperties.setEnabled(false);
+        ReflectionTestUtils.setField(retrievalService, "rerankingProperties", rerankingProperties);
 
         RetrievalProperties retrievalProperties = new RetrievalProperties();
         retrievalProperties.setDefaultTopK(5);
@@ -88,6 +102,10 @@ class RetrievalServiceTest {
                     String query = invocation.getArgument(0);
                     return new QueryRewritingService.RewrittenQueries(List.of(query));
                 });
+
+        // 默认 parent expansion 为 pass-through
+        lenient().when(parentChunkExpansionService.expandToParents(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test

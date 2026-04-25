@@ -2,8 +2,12 @@
   "hooks": {
     "SessionStart": [
       {
-        "type": "command",
-        "command": "cat \"$(git rev-parse --show-toplevel)/.claude/memory/project-progress.md\""
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat \"$(git rev-parse --show-toplevel)/.claude/memory/session-brief.md\""
+          }
+        ]
       }
     ]
   }

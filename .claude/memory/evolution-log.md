@@ -73,3 +73,10 @@
 - 原因：检索层仅有向量单路召回，缺少关键词检索、融合排序、查询增强和精排能力；分块层缺少语义感知
 - 影响：检索模式新增 SEMANTIC_ONLY/KEYWORD_ONLY/HYBRID 三种；新增 KeywordRetrievalStrategy、RrfFusionService、QueryRewritingService（Multi-Query + HyDE）、RerankingService、SemanticChunkStrategy、ParentChunkExpansionService；4 次 git commit，320 个测试全部通过
 - 关键提交：102e5c5（关键词+RRF+混合）、9efae8a（查询改写）、8f2438e（Reranking）、3e1816f（语义分块+父子块）
+
+## 2026-04-25
+
+- 变更：SessionStart hook 从加载完整 `project-progress.md` 调整为加载轻量 `session-brief.md`
+- 原因：新会话需要知道宏观进度，但不应在简单任务中强制注入完整进度明细占用上下文
+- 影响：`project-progress.md` 保持完整进度事实源，中等及以上任务和重大功能收口时按需读取；重大功能完成后需同步更新 `project-progress.md` 与 `session-brief.md`
+- 后续观察点：观察短摘要是否足以降低重复规划和上下文噪声

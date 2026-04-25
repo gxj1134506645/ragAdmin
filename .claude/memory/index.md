@@ -2,7 +2,8 @@
 
 ## 文件说明
 
-- [项目进度快照](project-progress.md) — **新会话必读**，项目整体完成状态与优先级
+- [会话启动摘要](session-brief.md) — **SessionStart hook 读取**，项目宏观进度与渐进式读取策略
+- [项目进度快照](project-progress.md) — 完整进度事实源，中等及以上任务、阶段规划和重大功能收口时读取
 - [已学规则](learned-rules.md) — 9 条稳定规则（R-001~R-009）
 - [纠正记录](corrections.md) — 3 条纠正（后台问答下线、分块策略重构、ChunkContext parseMode）
 - [阶段观察](observations.md) — 5 条观察（TextSplitter局限、中文句子检测、分块参数对齐、父子分块可行性、ES IK分词器）
@@ -12,6 +13,7 @@
 ## 当前高频主题
 
 - Phase 1 核心管线已完成，Phase 2 大部分完成
+- 新会话只强制加载 `session-brief.md`，避免完整进度占用过多上下文
 - 下一优先：聊天记忆 Redis 层、查询改写接入、语义分块、Cross-Encoder 重排序
 - 文档加载已统一为 MinerU 方案
 - 三端数据同步（PG + Milvus + ES）已实现

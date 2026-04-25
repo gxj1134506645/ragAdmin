@@ -8,16 +8,31 @@
 
 ## 项目定位
 
-- 这里是 Claude Code 项目的顶层入口文件
-- 项目目标、事实来源、架构边界、开发原则写在这里
-- 详细执行细则下沉到 `.claude/`
+`ragAdmin` 是一个面向内部使用的 RAG 知识库管理平台。
+
+当前阶段以核心管线和管理能力持续演进为主，重点聚焦：
+- 知识库与文档管理
+- 文档异步解析、清洗、分块与索引构建
+- 模型与提供方管理
+- 单知识库 RAG 问答与会话记忆
+- 后台治理：认证、权限、审计、任务监控
+
+## 当前事实来源
+
+当前阶段以下文档是主要事实来源：
+- `docs/architectures/rag-admin-architecture.md`
+- `docs/architectures/rag-admin-api-design.md`
+- `docs/architectures/rag-admin-schema-v1.sql`
+- `.claude/memory/project-progress.md`
+
+实现与文档出现差异时，默认先对齐文档，再决定实现。
 
 ## Agent 工程运行约定
 
 - `.claude/rules`：任务分类、记忆写入、子代理路由、验证清单等执行细则
-- `.claude/memory`：纠正记录、阶段观察、已学规则、反模式、演化日志、**项目进度快照**等工程记忆
+- `.claude/memory`：会话启动摘要、项目进度快照、纠正记录、阶段观察、已学规则、反模式、演化日志等工程记忆
 - `.claude/agents`：`planner`、`executor`、`verifier` 等子代理职责说明
-- `.claude/settings.json`：项目级 Hook 配置（SessionStart 自动加载项目进度等，随仓库提交共享）
+- `.claude/settings.json`：项目级 Hook 配置（SessionStart 自动加载会话启动摘要，随仓库提交共享）
 
 ## 记忆协作关系
 
@@ -43,13 +58,13 @@
 
 1. 识别任务作用域、影响路径与模块范围
 2. 读取本 `CLAUDE.md`
-3. **读取 `.claude/memory/project-progress.md` 了解项目整体进度和当前优先级**
+3. 读取 `.claude/memory/session-brief.md` 了解宏观进度与记忆读取策略
 4. 按任务类型读取 `.claude/rules`
-5. 按需读取 `.claude/memory` 下其他工程记忆
+5. 中等及以上任务、跨模块任务、阶段规划、重大功能收口时，读取 `.claude/memory/project-progress.md` 与相关工程记忆
 6. 判断是否启用子代理分工
 7. 执行任务
 8. 在关键 hook 阶段完成验证、复盘与沉淀
-9. 重大功能完成后更新 `.claude/memory/project-progress.md`
+9. 大块功能模块完成、阶段性提交、路线变化或重大验收通过后，主动更新 `.claude/memory/project-progress.md`，并同步更新 `.claude/memory/session-brief.md`
 
 ## 设计系统
 

@@ -43,11 +43,13 @@
 
 1. 识别任务作用域、影响路径与模块范围
 2. 读取本 `CLAUDE.md`
-3. 按任务类型读取 `.claude/rules`
-4. 按需读取 `.claude/memory`
-5. 判断是否启用子代理分工
-6. 执行任务
-7. 在关键 hook 阶段完成验证、复盘与沉淀
+3. **读取 `.claude/memory/project-progress.md` 了解项目整体进度和当前优先级**
+4. 按任务类型读取 `.claude/rules`
+5. 按需读取 `.claude/memory` 下其他工程记忆
+6. 判断是否启用子代理分工
+7. 执行任务
+8. 在关键 hook 阶段完成验证、复盘与沉淀
+9. 重大功能完成后更新 `.claude/memory/project-progress.md`
 
 ## 设计系统
 

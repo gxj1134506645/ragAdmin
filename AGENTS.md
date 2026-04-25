@@ -132,7 +132,7 @@
 - `.codex/rules`：任务分类、记忆写入、子代理路由、验证清单等执行细则
 - `.codex/rules/document-lifecycle.md`：文档流转、收口、删除与回写规则
 - `.codex/hooks`：任务开始、任务结束、失败复盘、提交前检查等关键阶段触发约定
-- `.codex/memory`：纠正记录、阶段观察、已学规则、反模式、演化日志等工程记忆
+- `.codex/memory`：纠正记录、阶段观察、已学规则、反模式、演化日志、**项目进度快照**等工程记忆
 - `.codex/agents`：`planner`、`executor`、`verifier` 三个固定角色 agent
 
 ## 记忆协作关系
@@ -153,11 +153,13 @@
 
 1. 识别任务作用域、影响路径与模块范围
 2. 读取本 `AGENTS.md` 中的项目目标、边界和实现约定
-3. 按任务类型读取 `.codex/rules` 下相关规则
-4. 按需读取 `.codex/memory` 下相关工程记忆
-5. 判断是否启用子代理分工
-6. 执行任务
-7. 在关键 hook 阶段完成验证、复盘与沉淀
+3. **读取 `.codex/memory/project-progress.md` 了解项目整体进度和当前优先级**
+4. 按任务类型读取 `.codex/rules` 下相关规则
+5. 按需读取 `.codex/memory` 下其他工程记忆
+6. 判断是否启用子代理分工
+7. 执行任务
+8. 在关键 hook 阶段完成验证、复盘与沉淀
+9. 重大功能完成后更新 `.codex/memory/project-progress.md`
 
 - `.codex/memory` 记录高价值、可复用、可降低重复错误概率的内容，同类问题优先更新原条目
 - `planner` 负责拆解任务与定义边界，`executor` 负责在边界内实施改动，`verifier` 负责验证结果与剩余风险
@@ -182,3 +184,67 @@ Git 规范：
 
 本文件是当前仓库的项目级工作规则文件，用于统一约束项目目标、工程边界和 Agent 协作方式。
 
+
+
+<claude-mem-context>
+# Memory Context
+
+# [ragAdmin] recent context, 2026-04-25 2:18pm GMT+8
+
+Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision
+Format: ID TIME TYPE TITLE
+Fetch details: get_observations([IDs]) | Search: mem-search skill
+
+Stats: 46 obs (19,435t read) | 0t work
+
+### Apr 19, 2026
+101 7:46p 🔵 Spring Boot application startup successful with service integrations
+102 8:06p 🔵 MinerU document parsing service failure investigation
+104 8:07p 🔵 MinerU parsing exception source code identified
+105 " 🔵 Document parsing workflow and error handling flow identified
+107 8:25p 🔵 PDF parsing fails on documents without table of contents
+108 8:26p 🔴 PDF parsing now gracefully falls back to page reader on TOC errors
+111 " 🔴 PDF reader fallback to page mode validated by unit tests
+113 8:29p ✅ Documented PDF reader fallback pattern in project knowledge base
+115 8:37p 🟣 PDF paragraph reader now validates extraction quality before accepting results
+118 8:40p 🔴 PDF reader quality-based fallback validated by test suite
+119 " 🔴 DocumentMetadataFactory now filters null keys and values during metadata enrichment
+120 8:41p 🔴 Test suite enhanced to validate metadata null filtering
+121 " 🔴 Test failure revealed Spring AI Document constructor rejects null metadata values
+122 8:42p 🔴 Test fixed to work around Spring AI Document constructor null validation
+124 " 🔴 Test suite validates DocumentMetadataFactory null filtering with all tests passing
+126 8:56p 🔵 PDF metadata null cause traced to missing TOC in ParagraphPdfDocumentReader
+127 " ⚖️ PDF parsing fallback strategy mandates automatic reader degradation
+128 " 🔴 PDF paragraph extraction quality-based fallback implemented
+130 9:08p 🔵 Document cleaning architecture requires layered policy-based approach
+131 " 🔵 PDF paragraph reading requires automatic fallback to page-level reading
+132 " ⚖️ Document cleaning must use rule-driven selective cleaner execution
+137 9:11p 🟣 PDF header/footer cleaner implementation committed to version control
+### Apr 21, 2026
+295 9:01a ✅ Comprehensive interview preparation document created for 太湖慧云 Java R&D Manager position
+297 9:19a ✅ Mock interview Q&A section added to interview preparation guide
+298 9:23a ✅ Advanced memory architecture and rapid-review sections added to interview prep guide
+299 12:41p 🔵 Interview reveals RAG agent quality metrics and fallback design gaps
+301 12:44p 🔵 Interview reveals RAG agent quality metrics and fallback design gaps
+302 12:45p ✅ Interview prep document restructured to emphasize RAG/Agent quality metrics and fallback design
+305 12:46p ✅ Interview prep document partially restructured with AI-first focus
+307 12:48p ✅ Interview prep document successfully restructured to AI-first priority format
+309 12:50p ✅ Interview prep document restructured with RAG/Agent quality and fallback content
+311 12:51p ✅ Interview prep "High-frequency 20 Questions" completely rewritten for RAG/Agent focus
+312 9:24p 🟣 Elasticsearch container added to docker-compose infrastructure
+313 9:25p 🟣 Kibana visualization layer added to Elasticsearch stack
+315 9:44p 🔵 Elasticsearch and Kibana containers verified operational for ragAdmin
+316 9:52p 🔵 Elasticsearch and Kibana containers verified operational for ragAdmin project
+317 " ✅ Docker Compose documentation added for Elasticsearch and Kibana services
+### Apr 23, 2026
+506 2:44p ✅ Interview preparation document created for Go engineer position
+509 2:47p ✅ Interview preparation document created for cross-border payment company Go engineer position
+511 2:58p ✅ Interview preparation document expanded with resume-based project deep-dive analysis
+513 3:03p ✅ Comprehensive mock interview Q&A section added to Xunlian interview preparation document
+537 4:18p 🔵 Java production Linux troubleshooting workflow and tools
+550 5:26p ✅ Java troubleshooting interview preparation content added
+569 6:38p 🔵 Production RAG and Agent development anti-patterns and best practices
+570 6:39p ✅ Interview preparation document expanded with RAG/Agent production lessons
+### Apr 24, 2026
+644 9:22a 🔵 Document chunking strategy for VLM-based multi-format document processing
+</claude-mem-context>

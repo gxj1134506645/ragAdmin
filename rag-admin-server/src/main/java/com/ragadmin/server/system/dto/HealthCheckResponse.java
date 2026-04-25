@@ -9,7 +9,7 @@ public record HealthCheckResponse(
         DependencyHealthResponse ollama,
         DependencyHealthResponse milvus,
         DependencyHealthResponse tavily,
-        DependencyHealthResponse ocr,
+        DependencyHealthResponse mineru,
         DependencyHealthResponse elasticsearch
 ) {
 }

@@ -12,6 +12,6 @@ export interface HealthCheckResponse {
   ollama: DependencyHealth
   milvus: DependencyHealth
   tavily: DependencyHealth
-  ocr: DependencyHealth
+  mineru: DependencyHealth
   elasticsearch: DependencyHealth
 }

@@ -84,9 +84,9 @@ public class SystemHealthService {
         DependencyHealthResponse milvus = checkMilvus();
         DependencyHealthResponse elasticsearch = checkElasticsearch();
         DependencyHealthResponse tavily = checkTavily();
-        DependencyHealthResponse ocr = checkOcr();
-        String status = isHealthy(postgres, redis, minio, bailian, ollama, milvus, tavily, ocr, elasticsearch) ? "UP" : "DEGRADED";
-        return new HealthCheckResponse(status, postgres, redis, minio, bailian, ollama, milvus, tavily, ocr, elasticsearch);
+        DependencyHealthResponse mineru = checkMineru();
+        String status = isHealthy(postgres, redis, minio, bailian, ollama, milvus, tavily, mineru, elasticsearch) ? "UP" : "DEGRADED";
+        return new HealthCheckResponse(status, postgres, redis, minio, bailian, ollama, milvus, tavily, mineru, elasticsearch);
     }
 
     private DependencyHealthResponse checkPostgres() {
@@ -289,10 +289,10 @@ public class SystemHealthService {
         return new DependencyHealthResponse("DOWN", "Tavily Provider 未就绪");
     }
 
-    private DependencyHealthResponse checkOcr() {
+    private DependencyHealthResponse checkMineru() {
         OcrCapability capability = mineruParseService.describeCapability();
         if (!capability.enabled()) {
-            return new DependencyHealthResponse("UNKNOWN", "OCR 已禁用");
+            return new DependencyHealthResponse("UNKNOWN", "MinerU 已禁用");
         }
         return capability.available()
                 ? new DependencyHealthResponse("UP", capability.message())

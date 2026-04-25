@@ -45,7 +45,7 @@ const DEPENDENCY_KEYS: { key: keyof HealthCheckResponse; label: string }[] = [
   { key: 'ollama', label: 'Ollama' },
   { key: 'milvus', label: 'Milvus' },
   { key: 'tavily', label: 'Tavily' },
-  { key: 'ocr', label: 'OCR' },
+  { key: 'mineru', label: 'MinerU' },
   { key: 'elasticsearch', label: 'Elasticsearch' },
 ]
 

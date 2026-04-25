@@ -173,7 +173,6 @@ onMounted(async () => {
         <span class="stat is-danger"><em>{{ summary.failureCount }}</em>失败</span>
         <span class="stat is-warm"><em>{{ summary.feedbackCount }}</em>反馈</span>
       </div>
-      <el-button size="small" @click="handleRefresh">刷新</el-button>
     </header>
 
     <section class="filter-panel soft-panel">
@@ -204,8 +203,8 @@ onMounted(async () => {
         </div>
         <div class="filter-actions">
           <el-button @click="handleReset">重置</el-button>
-          <el-button @click="handleRefresh">刷新</el-button>
           <el-button type="primary" @click="handleSearch">查询</el-button>
+          <el-button @click="handleRefresh">刷新</el-button>
         </div>
       </div>
     </section>

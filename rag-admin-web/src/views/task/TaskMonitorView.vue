@@ -227,10 +227,6 @@ onUnmounted(() => {
 
 <template>
   <section class="task-page">
-    <header class="task-head">
-      <el-button @click="handleRefresh">刷新任务</el-button>
-    </header>
-
     <section class="filter-panel soft-panel">
       <div class="filter-grid">
         <el-select v-model="query.taskStatus" placeholder="任务状态">
@@ -257,6 +253,7 @@ onUnmounted(() => {
       <div class="filter-actions">
         <el-button @click="handleReset">重置</el-button>
         <el-button type="primary" @click="handleSearch">查询任务</el-button>
+        <el-button @click="handleRefresh">刷新任务</el-button>
       </div>
     </section>
 

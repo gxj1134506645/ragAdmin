@@ -1005,10 +1005,10 @@ onUnmounted(() => {
                 </el-button>
                 <el-button @click="handleResetDocuments">重置</el-button>
                 <el-button type="primary" @click="handleSearchDocuments">查询</el-button>
+                <el-button :loading="documentLoading" @click="handleRetryDocuments">刷新</el-button>
               </div>
             </div>
             <div class="filter-toolbar-right">
-              <el-button :loading="documentLoading" @click="handleRetryDocuments">刷新文档列表</el-button>
               <el-button type="primary" @click="handleOpenUploadDialog">上传文档</el-button>
             </div>
           </div>

@@ -185,7 +185,6 @@ onMounted(async () => {
         <span class="stat"><em>{{ summary.totalVectorCount }}</em>向量总数</span>
         <span class="stat is-warning"><em>{{ summary.issueKnowledgeBaseCount }}</em>待处理</span>
       </div>
-      <el-button size="small" @click="handleRefresh">刷新</el-button>
     </header>
 
     <section class="filter-panel soft-panel">
@@ -214,6 +213,7 @@ onMounted(async () => {
       <div class="filter-actions">
         <el-button @click="handleReset">重置</el-button>
         <el-button type="primary" @click="handleSearch">查询概览</el-button>
+        <el-button @click="handleRefresh">刷新</el-button>
       </div>
     </section>
 

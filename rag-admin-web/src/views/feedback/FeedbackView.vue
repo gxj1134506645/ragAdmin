@@ -105,7 +105,6 @@ onMounted(loadData)
         <span class="stat-sep">|</span>
         <span class="stat-item stat-dislike"><em>{{ summary.dislike }}</em>待改进</span>
       </div>
-      <el-button size="small" @click="handleRefresh" :loading="loading">刷新</el-button>
     </header>
 
     <section class="filter-panel soft-panel">
@@ -127,6 +126,7 @@ onMounted(loadData)
         <div class="filter-actions">
           <el-button @click="handleReset">重置</el-button>
           <el-button type="primary" @click="handleSearch">查询</el-button>
+          <el-button @click="handleRefresh" :loading="loading">刷新</el-button>
         </div>
       </div>
     </section>

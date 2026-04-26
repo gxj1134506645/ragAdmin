@@ -63,7 +63,7 @@
 
 | 功能 | 完成度 | 说明 |
 |------|--------|------|
-| 聊天记忆 — Redis 短期记忆层 | 85% | 三层存储全部实现（PG长期+Redis短期+摘要表），8轮端到端验证通过，服务重启记忆恢复正常，会话隔离正常。待完善：摘要触发阈值生效、刷新日志提升、HikariPool keepalive 配置 |
+| 聊天记忆 — Redis 短期记忆层 | 95% | 三层存储全部实现并端到端验证通过。摘要触发阈值生效、刷新日志提升为 info、HikariPool keepalive 已配置 |
 | 查询改写接入检索管线 | 40% | DB 字段（V15）+ Prompt 模板已有，实际检索管线集成未完成 |
 | 语义分块 + 父子分块 | 20% | DB 列就绪（V16），SemanticChunkStrategy 和 ParentChunkExpansionService 未实现 |
 | Cross-Encoder 重排序 | 10% | LLM 重排序已完成，Cross-Encoder 策略 + Ollama 部署方案未开始 |

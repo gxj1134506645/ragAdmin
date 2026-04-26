@@ -107,6 +107,9 @@ rag:
     max-context-chunks: 5
     max-context-chars: 4000
     reference-snippet-chars: 200
+    query-rewriting:
+      multi-query-count: 3
+      log-max-query-length: 120
   search:
     enabled: true
     default-top-k: 5

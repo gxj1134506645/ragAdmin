@@ -37,7 +37,8 @@
 ### 检索与 RAG
 - [x] 混合检索：语义（Milvus）+ 关键词（ES BM25）+ 混合（RRF 融合）
 - [x] 知识库 CRUD + 状态控制
-- [x] 知识库级检索模式（SEMANTIC_ONLY / KEYWORD_ONLY / HYBRID）
+- [x] 知识库级检索模式（SEMANTIC_ONLY / KEYWORD_ONLY / HYBRID），HYBRID 为默认值
+- [x] 查询改写（Multi-Query 分解 + HyDE 假设文档），由知识库级模式控制
 - [x] LLM 重排序
 - [x] Web 搜索集成（Tavily），支持优雅降级
 - [x] RAG 聊天会话 + SSE 流式响应
@@ -64,7 +65,7 @@
 | 功能 | 完成度 | 说明 |
 |------|--------|------|
 | 聊天记忆 — Redis 短期记忆层 | 95% | 三层存储全部实现并端到端验证通过。摘要触发阈值生效、刷新日志提升为 info、HikariPool keepalive 已配置 |
-| 查询改写接入检索管线 | 40% | DB 字段（V15）+ Prompt 模板已有，实际检索管线集成未完成 |
+| 查询改写接入检索管线 | 95% | 核心能力已激活（Multi-Query + HyDE），全局 flag 门控已移除，混合检索默认 HYBRID。待扩展：查询预处理管道（语义丰富化 + 脏话过滤 + NL→检索语言转化） |
 | 语义分块 + 父子分块 | 20% | DB 列就绪（V16），SemanticChunkStrategy 和 ParentChunkExpansionService 未实现 |
 | Cross-Encoder 重排序 | 10% | LLM 重排序已完成，Cross-Encoder 策略 + Ollama 部署方案未开始 |
 | 统计 Dashboard 扩展 | 30% | 目前只有向量索引概览，缺更全面的指标面板 |

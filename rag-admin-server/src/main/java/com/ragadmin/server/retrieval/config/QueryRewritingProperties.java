@@ -5,17 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "rag.retrieval.query-rewriting")
 public class QueryRewritingProperties {
 
-    private boolean multiQueryEnabled = false;
     private int multiQueryCount = 3;
-    private boolean hydeEnabled = false;
-
-    public boolean isMultiQueryEnabled() {
-        return multiQueryEnabled;
-    }
-
-    public void setMultiQueryEnabled(boolean multiQueryEnabled) {
-        this.multiQueryEnabled = multiQueryEnabled;
-    }
+    private int logMaxQueryLength = 120;
 
     public int getMultiQueryCount() {
         return multiQueryCount;
@@ -25,11 +16,11 @@ public class QueryRewritingProperties {
         this.multiQueryCount = multiQueryCount;
     }
 
-    public boolean isHydeEnabled() {
-        return hydeEnabled;
+    public int getLogMaxQueryLength() {
+        return logMaxQueryLength;
     }
 
-    public void setHydeEnabled(boolean hydeEnabled) {
-        this.hydeEnabled = hydeEnabled;
+    public void setLogMaxQueryLength(int logMaxQueryLength) {
+        this.logMaxQueryLength = logMaxQueryLength;
     }
 }

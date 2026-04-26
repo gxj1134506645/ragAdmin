@@ -8,12 +8,12 @@ public enum RetrievalMode {
 
     public static RetrievalMode resolve(String value) {
         if (value == null || value.isBlank()) {
-            return SEMANTIC_ONLY;
+            return HYBRID;
         }
         try {
             return valueOf(value.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            return SEMANTIC_ONLY;
+            return HYBRID;
         }
     }
 }

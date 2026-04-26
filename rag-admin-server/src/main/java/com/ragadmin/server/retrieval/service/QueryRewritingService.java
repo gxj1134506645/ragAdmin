@@ -55,7 +55,7 @@ public class QueryRewritingService {
 
         var chatModel = modelService.findDefaultChatModelDescriptor();
         if (chatModel == null) {
-            log.debug("无可用聊天模型，跳过查询改写");
+            log.info("无可用聊天模型，跳过查询改写，mode={}", rewritingMode);
             return new RewrittenQueries(List.of(originalQuery));
         }
 
@@ -63,13 +63,11 @@ public class QueryRewritingService {
         queries.add(originalQuery);
 
         try {
-            if ((rewritingMode == QueryRewritingMode.MULTI_QUERY || rewritingMode == QueryRewritingMode.MULTI_QUERY_AND_HYDE)
-                    && properties.isMultiQueryEnabled()) {
+            if (rewritingMode == QueryRewritingMode.MULTI_QUERY || rewritingMode == QueryRewritingMode.MULTI_QUERY_AND_HYDE) {
                 queries.addAll(generateMultiQueries(originalQuery, chatModel.providerCode(), chatModel.modelCode()));
             }
 
-            if ((rewritingMode == QueryRewritingMode.HYDE || rewritingMode == QueryRewritingMode.MULTI_QUERY_AND_HYDE)
-                    && properties.isHydeEnabled()) {
+            if (rewritingMode == QueryRewritingMode.HYDE || rewritingMode == QueryRewritingMode.MULTI_QUERY_AND_HYDE) {
                 String hydeQuery = generateHydeQuery(originalQuery, chatModel.providerCode(), chatModel.modelCode());
                 if (hydeQuery != null && !hydeQuery.isBlank()) {
                     queries.add(hydeQuery);
@@ -78,6 +76,8 @@ public class QueryRewritingService {
         } catch (Exception e) {
             log.warn("查询改写失败，回退到原始查询: {}", e.getMessage());
         }
+
+        log.info("查询改写完成，mode={}, originalLength={}, resultCount={}", rewritingMode, originalQuery.length(), queries.size());
 
         return new RewrittenQueries(queries);
     }
@@ -102,7 +102,7 @@ public class QueryRewritingService {
                 }
             }
 
-            log.debug("Multi-Query 分解: original={}, generated={}", originalQuery, parsed.size());
+            log.info("Multi-Query 分解完成，generated={}, queries={}", parsed.size(), truncateForLog(parsed));
             return parsed;
         } catch (Exception e) {
             log.warn("Multi-Query 生成失败: {}", e.getMessage());
@@ -119,11 +119,18 @@ public class QueryRewritingService {
             );
 
             ChatCompletionResult result = conversationChatClient.chat(providerCode, modelCode, messages);
-            log.debug("HyDE 生成: original={}, length={}", originalQuery, result.content() != null ? result.content().length() : 0);
+            log.info("HyDE 生成完成，length={}", result.content() != null ? result.content().length() : 0);
             return result.content();
         } catch (Exception e) {
             log.warn("HyDE 生成失败: {}", e.getMessage());
             return null;
         }
+    }
+
+    private List<String> truncateForLog(List<String> queries) {
+        int maxLen = properties.getLogMaxQueryLength();
+        return queries.stream()
+                .map(q -> q.length() <= maxLen ? q : q.substring(0, maxLen) + "...")
+                .toList();
     }
 }

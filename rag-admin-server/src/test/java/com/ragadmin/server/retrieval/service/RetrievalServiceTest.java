@@ -114,7 +114,7 @@ class RetrievalServiceTest {
         knowledgeBase.setId(1L);
         knowledgeBase.setEmbeddingModelId(10L);
         knowledgeBase.setRetrieveTopK(3);
-        // SEMANTIC_ONLY (default)
+        knowledgeBase.setRetrievalMode("SEMANTIC_ONLY");
 
         ChunkVectorRefEntity sampleRef = new ChunkVectorRefEntity();
         sampleRef.setCollectionName("kb_1");
@@ -241,18 +241,18 @@ class RetrievalServiceTest {
     }
 
     @Test
-    void shouldDefaultToSemanticOnlyWhenModeIsNull() {
+    void shouldDefaultToHybridWhenModeIsNull() {
         KnowledgeBaseEntity kb = new KnowledgeBaseEntity();
         kb.setId(1L);
         kb.setEmbeddingModelId(10L);
-        // retrievalMode is null => SEMANTIC_ONLY
+        // retrievalMode is null => HYBRID (semantic + keyword + RRF)
 
         when(chunkVectorRefMapper.selectOne(any())).thenReturn(null);
 
         RetrievalService.RetrievalResult result = retrievalService.retrieve(kb, "查询");
 
         assertTrue(result.chunks().isEmpty());
-        verify(keywordRetrievalStrategy, never()).retrieve(any(), anyString(), anyInt());
+        verify(keywordRetrievalStrategy).retrieve(any(), anyString(), anyInt());
     }
 
     @Test

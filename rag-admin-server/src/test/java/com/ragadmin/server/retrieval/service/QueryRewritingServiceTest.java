@@ -14,8 +14,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -35,8 +33,6 @@ class QueryRewritingServiceTest {
 
     private QueryRewritingService queryRewritingService;
 
-    private QueryRewritingProperties properties;
-
     @BeforeEach
     void setUp() {
         queryRewritingService = new QueryRewritingService();
@@ -44,10 +40,8 @@ class QueryRewritingServiceTest {
         ReflectionTestUtils.setField(queryRewritingService, "promptTemplateService", promptTemplateService);
         ReflectionTestUtils.setField(queryRewritingService, "modelService", modelService);
 
-        properties = new QueryRewritingProperties();
-        properties.setMultiQueryEnabled(true);
+        QueryRewritingProperties properties = new QueryRewritingProperties();
         properties.setMultiQueryCount(3);
-        properties.setHydeEnabled(true);
         ReflectionTestUtils.setField(queryRewritingService, "properties", properties);
 
         ReflectionTestUtils.setField(queryRewritingService, "multiQueryPromptResource", new ByteArrayResource("multi-query prompt".getBytes()));
@@ -116,7 +110,7 @@ class QueryRewritingServiceTest {
 
         QueryRewritingService.RewrittenQueries result = queryRewritingService.rewrite("什么是查询改写", "MULTI_QUERY_AND_HYDE");
 
-        assertTrue(result.queries().size() >= 3); // original + 2 multi + 1 hyde
+        assertTrue(result.queries().size() >= 3);
     }
 
     @Test
@@ -141,17 +135,5 @@ class QueryRewritingServiceTest {
 
         assertEquals(1, result.queries().size());
         assertEquals("测试问题", result.queries().getFirst());
-    }
-
-    @Test
-    void shouldSkipMultiQueryWhenDisabled() {
-        properties.setMultiQueryEnabled(false);
-        when(modelService.findDefaultChatModelDescriptor())
-                .thenReturn(new ChatModelDescriptor(1L, "qwen-max", "BAILIAN", "百炼"));
-
-        QueryRewritingService.RewrittenQueries result = queryRewritingService.rewrite("测试问题", "MULTI_QUERY");
-
-        assertEquals(1, result.queries().size());
-        verifyNoInteractions(conversationChatClient);
     }
 }

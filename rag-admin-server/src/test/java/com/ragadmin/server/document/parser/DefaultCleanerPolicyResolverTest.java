@@ -17,7 +17,7 @@ class DefaultCleanerPolicyResolverTest {
     @Test
     void shouldEnableHeaderFooterWhenPdfTextAndSignalsDetected() {
         DocumentEntity document = document("PDF");
-        DocumentSignals signals = new DocumentSignals(true, false, false, false, false, false, false, false, false, 0.0, 0.0, 0.1, 0.05);
+        DocumentSignals signals = new DocumentSignals(true, false, false, false, false, false, false, false, false, false, 0.0, 0.0, 0.1, 0.05);
 
         DocumentCleanPolicy policy = resolver.resolve(new DocumentCleaningRequest(
                 document,
@@ -48,7 +48,7 @@ class DefaultCleanerPolicyResolverTest {
     @Test
     void shouldEnableLineMergeWhenWeakParagraphStructure() {
         DocumentEntity document = document("PDF");
-        DocumentSignals signals = new DocumentSignals(false, false, false, true, false, false, false, false, false, 0.0, 0.0, 0.1, 0.05);
+        DocumentSignals signals = new DocumentSignals(false, false, false, true, false, false, false, false, false, false, 0.0, 0.0, 0.1, 0.05);
 
         DocumentCleanPolicy policy = resolver.resolve(new DocumentCleaningRequest(
                 document,
@@ -72,7 +72,7 @@ class DefaultCleanerPolicyResolverTest {
 
     @Test
     void shouldEnableOcrNoiseWhenOcrModeAndNoiseDetected() {
-        DocumentSignals signals = new DocumentSignals(false, false, false, false, true, false, false, false, false, 0.0, 0.0, 0.1, 0.05);
+        DocumentSignals signals = new DocumentSignals(false, false, false, false, true, false, false, false, false, false, 0.0, 0.0, 0.1, 0.05);
 
         DocumentCleanPolicy policy = resolver.resolve(new DocumentCleaningRequest(
                 document("PDF"),

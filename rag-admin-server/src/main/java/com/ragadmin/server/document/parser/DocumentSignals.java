@@ -10,6 +10,7 @@ public record DocumentSignals(
         boolean tocOutlineMissing,
         boolean markdownTableDetected,
         boolean markdownImageDetected,
+        boolean markdownHeadingDetected,
         double tableRatio,
         double imageRatio,
         double tableRatioThreshold,
@@ -18,7 +19,7 @@ public record DocumentSignals(
 
     public static DocumentSignals empty() {
         return new DocumentSignals(false, false, false, false, false, false, false,
-                false, false, 0.0, 0.0, 0.1, 0.05);
+                false, false, false, 0.0, 0.0, 0.1, 0.05);
     }
 
     public boolean containsTable() {

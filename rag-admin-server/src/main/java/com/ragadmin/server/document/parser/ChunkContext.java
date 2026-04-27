@@ -51,6 +51,10 @@ public record ChunkContext(
         return signals != null && signals.containsImage();
     }
 
+    public boolean hasHeadingStructure() {
+        return signals != null && signals.markdownHeadingDetected();
+    }
+
     public static ChunkContext of(DocumentEntity document, DocumentSignals signals,
                                    ChunkStrategyProperties properties, String parseMode) {
         String contentType = signals != null ? signals.inferContentType() : "TEXT";

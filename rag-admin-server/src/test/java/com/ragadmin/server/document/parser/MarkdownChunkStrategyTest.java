@@ -16,11 +16,13 @@ class MarkdownChunkStrategyTest {
 
     private ChunkContext mdContext(int maxChunkChars, int overlapChars) {
         DocumentEntity doc = new DocumentEntity();
-        doc.setDocType("MD");
-        return ChunkContext.of(doc, DocumentSignals.empty(), new ChunkStrategyProperties(maxChunkChars, overlapChars, 50), "TEXT");
+        doc.setDocType("PDF");
+        DocumentSignals signals = new DocumentSignals(false, false, false, false, false, false, false,
+                false, false, true, 0.0, 0.0, 0.1, 0.05);
+        return ChunkContext.of(doc, signals, new ChunkStrategyProperties(maxChunkChars, overlapChars, 50), "TEXT");
     }
 
-    private ChunkContext nonMdContext() {
+    private ChunkContext noHeadingContext() {
         DocumentEntity doc = new DocumentEntity();
         doc.setDocType("PDF");
         return ChunkContext.of(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "TEXT");
@@ -30,21 +32,13 @@ class MarkdownChunkStrategyTest {
     class Supports {
 
         @Test
-        void shouldMatchMarkdownDocType() {
+        void shouldMatchWhenHeadingStructureDetected() {
             assertTrue(strategy.supports(mdContext(800, 120)));
         }
 
         @Test
-        void shouldMatchMarkdownAltDocType() {
-            DocumentEntity doc = new DocumentEntity();
-            doc.setDocType("MARKDOWN");
-            ChunkContext ctx = ChunkContext.of(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "TEXT");
-            assertTrue(strategy.supports(ctx));
-        }
-
-        @Test
-        void shouldNotMatchPdfDocType() {
-            assertFalse(strategy.supports(nonMdContext()));
+        void shouldNotMatchWhenNoHeadingStructure() {
+            assertFalse(strategy.supports(noHeadingContext()));
         }
     }
 

@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 @Component
-@Order(10)
+@Order(5)
 public class MarkdownChunkStrategy implements DocumentChunkStrategy {
 
     private static final Pattern HEADING_PATTERN = Pattern.compile("^#{1,6}\\s+.+", Pattern.MULTILINE);
@@ -19,7 +19,9 @@ public class MarkdownChunkStrategy implements DocumentChunkStrategy {
 
     @Override
     public boolean supports(ChunkContext context) {
-        return context.isMarkdown();
+        return context.hasHeadingStructure()
+                && !context.contentContainsTable()
+                && !context.contentContainsImage();
     }
 
     @Override

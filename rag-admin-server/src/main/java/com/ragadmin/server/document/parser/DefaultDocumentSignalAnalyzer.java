@@ -58,6 +58,7 @@ public class DefaultDocumentSignalAnalyzer implements DocumentSignalAnalyzer {
                 detectTocOutlineMissing(documents),
                 detectMarkdownTable(documents),
                 detectMarkdownImage(documents),
+                detectMarkdownHeading(documents),
                 computeTableRatio(documents),
                 computeImageRatio(documents),
                 properties.getTableRatioThreshold(),
@@ -290,6 +291,7 @@ public class DefaultDocumentSignalAnalyzer implements DocumentSignalAnalyzer {
     private static final Pattern PIPE_TABLE_ROW = Pattern.compile("^\\|.+\\|$");
     private static final Pattern PIPE_TABLE_SEP = Pattern.compile("^\\|[-:]+[-| :]*\\|$");
     private static final Pattern IMAGE_REF = Pattern.compile("!\\[[^\\]]*\\]\\([^)]+\\)");
+    private static final Pattern MARKDOWN_HEADING = Pattern.compile("^#{1,6}\\s+.+");
 
     boolean detectMarkdownTable(List<Document> documents) {
         for (Document doc : documents) {
@@ -311,6 +313,21 @@ public class DefaultDocumentSignalAnalyzer implements DocumentSignalAnalyzer {
             if (text != null && IMAGE_REF.matcher(text).find()) return true;
         }
         return false;
+    }
+
+    boolean detectMarkdownHeading(List<Document> documents) {
+        int headingCount = 0;
+        for (Document doc : documents) {
+            if (doc == null || !doc.isText()) continue;
+            String text = doc.getText();
+            if (text == null) continue;
+            for (String line : text.split("\\r?\\n")) {
+                if (MARKDOWN_HEADING.matcher(line.trim()).matches()) {
+                    headingCount++;
+                }
+            }
+        }
+        return headingCount >= 2;
     }
 
     double computeTableRatio(List<Document> documents) {

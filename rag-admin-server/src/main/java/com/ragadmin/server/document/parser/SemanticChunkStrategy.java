@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@Order(5)
+@Order(6)
 public class SemanticChunkStrategy implements DocumentChunkStrategy {
 
     private static final Logger log = LoggerFactory.getLogger(SemanticChunkStrategy.class);
@@ -67,12 +67,12 @@ public class SemanticChunkStrategy implements DocumentChunkStrategy {
         try {
             embeddingDesc = resolveEmbeddingDescriptor(context);
             if (embeddingDesc == null) {
-                log.warn("无法解析 embedding 模型，回退到普通分块，kbId={}", context.document().getKbId());
-                return new RecursiveFallbackStrategy().chunk(documents, context);
+                throw new IllegalStateException("无法解析 embedding 模型，kbId=" + context.document().getKbId());
             }
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
-            log.info("Embedding 模型不可用，回退到普通分块: {}", e.getMessage());
-            return new RecursiveFallbackStrategy().chunk(documents, context);
+            throw new IllegalStateException("Embedding 模型不可用: " + e.getMessage(), e);
         }
 
         List<List<Float>> embeddings = computeEmbeddings(childTexts, embeddingDesc);

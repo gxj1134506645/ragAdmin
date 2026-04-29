@@ -1,12 +1,12 @@
 # ragAdmin 项目进度快照
 
-> 最后更新：2026-04-26
+> 最后更新：2026-04-29
 >
 > 本文件是项目完整进度的单一事实源。每次完成重大功能或阶段后更新；新会话默认先读取 `session-brief.md`，中等及以上任务再读取本文件。
 
 ## 总体状态
 
-- **当前阶段**：Phase 1 基本完成，Phase 2 大部分完成，Phase 3 未启动
+- **当前阶段**：Phase 1 完成，Phase 2 大部分完成，Phase 3 未启动
 - **后端**：17 个 Flyway migration，核心管线已跑通
 - **管理前端**（rag-admin-web）：12 个视图模块已实现
 - **聊天前端**（rag-chat-web）：通用聊天 + 知识库聊天已实现
@@ -33,13 +33,20 @@
 - [x] 三端数据同步（PG + Milvus + ES）
 - [x] 图片处理管线（CDN 图片下载转存 MinIO、MinerU ZIP 图片提取上传、URL 重写）
 - [x] 内容感知清洗策略（DocumentSignalAnalyzer 12 种信号驱动清洗策略选择）
+- [x] 内容感知分块（ContentAwareChunkStrategy 两阶段分块 + 代码块感知）
+- [x] 语义分块 + 父子分块（SemanticChunkStrategy + ParentChunkExpansionService）
+- [x] 分块策略 YAML 参数覆写（每策略独立配置，消除 30+ 处硬编码魔法值）
 
 ### 检索与 RAG
 - [x] 混合检索：语义（Milvus）+ 关键词（ES BM25）+ 混合（RRF 融合）
 - [x] 知识库 CRUD + 状态控制
 - [x] 知识库级检索模式（SEMANTIC_ONLY / KEYWORD_ONLY / HYBRID），HYBRID 为默认值
-- [x] 查询改写（Multi-Query 分解 + HyDE 假设文档），由知识库级模式控制
+- [x] 查询改写（Multi-Query 分解 + HyDE 假设文档），由知识库级模式控制，全局 flag 门控已移除
 - [x] LLM 重排序
+- [x] 检索冲突检测（ConflictDetectionService）
+  - 版本冲突自动消解（同文档多版本检测，零模型调用）
+  - LLM NLI 矛盾检测（主体分组 + 两两 contradiction 判断）
+  - Reranking + Chat Prompt 矛盾感知增强
 - [x] Web 搜索集成（Tavily），支持优雅降级
 - [x] RAG 聊天会话 + SSE 流式响应
 - [x] 答案引用与反馈
@@ -65,11 +72,9 @@
 | 功能 | 完成度 | 说明 |
 |------|--------|------|
 | 聊天记忆 — Redis 短期记忆层 | 95% | 三层存储全部实现并端到端验证通过。摘要触发阈值生效、刷新日志提升为 info、HikariPool keepalive 已配置 |
-| 查询改写接入检索管线 | 95% | 核心能力已激活（Multi-Query + HyDE），全局 flag 门控已移除，混合检索默认 HYBRID。待扩展：查询预处理管道（语义丰富化 + 脏话过滤 + NL→检索语言转化） |
-| 语义分块 + 父子分块 | 20% | DB 列就绪（V16），SemanticChunkStrategy 和 ParentChunkExpansionService 未实现 |
-| Cross-Encoder 重排序 | 10% | LLM 重排序已完成，Cross-Encoder 策略 + Ollama 部署方案未开始 |
+| 查询预处理（PII 脱敏 + 内容过滤） | 10% | 架构设计 + 实施计划已完成，代码未开始。详见 `docs/plans/query-preprocess-plan.md` |
+| Cross-Encoder 重排序 | 15% | LLM 重排序已完成，Cross-Encoder rerankViaCrossEncoder 代码框架已有（RerankingService），待对接 Ollama Qwen3-Reranker-0.6B |
 | 统计 Dashboard 扩展 | 30% | 目前只有向量索引概览，缺更全面的指标面板 |
-| 分块策略 YAML 参数覆写 | 60% | 5 种策略代码完成，每策略独立配置覆写机制待实现 |
 
 ---
 
@@ -77,6 +82,7 @@
 
 | 功能 | 设计文档 | 说明 |
 |------|----------|------|
+| 查询预处理完整方案 | `rag-admin-query-rewriting-architecture.md` 第 2 节 | PII 脱敏 + 敏感词过滤 + prompt injection 检测 |
 | 内部 MCP 工具平台 | `rag-admin-internal-mcp-platform-design.md` | 企业工具集成，Streamable-HTTP MCP，无代码 |
 | 多模型路由 / 智能切换 | 架构文档 Phase 2 | 目前只能手动切模型 |
 | 多模态能力 | 架构文档 Phase 3 | OCR/视觉摄入、图片生成等 |
@@ -86,7 +92,7 @@
 
 ## 下一优先级建议
 
-1. 聊天记忆 Redis 短期记忆层（基础设施已就绪，实现成本低，对话连贯性提升大）
-2. 查询改写接入检索管线（Prompt + DB 已有，接入即可用）
-3. 语义分块 + 父子分块（DB 列就绪，检索质量关键提升）
-4. Cross-Encoder 重排序（LLM 重排序已验证，Cross-Encoder 是性能+质量双重提升）
+1. 查询预处理（架构 + 计划已就绪，纯 Java 正则实现，无外部依赖）
+2. Cross-Encoder 重排序（Ollama Qwen3-Reranker-0.6B 已部署，对接即可用）
+3. 聊天记忆 Redis 短期记忆层收口（95%，剩余优化项）
+4. 统计 Dashboard 扩展

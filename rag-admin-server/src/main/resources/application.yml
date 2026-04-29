@@ -117,6 +117,14 @@ rag:
         confidence-threshold: 0.7
       resolution:
         enabled: true
+    query-preprocess:
+      enabled: true
+      pii-mask:
+        enabled: true
+      content-filter:
+        enabled: true
+        block-enabled: false
+        blocked-words: []
     query-rewriting:
       multi-query-count: 3
       log-max-query-length: 120

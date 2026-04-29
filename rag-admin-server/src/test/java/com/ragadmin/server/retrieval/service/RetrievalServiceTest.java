@@ -65,6 +65,12 @@ class RetrievalServiceTest {
     @Mock
     private ParentChunkExpansionService parentChunkExpansionService;
 
+    @Mock
+    private QueryPreprocessService queryPreprocessService;
+
+    @Mock
+    private ConflictDetectionService conflictDetectionService;
+
     private com.ragadmin.server.retrieval.config.RerankingProperties rerankingProperties;
 
     private RetrievalService retrievalService;
@@ -82,6 +88,8 @@ class RetrievalServiceTest {
         ReflectionTestUtils.setField(retrievalService, "queryRewritingService", queryRewritingService);
         ReflectionTestUtils.setField(retrievalService, "rerankingService", rerankingService);
         ReflectionTestUtils.setField(retrievalService, "parentChunkExpansionService", parentChunkExpansionService);
+        ReflectionTestUtils.setField(retrievalService, "queryPreprocessService", queryPreprocessService);
+        ReflectionTestUtils.setField(retrievalService, "conflictDetectionService", conflictDetectionService);
 
         rerankingProperties = new com.ragadmin.server.retrieval.config.RerankingProperties();
         rerankingProperties.setEnabled(false);
@@ -106,6 +114,20 @@ class RetrievalServiceTest {
         // 默认 parent expansion 为 pass-through
         lenient().when(parentChunkExpansionService.expandToParents(any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // 默认 query preprocess 为 pass-through
+        lenient().when(queryPreprocessService.preprocess(anyString()))
+                .thenAnswer(invocation -> {
+                    String query = invocation.getArgument(0);
+                    return new com.ragadmin.server.retrieval.model.PreprocessResult(query, false, false);
+                });
+
+        // 默认 conflict detection 为 pass-through
+        lenient().when(conflictDetectionService.detect(anyString(), any()))
+                .thenAnswer(invocation -> {
+                    java.util.List<com.ragadmin.server.retrieval.service.RetrievalService.RetrievedChunk> chunks = invocation.getArgument(1);
+                    return new com.ragadmin.server.retrieval.model.ConflictDetectionResult(java.util.List.of(), chunks);
+                });
     }
 
     @Test

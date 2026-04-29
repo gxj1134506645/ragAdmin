@@ -68,9 +68,16 @@ public class RetrievalService {
     @Autowired
     private ConflictDetectionService conflictDetectionService;
 
+    @Autowired
+    private QueryPreprocessService queryPreprocessService;
+
     public RetrievalResult retrieve(KnowledgeBaseEntity knowledgeBase, String question) {
+        // Query 预处理：PII 脱敏 + 内容过滤
+        var preprocessResult = queryPreprocessService.preprocess(question);
+        String processedQuestion = preprocessResult.getQuery();
+
         QueryRewritingService.RewrittenQueries rewritten = queryRewritingService.rewrite(
-                question, knowledgeBase.getRetrievalQueryRewritingMode());
+                processedQuestion, knowledgeBase.getRetrievalQueryRewritingMode());
 
         if (rewritten.queries().size() == 1) {
             return retrieveSingleQuery(knowledgeBase, rewritten.queries().getFirst());
